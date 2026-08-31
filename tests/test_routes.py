@@ -436,6 +436,45 @@ def test_ref_set_upload_invalid_role_shows_error(client):
     assert "No images yet" in resp.text
 
 
+def test_ref_upload_rejects_bad_mime_and_oversized_file(client):
+    location = _create_character(client)
+    character_id = location.rsplit("/", 1)[-1]
+    draft = client.post(
+        f"/characters/{character_id}/ref-sets", follow_redirects=False
+    )
+    ref_set_id = draft.headers["location"].rsplit("/", 1)[-1]
+
+    bad_mime = client.post(
+        f"/ref-sets/{ref_set_id}/images",
+        data={"role": "face_front"},
+        files={"image": ("notes.txt", b"not an image", "text/plain")},
+    )
+    assert bad_mime.status_code == 200
+    assert "PNG, JPEG, or WebP" in bad_mime.text
+
+    oversized = client.post(
+        f"/ref-sets/{ref_set_id}/images",
+        data={"role": "face_front"},
+        files={"image": ("huge.png", b"x" * (10 * 1024 * 1024 + 1), "image/png")},
+    )
+    assert oversized.status_code == 200
+    assert "10 MB limit" in oversized.text
+
+    # Declared MIME is not trusted: Pillow-decoded GIF bytes are still rejected.
+    import io
+    from PIL import Image
+
+    gif = io.BytesIO()
+    Image.new("RGB", (2, 2)).save(gif, format="GIF")
+    spoofed = client.post(
+        f"/ref-sets/{ref_set_id}/images",
+        data={"role": "face_front"},
+        files={"image": ("fake.png", gif.getvalue(), "image/png")},
+    )
+    assert spoofed.status_code == 200
+    assert "decoded image format GIF is not allowed" in spoofed.text
+
+
 def test_ref_set_remove_and_rerole_via_route(client):
     location = _create_character(client)
     character_id = location.rsplit("/", 1)[-1]

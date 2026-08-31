@@ -32,6 +32,22 @@ class GenerationOutcome:
     warnings: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class GenerationPreview:
+    scene_id: int
+    model: str
+    image_size: str
+    prompt: str
+    prompt_hash: str
+    attachments: tuple[dict, ...]
+    warnings: tuple[str, ...]
+    estimated_cost_cents: int
+    spent_today_cents: int
+    remaining_after_cents: int
+    provider_request: ProviderRequest
+    request_capture: dict
+
+
 _FORMAT_MIME = {
     "PNG": "image/png",
     "JPEG": "image/jpeg",
@@ -48,21 +64,21 @@ class GenerationService:
         conn: sqlite3.Connection,
         storage: ImageStorage,
         settings: Settings,
-        provider: ImageProvider,
+        provider: ImageProvider | None,
     ) -> None:
         self.conn = conn
         self.storage = storage
         self.settings = settings
         self.provider = provider
 
-    def generate(
+    def preview(
         self,
         scene_id: int,
         *,
         model: str | None = None,
         image_size: str | None = None,
-        parent_generation_id: int | None = None,
-    ) -> GenerationOutcome:
+    ) -> GenerationPreview:
+        """Run the exact no-spend preflight used by generate()."""
         selected_model = model or self.settings.default_model
         selected_size = image_size or self.settings.default_image_size
         scene_row = self.conn.execute(
@@ -161,17 +177,55 @@ class GenerationService:
             "store": False,
         }
         ledger = CostLedger(self.conn, self.settings)
-        generation_id, estimate = ledger.reserve(
+        estimate = ledger.estimate(selected_model, selected_size)
+        spent = ledger.spent_today()
+        remaining = self.settings.daily_spend_cap_cents - spent - estimate
+        if remaining < 0:
+            from app.services.costs import BudgetExceededError
+
+            raise BudgetExceededError(
+                f"daily budget would be exceeded: {spent} cents spent/reserved, "
+                f"{estimate} cents requested, "
+                f"{self.settings.daily_spend_cap_cents} cents allowed"
+            )
+        return GenerationPreview(
             scene_id=scene_id,
             model=selected_model,
             image_size=selected_size,
+            prompt=assembled.text,
             prompt_hash=assembled.prompt_hash,
-            request_json=request_capture,
+            attachments=tuple(attachment_capture),
+            warnings=assembled.warnings,
+            estimated_cost_cents=estimate,
+            spent_today_cents=spent,
+            remaining_after_cents=remaining,
+            provider_request=request,
+            request_capture=request_capture,
+        )
+
+    def generate(
+        self,
+        scene_id: int,
+        *,
+        model: str | None = None,
+        image_size: str | None = None,
+        parent_generation_id: int | None = None,
+    ) -> GenerationOutcome:
+        if self.provider is None:
+            raise GenerationError("generation provider is not configured")
+        preview = self.preview(scene_id, model=model, image_size=image_size)
+        ledger = CostLedger(self.conn, self.settings)
+        generation_id, estimate = ledger.reserve(
+            scene_id=scene_id,
+            model=preview.model,
+            image_size=preview.image_size,
+            prompt_hash=preview.prompt_hash,
+            request_json=preview.request_capture,
             parent_generation_id=parent_generation_id,
         )
 
         try:
-            result = self.provider.generate(request)
+            result = self.provider.generate(preview.provider_request)
             stored = self.storage.store(
                 result.image_bytes, source_name=f"generation-{generation_id}.png"
             )
@@ -179,16 +233,16 @@ class GenerationService:
                 "schema_version": 1,
                 "generation_id": generation_id,
                 "scene_id": scene_id,
-                "cast": request_capture["cast"],
-                "model": selected_model,
+                "cast": preview.request_capture["cast"],
+                "model": preview.model,
                 "params": {
-                    "image_size": selected_size,
-                    "aspect_ratio": scene_row["aspect_ratio"],
+                    "image_size": preview.image_size,
+                    "aspect_ratio": preview.provider_request.aspect_ratio,
                 },
-                "assembled_prompt": assembled.text,
-                "input_images": attachment_capture,
-                "slot_allocation": attachment_capture,
-                "prompt_hash": assembled.prompt_hash,
+                "assembled_prompt": preview.prompt,
+                "input_images": list(preview.attachments),
+                "slot_allocation": list(preview.attachments),
+                "prompt_hash": preview.prompt_hash,
                 "interaction_id": result.interaction_id,
                 "cost_cents": result.billed_cost_cents or estimate,
                 "price_table_version": self.settings.price_table_version,
@@ -210,9 +264,9 @@ class GenerationService:
             generation_id,
             candidate_id,
             stored.sha256,
-            assembled.prompt_hash,
+            preview.prompt_hash,
             result.billed_cost_cents or estimate,
-            assembled.warnings,
+            preview.warnings,
         )
 
     def _load_cast(self, cast_json: str) -> tuple[CastInput, ...]:

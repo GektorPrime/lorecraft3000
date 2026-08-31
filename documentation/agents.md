@@ -241,6 +241,15 @@ tagging, canonical ref-set versioning, the prompt assembler, generation with ful
 request/response capture, cost ledger with a hard daily cap. No verification yet — this
 alone is most of the value.
 
+**Phase 1 result — COMPLETE (2026-08-31).** The local FastAPI/HTMX application now covers
+the full multi-character vertical path: character/style CRUD, immutable canonical ref-set
+versioning, ordered panel casts, deterministic slot budgeting, exact no-spend prompt/cost
+preview, Gemini behind a provider adapter, a hard $3/day reservation ledger, content-addressed
+outputs with complete provenance, and manual accept/reject review. Five-character panels are
+supported through Pro; over-capacity Flash requests fail before spend with Pro/split guidance.
+The default test suite uses a fake provider and never calls the network; the paid adapter smoke
+test is separately marked and skipped unless explicitly enabled.
+
 **Phase 2 — best-of-N and ranking (~1 week).** N candidates per scene, Tier 1 + Tier 2,
 sorted review queue, per-character calibration sets and threshold picker. Tier 3 behind a
 button, off by default.

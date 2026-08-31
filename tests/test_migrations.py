@@ -78,7 +78,7 @@ def test_generation_core_columns_are_migrated(conn):
         row["name"]
         for row in conn.execute("PRAGMA table_info(candidate)").fetchall()
     }
-    assert "style_id" in scene_columns
+    assert {"style_id", "model", "image_size"} <= scene_columns
     assert {
         "price_table_version", "response_json", "error_text", "completed_at"
     } <= generation_columns

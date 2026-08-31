@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Settings
 from app.db import connect
+from app.providers.gemini import GeminiProvider
 from app.storage import ImageStorage
 
 # Single Settings instance for the whole app (env/.env loaded in app.config).
@@ -34,3 +35,8 @@ def get_conn():
 def get_storage() -> ImageStorage:
     """Return the content-addressed image store rooted at settings.store_root."""
     return ImageStorage(settings.store_root)
+
+
+def get_provider():
+    """Construct the real provider only for an explicit generation request."""
+    return GeminiProvider()

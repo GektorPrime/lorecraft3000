@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "description": "Frozen scene prompts for comparing prompt/model/reference changes. Character IDs are bound by the benchmark runner later.",
+  "scenes": [
+    {"id": "fireplace_map", "beat": "Two characters compare a map beside a fireplace", "camera": "eye level", "framing": "medium two-shot", "mood": "tense"},
+    {"id": "rainy_platform", "beat": "Three characters wait beneath a station canopy in rain", "camera": "low angle", "framing": "wide", "mood": "foreboding"},
+    {"id": "library_argument", "beat": "Two characters argue quietly between tall library shelves", "camera": "eye level", "framing": "medium", "mood": "restrained anger"},
+    {"id": "carriage_arrival", "beat": "A character steps from a carriage as two others watch", "camera": "three-quarter", "framing": "wide", "mood": "expectant"},
+    {"id": "portrait_sitting", "beat": "A character sits formally for a painted portrait", "camera": "eye level", "framing": "waist-up", "mood": "composed"},
+    {"id": "laboratory_discovery", "beat": "Four characters gather around an unfamiliar mechanism", "camera": "high angle", "framing": "group medium", "mood": "astonished"},
+    {"id": "foggy_bridge", "beat": "Two characters confront each other on a fog-bound bridge", "camera": "profile", "framing": "wide two-shot", "mood": "dangerous"},
+    {"id": "dinner_secret", "beat": "Five characters react as a sealed letter is opened at dinner", "camera": "eye level", "framing": "wide group", "mood": "shocked"},
+    {"id": "garden_confession", "beat": "Two characters speak privately beside winter roses", "camera": "three-quarter", "framing": "medium two-shot", "mood": "vulnerable"},
+    {"id": "courtroom_testimony", "beat": "One character testifies while three others observe", "camera": "low angle", "framing": "wide", "mood": "severe"},
+    {"id": "workshop_bargain", "beat": "Three characters negotiate over a clockwork device", "camera": "eye level", "framing": "medium group", "mood": "wary"},
+    {"id": "alley_pursuit", "beat": "Two characters run through a gaslit alley", "camera": "rear three-quarter", "framing": "full body", "mood": "urgent"},
+    {"id": "sickroom_vigil", "beat": "Three characters keep vigil around a bedside", "camera": "eye level", "framing": "medium group", "mood": "somber"},
+    {"id": "opera_balcony", "beat": "Two characters exchange a glance across an opera balcony", "camera": "long lens", "framing": "wide", "mood": "secretive"},
+    {"id": "dockside_departure", "beat": "Four characters say farewell beside a steamship", "camera": "low angle", "framing": "wide group", "mood": "bittersweet"},
+    {"id": "newspaper_office", "beat": "Three characters crowd around a freshly printed headline", "camera": "high angle", "framing": "medium group", "mood": "alarmed"},
+    {"id": "church_crypt", "beat": "Two characters discover an opened stone vault", "camera": "over shoulder", "framing": "medium", "mood": "dread"},
+    {"id": "snowbound_inn", "beat": "Five strangers face one another in a snowbound inn", "camera": "eye level", "framing": "wide group", "mood": "suspicious"},
+    {"id": "factory_overlook", "beat": "Three characters survey a vast factory floor", "camera": "rear three-quarter", "framing": "wide", "mood": "uneasy"},
+    {"id": "sunrise_reconciliation", "beat": "Two characters reconcile on a hill at sunrise", "camera": "eye level", "framing": "full-body two-shot", "mood": "hopeful"}
+  ]
+}

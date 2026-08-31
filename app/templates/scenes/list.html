@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Panels — LoreCraft3000{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><h1>Panels</h1><p class="muted">One panel is one generated comic frame.</p></div>
+  <a class="button" href="/scenes/new">New panel</a>
+</div>
+
+<div class="budget-meter">
+  <strong>Today:</strong> ${{ '%.2f' | format(spent_cents / 100) }} of
+  ${{ '%.2f' | format(cap_cents / 100) }} reserved or spent
+</div>
+
+{% if scenes %}
+<div class="card-grid">
+  {% for scene in scenes %}
+  <article class="card">
+    <p class="eyebrow">Panel {{ scene.id }} · {{ scene.aspect_ratio }}</p>
+    <h2>{{ scene.beat_text }}</h2>
+    <p>{{ scene.cast | length }} character{% if scene.cast | length != 1 %}s{% endif %}
+      · {{ scene.model }} · {{ scene.image_size }}</p>
+    <a href="/scenes/{{ scene.id }}/preview">Preview and generate</a>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">No panels yet.</p>
+{% endif %}
+{% endblock %}

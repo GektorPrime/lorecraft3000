@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Panel {{ scene.id }} preview — LoreCraft3000{% endblock %}
+{% block content %}
+<p><a href="/scenes">&larr; Panels</a></p>
+<p class="eyebrow">Panel {{ scene.id }} · no-spend preview</p>
+<h1>{{ scene.beat_text }}</h1>
+
+{% if notice %}<div class="warning"><strong>Last attempt failed.</strong> {{ notice }} You can review the unchanged preview and retry.</div>{% endif %}
+{% if error %}
+<div class="error"><strong>Generation blocked.</strong> {{ error }}</div>
+<p class="hint">No provider request was made and no cost was reserved.</p>
+{% elif preview %}
+  {% for warning in preview.warnings %}<div class="warning">{{ warning }}</div>{% endfor %}
+  <div class="preview-summary">
+    <div><span>Estimated call</span><strong>${{ '%.2f' | format(preview.estimated_cost_cents / 100) }}</strong></div>
+    <div><span>Spent / reserved today</span><strong>${{ '%.2f' | format(preview.spent_today_cents / 100) }}</strong></div>
+    <div><span>Remaining after call</span><strong>${{ '%.2f' | format(preview.remaining_after_cents / 100) }}</strong></div>
+  </div>
+
+  <h2>Reference-slot allocation</h2>
+  <table><thead><tr><th>Image</th><th>Character</th><th>Ref-set</th><th>Role</th><th>Hash</th></tr></thead>
+  <tbody>{% for item in preview.attachments %}<tr>
+    <td>{{ item.image_number }}</td><td>{{ item.character_name }}</td>
+    <td>v{{ item.ref_set_version }}</td><td>{{ item.role }}</td>
+    <td><code>{{ item.sha256[:12] }}</code></td>
+  </tr>{% endfor %}</tbody></table>
+
+  <h2>Exact prompt</h2>
+  <pre class="prompt-preview">{{ preview.prompt }}</pre>
+  <form method="post" action="/scenes/{{ scene.id }}/generate">
+    <button class="generate-button" type="submit">Generate one candidate · ${{ '%.2f' | format(preview.estimated_cost_cents / 100) }}</button>
+  </form>
+{% endif %}
+
+{% if generations %}
+<h2>Attempts</h2>
+<table><thead><tr><th>ID</th><th>State</th><th>Model</th><th>Cost</th><th></th></tr></thead>
+<tbody>{% for generation in generations %}<tr>
+  <td>{{ generation.id }}</td><td><span class="badge">{{ generation.state }}</span></td>
+  <td>{{ generation.model }}</td><td>${{ '%.2f' | format(generation.cost_usd_cents / 100) }}</td>
+  <td><a href="/generations/{{ generation.id }}">Details</a></td>
+</tr>{% endfor %}</tbody></table>
+{% endif %}
+{% endblock %}

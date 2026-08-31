@@ -56,7 +56,13 @@ class ImageStorage:
     def __init__(self, root: Path | str) -> None:
         self.root = Path(root)
 
-    def store(self, data: bytes, *, source_name: str | None = None) -> StoredImage:
+    def store(
+        self,
+        data: bytes,
+        *,
+        source_name: str | None = None,
+        allowed_formats: set[str] | None = None,
+    ) -> StoredImage:
         """Verify, hash, and store image bytes. Returns metadata.
 
         Raises ImageStorageError if the bytes are not a decodable image.
@@ -72,6 +78,11 @@ class ImageStorage:
             raise ImageStorageError(f"not a decodable image: {exc}") from exc
 
         fmt = (img.format or "PNG").upper()
+        if allowed_formats is not None and fmt not in allowed_formats:
+            allowed = ", ".join(sorted(allowed_formats))
+            raise ImageStorageError(
+                f"decoded image format {fmt} is not allowed; use {allowed}"
+            )
         ext = _FORMAT_EXT.get(fmt)
         if ext is None:
             raise ImageStorageError(f"unsupported image format: {fmt}")

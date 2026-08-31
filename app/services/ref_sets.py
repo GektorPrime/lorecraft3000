@@ -191,7 +191,11 @@ class RefSetService:
         self._require_draft(ref_set_id)
         self._validate_role(role)
         try:
-            meta = self.storage.store(data, source_name=source_name)
+            meta = self.storage.store(
+                data,
+                source_name=source_name,
+                allowed_formats={"PNG", "JPEG", "WEBP"},
+            )
         except ImageStorageError as exc:
             raise ImageRejectedError(f"image rejected: {exc}") from exc
         cur = self.conn.execute(
