@@ -10,6 +10,10 @@ out/
 # Local project documentation and agent state
 documentation/
 
+# Local reference inputs; keep only the directory placeholder in Git
+refs/*
+!refs/.gitkeep
+
 # Content-addressed image store
 store/
 
