@@ -1,0 +1,15 @@
+# Secrets — never commit
+.env
+
+# Virtual environment
+.venv/
+
+# Generated output
+out/
+
+# OS metadata
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]

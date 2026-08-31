@@ -1,0 +1,14 @@
+[project]
+name = "lorecraft3000"
+version = "0.1.0"
+description = "Phase 0 spike: character-consistency reference validation (validate_refs.py)."
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=2.20.0",
+    "pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.uv]
+# Script-based project: uv sync installs dependencies only, no package build.
+package = false
