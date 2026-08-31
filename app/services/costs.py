@@ -133,16 +133,20 @@ class CostLedger:
             )
         return int(cursor.lastrowid)
 
-    def fail(self, generation_id: int, error: str) -> None:
-        """Keep the conservative reservation because a sent call may be billed."""
+    def fail(
+        self, generation_id: int, error: str, *, charge_expected: bool = True
+    ) -> None:
+        """Reconcile a failure, retaining cost unless it is known non-billable."""
         with self.conn:
             updated = self.conn.execute(
                 """
                 UPDATE generation
-                   SET state = 'failed', error_text = ?, completed_at = datetime('now')
+                   SET state = 'failed', error_text = ?,
+                       cost_usd_cents = CASE WHEN ? THEN cost_usd_cents ELSE 0 END,
+                       completed_at = datetime('now')
                  WHERE id = ? AND state = 'pending'
                 """,
-                (error, generation_id),
+                (error, charge_expected, generation_id),
             )
             if updated.rowcount != 1:
                 raise CostError(
