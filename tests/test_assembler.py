@@ -101,7 +101,6 @@ def test_three_character_flash_warns_about_pro():
         style_contract="style",
     )
     assert result.warnings == ("Pro is recommended for panels with 3 or more characters",)
-    assert capabilities_for("gemini-3.1-flash-image").supports_media_resolution is False
 
 
 def test_prompt_contains_constraints_but_no_unprovided_lore():

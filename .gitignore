@@ -26,3 +26,12 @@ data/
 # Python
 __pycache__/
 *.py[cod]
+
+# Frontend — installed packages and the production build.
+# `npm run build` regenerates frontend/dist; app/main.py serves
+# it when present but it is never checked into version control.
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
