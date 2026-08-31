@@ -18,14 +18,13 @@ from app.domain.generation import (
 class ModelCapabilities:
     model: str
     max_character_references: int
-    supports_media_resolution: bool
 
 
 MODEL_CAPABILITIES = {
     "gemini-3.1-flash-image": ModelCapabilities(
-        "gemini-3.1-flash-image", 4, False
+        "gemini-3.1-flash-image", 4
     ),
-    "gemini-3-pro-image": ModelCapabilities("gemini-3-pro-image", 5, True),
+    "gemini-3-pro-image": ModelCapabilities("gemini-3-pro-image", 5),
 }
 
 

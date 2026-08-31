@@ -1,0 +1,58 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, getCharacter, listCharacters } from './client'
+
+const originalFetch = globalThis.fetch
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+describe('api client', () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn()
+  })
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    vi.restoreAllMocks()
+  })
+
+  it('requests the correct relative /api/v1 URL', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse([]))
+    await listCharacters()
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/v1/characters',
+      expect.objectContaining({ headers: expect.objectContaining({ 'Content-Type': 'application/json' }) }),
+    )
+  })
+
+  it('returns parsed JSON on success', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      jsonResponse({ id: 1, name: 'Elias', avatar_url: null, avatar_initials: 'EL' }),
+    )
+    const character = await getCharacter(1)
+    expect(character.name).toBe('Elias')
+  })
+
+  it('throws an ApiError with message/type from the backend error envelope', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(async () =>
+      jsonResponse(
+        { detail: { message: 'character 9999 not found', type: 'CharacterNotFoundError' } },
+        404,
+      ),
+    )
+    let caught: unknown
+    try {
+      await getCharacter(9999)
+    } catch (err) {
+      caught = err
+    }
+    expect(caught).toBeInstanceOf(ApiError)
+    expect(caught).toMatchObject({
+      message: 'character 9999 not found',
+      type: 'CharacterNotFoundError',
+    })
+  })
+})

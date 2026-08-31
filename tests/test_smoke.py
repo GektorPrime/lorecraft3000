@@ -4,15 +4,24 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app.main import app, settings
+from app.main import FRONTEND_DIST_DIR, app, settings
 
 
 def test_home_route_responds():
+    """"/" always responds; its content depends on whether the React frontend
+    has been built (frontend/dist/, see app/main.py + README "Frontend"
+    section). Both branches are exercised so this test is correct whether or
+    not `npm run build` has been run locally."""
     client = TestClient(app)
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "LoreCraft3000" in resp.text
-    assert 'href="/scenes/new"' in resp.text
+    if (FRONTEND_DIST_DIR / "index.html").is_file():
+        # Primary UI: the built React app's shell.
+        assert '<div id="root">' in resp.text
+    else:
+        # Fallback: the legacy server-rendered landing page.
+        assert "LoreCraft3000" in resp.text
+        assert 'href="/scenes/new"' in resp.text
 
 
 def test_health_route():

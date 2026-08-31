@@ -32,14 +32,15 @@ def _request(model):
     )
 
 
-def test_flash_omits_resolution_and_pro_uses_high():
+@pytest.mark.parametrize(
+    "model", ("gemini-3.1-flash-image", "gemini-3-pro-image")
+)
+def test_image_models_omit_unsupported_media_resolution(model):
     interactions = _Interactions()
     provider = GeminiProvider(SimpleNamespace(interactions=interactions))
-    provider.generate(_request("gemini-3.1-flash-image"))
+    provider.generate(_request(model))
     assert "resolution" not in interactions.kwargs["input"][1]
     assert "labels" not in interactions.kwargs
-    provider.generate(_request("gemini-3-pro-image"))
-    assert interactions.kwargs["input"][1]["resolution"] == "high"
 
 
 def test_sanitized_request_has_hash_but_no_bytes_or_key():
@@ -66,4 +67,18 @@ def test_consumer_api_400_is_marked_non_billable():
     provider = GeminiProvider(SimpleNamespace(interactions=RejectedInteractions()))
     with pytest.raises(GeminiProviderError) as excinfo:
         provider.generate(_request("gemini-3.1-flash-image"))
+    assert excinfo.value.charge_expected is False
+
+
+def test_high_demand_500_is_marked_non_billable():
+    class BusyInteractions:
+        def create(self, **kwargs):
+            raise RuntimeError(
+                "Error code: 500 - gemini-3-pro-image is currently experiencing "
+                "high demand. Please try again later."
+            )
+
+    provider = GeminiProvider(SimpleNamespace(interactions=BusyInteractions()))
+    with pytest.raises(GeminiProviderError) as excinfo:
+        provider.generate(_request("gemini-3-pro-image"))
     assert excinfo.value.charge_expected is False

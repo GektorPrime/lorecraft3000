@@ -18,6 +18,8 @@ MIGRATIONS: list[str] = [
     "app.migrations.002_default_style",
     "app.migrations.003_generation_core",
     "app.migrations.004_scene_generation_settings",
+    "app.migrations.005_repair_canonical_trigger",
+    "app.migrations.006_reconcile_high_demand_failures",
 ]
 
 
