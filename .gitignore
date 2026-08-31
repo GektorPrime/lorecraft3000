@@ -7,6 +7,9 @@
 # Generated output
 out/
 
+# Local project documentation and agent state
+documentation/
+
 # Content-addressed image store
 store/
 
