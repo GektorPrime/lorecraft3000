@@ -35,29 +35,29 @@ except ImportError:
 
 MODEL       = "gemini-3.1-flash-image"
 IMAGE_SIZE  = "1K"            # "512" | "1K" | "2K" | "4K"
-ASPECT      = "3:2"           # comic panel, not square
+ASPECT      = "3:2"           # 3:2 landscape, not square
 REF_DIR     = Path("refs")
 OUT_ROOT    = Path("out")
 RUNS_PER_ARM = 2              # repeats per scene per arm
 MAX_IMAGES   = 20             # hard stop. refuses to run past this.
 COST_PER_IMAGE = {"512": 0.045, "1K": 0.067, "2K": 0.101, "4K": 0.151}
 
-CHARACTER = "ELIAS"
+CHARACTER = "the subject"
 
 # Discriminative traits only. No "brown hair, blue eyes" - that describes
 # ten million people and competes with the reference images.
 VISUAL_CONTRACT = (
-    "ELIAS: late 40s, gaunt, deep vertical scar through the left eyebrow, "
-    "heavy-lidded asymmetric eyes, greying stubble, permanently creased brow, "
-    "worn olive field jacket with the collar always turned up."
+    "the subject: an older Victorian man, narrow serious face, deep-set eyes, "
+    "prominent nose, long full beard dark at the sides with a strong grey/white "
+    "centre, receding dark hair combed back, lean build."
 )
 
-STYLE = "graphic novel ink and wash, heavy blacks, limited muted palette"
+STYLE = "Victorian-era oil painting, warm dark palette, soft candlelit light, visible brushwork"
 
 SCENES = [
-    "standing at the end of a rain-slicked pier at dusk, looking back over one shoulder",
-    "seated alone in a diner booth under fluorescent light, hands flat on the table",
-    "walking away down a narrow alley, seen from behind at three-quarter angle",
+    "standing beside a fireplace in a dim Victorian study, turned at a three-quarter angle with the face clearly visible",
+    "seated in a wingback chair facing the viewer, hands resting on the armrests",
+    "walking away down a lamplit Victorian street at dusk, seen from behind at a three-quarter angle, head turned slightly so part of the profile is visible",
 ]
 
 # ---------------------------------------------------------------- helpers
@@ -81,21 +81,44 @@ def image_part(path: Path):
         "type": "image",
         "data": base64.b64encode(path.read_bytes()).decode(),
         "mime_type": mime,
-        "resolution": "high",     # read the reference in detail
+        # NOTE: per-image resolution is omitted on purpose. gemini-3.1-flash-image
+        # rejects a "resolution" field server-side with HTTP 400, so refs are sent
+        # at the model's default detail.
     }
+
+
+# Per-image subject notes for arm A. The reference paintings are not all simple
+# single-subject portraits: images 2 and 3 contain distractor people, so the
+# intended subject must be named per image instead of a generic "Image 1-3".
+REF_NOTES = [
+    "Image 1: the older Victorian man seated by the fireplace - long full beard dark at the sides with a strong grey/white centre, receding dark hair combed back, narrow serious face, deep-set eyes, prominent nose.",
+    "Image 2: the CENTRAL seated bearded man wearing a flat cap and handling a long gun. Other people and dogs appear in this painting - ignore them.",
+    "Image 3: the FOREGROUND bearded man looking toward the viewer. A partial man appears at the right edge - ignore him.",
+]
+
+
+def ref_declaration(n: int) -> str:
+    notes = []
+    for i in range(n):
+        if i < len(REF_NOTES):
+            notes.append(REF_NOTES[i])
+        else:
+            notes.append(f"Image {i+1}: the same bearded Victorian man; ignore any other people in the painting.")
+    return "\n".join(notes)
 
 
 def build_input(scene: str, refs, use_refs: bool):
     """Arm A attaches references and names them. Arm B is text only."""
     if use_refs:
-        labels = ", ".join(f"Image {i+1}" for i in range(len(refs)))
         text = (
-            f"{labels} are reference photographs of the same character, {CHARACTER}. "
-            f"Match this character's face and build exactly.\n\n"
+            "The attached images are reference paintings, not photographs, and are "
+            f"intended to depict the same character: {CHARACTER}. Match that same "
+            "man's face, hairline, beard pattern, and build exactly.\n\n"
+            f"{ref_declaration(len(refs))}\n\n"
             f"{VISUAL_CONTRACT}\n\n"
             f"Scene: {CHARACTER} {scene}.\n"
             f"Style: {STYLE}.\n"
-            f"Single figure. No text, no speech bubbles, no captions, no watermark."
+            f"Exactly one person (single figure). No text, no captions, no speech bubbles, no watermark."
         )
         return [{"type": "text", "text": text}] + [image_part(p) for p in refs]
 
@@ -103,7 +126,7 @@ def build_input(scene: str, refs, use_refs: bool):
         f"{VISUAL_CONTRACT}\n\n"
         f"Scene: {CHARACTER} {scene}.\n"
         f"Style: {STYLE}.\n"
-        f"Single figure. No text, no speech bubbles, no captions, no watermark."
+        f"Exactly one person (single figure). No text, no captions, no speech bubbles, no watermark."
     )
     return [{"type": "text", "text": text}]
 
