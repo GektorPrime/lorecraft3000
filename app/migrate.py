@@ -15,6 +15,7 @@ from app.db import connect
 # Ordered list of migration modules. Each module must expose `upgrade(conn)`.
 MIGRATIONS: list[str] = [
     "app.migrations.001_initial",
+    "app.migrations.002_default_style",
 ]
 
 
