@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import base64
+import re
 
 from app.assembler.core import capabilities_for
 from app.providers.base import ProviderRequest, ProviderResult
 
 
 class GeminiProviderError(Exception):
-    pass
+    def __init__(self, message: str, *, charge_expected: bool = True) -> None:
+        super().__init__(message)
+        self.charge_expected = charge_expected
 
 
 class GeminiProvider:
@@ -44,7 +47,6 @@ class GeminiProvider:
                 "image_size": request.image_size,
             },
             "store": False,
-            "labels": request.labels,
         }
 
     @staticmethod
@@ -62,7 +64,6 @@ class GeminiProvider:
             ],
             "aspect_ratio": request.aspect_ratio,
             "image_size": request.image_size,
-            "labels": request.labels,
             "store": False,
         }
 
@@ -83,4 +84,14 @@ class GeminiProvider:
         except GeminiProviderError:
             raise
         except Exception as exc:
-            raise GeminiProviderError(f"Gemini generation failed: {exc}") from exc
+            status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+            if status is None:
+                match = re.search(r"(?:Error code|code)[:=]\s*(\d{3})", str(exc))
+                status = int(match.group(1)) if match else None
+            charge_expected = not (
+                isinstance(status, int) and 400 <= status < 500
+            )
+            raise GeminiProviderError(
+                f"Gemini generation failed: {exc}",
+                charge_expected=charge_expected,
+            ) from exc

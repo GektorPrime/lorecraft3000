@@ -115,6 +115,24 @@ def test_failed_call_stays_in_conservative_spend_total(conn, tmp_path):
     assert ledger.spent_today() == 7
 
 
+def test_known_non_billable_failure_releases_reservation(conn, tmp_path):
+    ledger = CostLedger(conn, _settings(tmp_path))
+    generation_id, _ = ledger.reserve(
+        scene_id=_scene(conn),
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+    )
+    ledger.fail(generation_id, "HTTP 400", charge_expected=False)
+    row = conn.execute(
+        "SELECT state, cost_usd_cents FROM generation WHERE id = ?",
+        (generation_id,),
+    ).fetchone()
+    assert tuple(row) == ("failed", 0)
+    assert ledger.spent_today() == 0
+
+
 def test_unverified_price_is_rejected(conn, tmp_path):
     ledger = CostLedger(conn, _settings(tmp_path))
     with pytest.raises(UnknownPriceError):

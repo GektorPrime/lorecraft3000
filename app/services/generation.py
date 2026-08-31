@@ -257,7 +257,11 @@ class GenerationService:
                 actual_cost_cents=result.billed_cost_cents,
             )
         except Exception as exc:
-            ledger.fail(generation_id, str(exc))
+            ledger.fail(
+                generation_id,
+                str(exc),
+                charge_expected=getattr(exc, "charge_expected", True),
+            )
             raise GenerationError(f"generation {generation_id} failed: {exc}") from exc
 
         return GenerationOutcome(
