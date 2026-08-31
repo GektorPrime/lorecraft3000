@@ -1,7 +1,6 @@
-# LoreCraft3000 — Design & Spec
+# LoreCraft3000 Agent Notes
 
-The full project design, specification, and state document has moved.
+The tracked project overview and commands are in [README.md](README.md).
 
-**Canonical document:** [documentation/agents.md](documentation/agents.md)
-
-This file is a stub pointing to the canonical design/spec document.
+Local design and planning notes may exist under the ignored `documentation/`
+directory. They are workspace state, not repository artifacts.
