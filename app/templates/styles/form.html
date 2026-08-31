@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if style else 'New' }} style — LoreCraft3000{% endblock %}
+{% block content %}
+<h1>{{ 'Edit' if style else 'New' }} style</h1>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+{% set action = '/styles/' ~ style.id ~ '/edit' if style else '/styles' %}
+<form method="post" action="{{ action }}">
+  <label for="name">Name *</label>
+  <input type="text" id="name" name="name" required value="{{ values.name }}">
+  <p class="hint">Must be unique.</p>
+
+  <label for="style_contract">Style contract</label>
+  <textarea id="style_contract" name="style_contract" rows="6">{{ values.style_contract }}</textarea>
+  <p class="hint">Sent to the model verbatim and identically every time.</p>
+
+  <label for="ref_image_ids">Ref image ids</label>
+  <input type="text" id="ref_image_ids" name="ref_image_ids" value="{{ values.ref_image_ids }}">
+  <p class="hint">Comma-separated ref_image ids used as style references (optional).</p>
+
+  <div class="actions">
+    <button type="submit">Save</button>
+    <a class="button" href="/styles">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Ref-set v{{ ref_set.version }} — {{ character.name }} — LoreCraft3000{% endblock %}
+{% block content %}
+<p><a href="/characters/{{ character.id }}">&larr; {{ character.name }}</a></p>
+
+<h1>Reference set v{{ ref_set.version }}</h1>
+<p>
+  <span class="badge badge-{{ ref_set.status }}">{{ ref_set.status }}</span>
+  {% if canonical and canonical.id == ref_set.id %}<span class="badge">current canonical</span>{% endif %}
+  <span class="muted">created {{ ref_set.created_at }}</span>
+</p>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+{% if ref_set.status == 'draft' %}
+<p class="hint">Drafts are editable. Promote to make this the canonical reference set
+  (the prior canonical, if any, is retired and kept forever).</p>
+<div class="actions">
+  <form class="inline" method="post" action="/ref-sets/{{ ref_set.id }}/promote">
+    <button type="submit">Promote to canonical</button>
+  </form>
+  <form class="inline" method="post" action="/ref-sets/{{ ref_set.id }}/copy">
+    <button type="submit" class="link-button">Copy to new draft</button>
+  </form>
+</div>
+{% else %}
+<p class="hint">This set is {{ ref_set.status }} and immutable — it cannot be edited.
+  Use “Copy to new draft” to iterate toward a new canonical.</p>
+<div class="actions">
+  <form class="inline" method="post" action="/ref-sets/{{ ref_set.id }}/copy">
+    <button type="submit" class="link-button">Copy to new draft</button>
+  </form>
+</div>
+{% endif %}
+
+<h2>Images</h2>
+<div id="ref-images">
+  {% include "ref_sets/_images.html" %}
+</div>
+{% endblock %}
