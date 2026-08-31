@@ -32,19 +32,19 @@ def test_default_model_and_size():
 def test_price_table_has_exact_version_and_mappings():
     """Assert the exact price table version and all model->size->price mappings."""
     s = Settings()
-    assert s.price_table_version == "2026-08-30.1"
+    assert s.price_table_version == "2026-08-31.1"
 
     # Exact mappings for all four models present in app/config.py.
     assert s.model_prices_cents == {
-        "gemini-3.1-flash-lite-image": {"1K": 3},
+        "gemini-3.1-flash-lite-image": {"1K": 4},
         "gemini-3.1-flash-image": {
             "512": 5,
             "1K": 7,
-            "2K": 10,
-            "4K": 15,
+            "2K": 11,
+            "4K": 16,
         },
         "gemini-3-pro-image": {
-            "1K": 13,
+            "1K": 14,
             "2K": 20,
             "4K": 24,
         },
@@ -70,11 +70,11 @@ def test_price_table_is_independent_per_instance():
 
     # s2 must be unaffected.
     assert s2.model_prices_cents["gemini-3.1-flash-image"]["1K"] == 7
-    assert s2.model_prices_cents["gemini-3-pro-image"]["1K"] == 13
+    assert s2.model_prices_cents["gemini-3-pro-image"]["1K"] == 14
 
     # The global MODEL_PRICES_CENTS must be unaffected.
     assert MODEL_PRICES_CENTS["gemini-3.1-flash-image"]["1K"] == 7
-    assert MODEL_PRICES_CENTS["gemini-3-pro-image"]["1K"] == 13
+    assert MODEL_PRICES_CENTS["gemini-3-pro-image"]["1K"] == 14
 
 
 # ---------------------------------------------------------------------------

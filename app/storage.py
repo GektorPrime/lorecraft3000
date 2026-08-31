@@ -134,4 +134,41 @@ class ImageStorage:
 
     def path_for(self, sha256: str, ext: str) -> Path:
         """Return the expected on-disk path for a stored image."""
+        self._validate_sha256(sha256)
         return self.root / sha256[:2] / f"{sha256}.{ext}"
+
+    def read(self, sha256: str) -> tuple[bytes, dict]:
+        """Read stored bytes and sidecar metadata by content hash."""
+        self._validate_sha256(sha256)
+        sidecar_path = self.root / sha256[:2] / f"{sha256}.json"
+        try:
+            metadata = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            extension = metadata["extension"]
+            data = self.path_for(sha256, extension).read_bytes()
+        except (OSError, KeyError, json.JSONDecodeError) as exc:
+            raise ImageStorageError(f"stored image {sha256} is incomplete: {exc}") from exc
+        if hashlib.sha256(data).hexdigest() != sha256:
+            raise ImageStorageError(f"stored image {sha256} failed its hash check")
+        return data, metadata
+
+    def append_provenance(self, sha256: str, record: dict) -> None:
+        """Append a secret-free provenance record to an image sidecar."""
+        self._validate_sha256(sha256)
+        sidecar_path = self.root / sha256[:2] / f"{sha256}.json"
+        try:
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ImageStorageError(f"cannot read sidecar for {sha256}: {exc}") from exc
+        provenance = sidecar.setdefault("provenance", [])
+        if not isinstance(provenance, list):
+            raise ImageStorageError(f"invalid provenance data for {sha256}")
+        provenance.append(record)
+        self._atomic_write(
+            sidecar_path,
+            json.dumps(sidecar, indent=2, sort_keys=True).encode("utf-8"),
+        )
+
+    @staticmethod
+    def _validate_sha256(sha256: str) -> None:
+        if len(sha256) != 64 or any(c not in "0123456789abcdef" for c in sha256):
+            raise ImageStorageError("sha256 must be 64 lowercase hexadecimal characters")

@@ -35,9 +35,14 @@ working landing page; the database is initialized (idempotently) on startup.
 uv run pytest
 ```
 
-Tests never hit the network. They cover schema invariants, the migration
-runner, the content-addressed image storage service, and a home-route smoke
-test.
+The default suite never hits the network. It covers schema invariants, the
+library and reference workflow, multi-character prompt assembly, cost guarding,
+provider request construction, provenance, and a fake-provider generation path.
+The paid Gemini smoke test is skipped unless explicitly authorized:
+
+```bash
+LORECRAFT_RUN_LIVE_TESTS=1 uv run pytest -m live
+```
 
 ## Project layout
 
@@ -49,12 +54,12 @@ app/
   migrate.py       migration runner (idempotent)
   migrations/      ordered migration modules
   storage.py       content-addressed image storage
-  domain/          (later) domain models/services
-  services/        (later) business services
-  providers/       (later) provider adapters
-  assembler/       (later) prompt assembler
-  templates/       (later) server-rendered templates
-  static/          (later) static assets
+  domain/          domain models and generation request values
+  services/        library, cost ledger, and generation orchestration
+  providers/       provider boundary and Gemini adapter
+  assembler/       multi-character prompt and reference-slot assembly
+  templates/       server-rendered Jinja templates
+  static/          CSS and vendored HTMX
 tests/             pytest suite
 validate_refs.py   Phase 0 standalone utility (unchanged)
 ```

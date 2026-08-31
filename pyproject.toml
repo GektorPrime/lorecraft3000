@@ -22,3 +22,8 @@ dev = [
 [tool.uv]
 # Script-based project: uv sync installs dependencies only, no package build.
 package = false
+
+[tool.pytest.ini_options]
+markers = [
+    "live: paid integration test; skipped unless explicitly enabled",
+]
