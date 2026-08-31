@@ -17,6 +17,7 @@ MIGRATIONS: list[str] = [
     "app.migrations.001_initial",
     "app.migrations.002_default_style",
     "app.migrations.003_generation_core",
+    "app.migrations.004_scene_generation_settings",
 ]
 
 

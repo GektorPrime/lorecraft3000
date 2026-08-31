@@ -14,11 +14,14 @@ class GeminiProviderError(Exception):
 
 class GeminiProvider:
     def __init__(self, client=None) -> None:
-        if client is None:
+        self.client = client
+
+    def _client(self):
+        if self.client is None:
             from google import genai
 
-            client = genai.Client()
-        self.client = client
+            self.client = genai.Client()
+        return self.client
 
     def build_api_request(self, request: ProviderRequest) -> dict:
         capabilities = capabilities_for(request.model)
@@ -65,7 +68,7 @@ class GeminiProvider:
 
     def generate(self, request: ProviderRequest) -> ProviderResult:
         try:
-            interaction = self.client.interactions.create(
+            interaction = self._client().interactions.create(
                 **self.build_api_request(request)
             )
             image = getattr(interaction, "output_image", None)

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}New panel — LoreCraft3000{% endblock %}
+{% block content %}
+<p><a href="/scenes">&larr; Panels</a></p>
+<h1>Stage a new panel</h1>
+<p class="lede">Compose the moment first. The next screen shows the exact prompt,
+reference allocation, and cost before any paid request.</p>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form method="post" action="/scenes">
+  <label>Action / beat
+    <textarea name="beat_text" rows="3" required>{{ values.get('beat_text', '') }}</textarea>
+  </label>
+  <div class="form-grid">
+    <label>Camera angle<input type="text" name="camera" required value="{{ values.get('camera', '') }}"></label>
+    <label>Framing<input type="text" name="framing" required value="{{ values.get('framing', '') }}"></label>
+    <label>Mood<input type="text" name="mood" value="{{ values.get('mood', '') }}"></label>
+    <label>Aspect ratio<select name="aspect_ratio">{% for ratio in aspect_ratios %}<option value="{{ ratio }}" {% if values.get('aspect_ratio', '3:2') == ratio %}selected{% endif %}>{{ ratio }}</option>{% endfor %}</select></label>
+  </div>
+
+  <h2>Ordered cast</h2>
+  <p class="hint">Enter character IDs in visual left-to-right or narrative order,
+  separated by commas. Five-character panels require Pro.</p>
+  <label>Cast order<input type="text" name="cast_order" required placeholder="1, 3, 2" value="{{ values.get('cast_order', '') }}"></label>
+  <table>
+    <thead><tr><th>ID</th><th>Character</th><th>Staging role</th><th>Prominence</th></tr></thead>
+    <tbody>
+    {% for character in characters %}
+      <tr>
+        <td><code>{{ character.id }}</code></td><td>{{ character.name }}</td>
+        <td><input type="text" name="role_{{ character.id }}" value="{{ values.get('role_' ~ character.id, '') }}" placeholder="holds the map"></td>
+        <td><input class="short-input" type="number" min="1" name="prominence_{{ character.id }}" value="{{ values.get('prominence_' ~ character.id, '1') }}"></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="form-grid">
+    <label>Style<select name="style_id" required>{% for style in styles %}<option value="{{ style.id }}" {% if values.get('style_id') | string == style.id | string %}selected{% endif %}>{{ style.name }}</option>{% endfor %}</select></label>
+    <label>Model<select name="model">{% for model in models %}<option value="{{ model }}" {% if values.get('model', 'gemini-3.1-flash-image') == model %}selected{% endif %}>{{ model }}</option>{% endfor %}</select></label>
+    <label>Image size<select name="image_size">{% for size in image_sizes %}<option value="{{ size }}" {% if values.get('image_size', '1K') == size %}selected{% endif %}>{{ size }}</option>{% endfor %}</select></label>
+  </div>
+  <p><button type="submit">Save and preview</button></p>
+</form>
+{% endblock %}

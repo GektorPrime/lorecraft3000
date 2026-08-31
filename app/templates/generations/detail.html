@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Generation {{ generation.id }} — LoreCraft3000{% endblock %}
+{% block content %}
+<p><a href="/scenes/{{ generation.scene_id }}/preview">&larr; Panel preview</a></p>
+<p class="eyebrow">Generation {{ generation.id }}</p>
+<h1>{{ generation.state }}</h1>
+<dl>
+  <dt>Model</dt><dd>{{ generation.model }}</dd>
+  <dt>Cost</dt><dd>${{ '%.2f' | format(generation.cost_usd_cents / 100) }}</dd>
+  <dt>Prompt hash</dt><dd><code>{{ generation.prompt_hash }}</code></dd>
+  <dt>Interaction</dt><dd>{{ generation.interaction_id or 'none' }}</dd>
+  <dt>Created</dt><dd>{{ generation.created_at }}</dd>
+</dl>
+
+{% if generation.error_text %}<div class="error">{{ generation.error_text }}</div>{% endif %}
+{% if candidate %}
+<figure class="candidate">
+  {% if image_available %}
+  <img src="/media/{{ candidate.sha256 }}" alt="Generated panel candidate">
+  {% else %}
+  <div class="error">The candidate file is missing from content-addressed storage.</div>
+  {% endif %}
+  <figcaption>Review status: <strong>{{ candidate.review_status }}</strong></figcaption>
+</figure>
+<div class="actions">
+  <form method="post" action="/candidates/{{ candidate.id }}/review"><input type="hidden" name="verdict" value="accepted"><button type="submit">Accept</button></form>
+  <form method="post" action="/candidates/{{ candidate.id }}/review"><input type="hidden" name="verdict" value="rejected"><button class="danger-button" type="submit">Reject</button></form>
+</div>
+<p class="hint">Accepting a panel never promotes it into a character's canonical references.</p>
+{% endif %}
+
+{% if request_data.attachments %}
+<h2>Attached canonical references</h2>
+<div class="reference-strip">
+  {% for reference in request_data.attachments %}
+  <figure><img src="/media/{{ reference.sha256 }}" alt="{{ reference.character_name }} {{ reference.role }} reference"><figcaption>Image {{ reference.image_number }} · {{ reference.character_name }} · v{{ reference.ref_set_version }} · {{ reference.role }}</figcaption></figure>
+  {% endfor %}
+</div>
+{% endif %}
+
+<details><summary>Exact request provenance</summary><pre class="prompt-preview">{{ request_json }}</pre></details>
+<details><summary>Provider response metadata</summary><pre class="prompt-preview">{{ response_json }}</pre></details>
+{% endblock %}

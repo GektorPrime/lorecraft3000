@@ -12,6 +12,7 @@ def test_home_route_responds():
     resp = client.get("/")
     assert resp.status_code == 200
     assert "LoreCraft3000" in resp.text
+    assert 'href="/scenes/new"' in resp.text
 
 
 def test_health_route():

@@ -19,6 +19,9 @@ from app.storage import ImageStorage
 
 router = APIRouter(prefix="/ref-sets", tags=["ref-sets"])
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+ALLOWED_UPLOAD_MIME = {"image/png", "image/jpeg", "image/webp"}
+
 
 def _images_fragment(
     request: Request, service: RefSetService, ref_set_id: int, error: str | None = None
@@ -72,9 +75,13 @@ def upload_image(
 ) -> HTMLResponse:
     """Upload image bytes into a draft and assign a role (HTMX fragment)."""
     service = RefSetService(conn, storage)
-    data = image.file.read() if image.file else b""
     error: str | None = None
     try:
+        if image.content_type not in ALLOWED_UPLOAD_MIME:
+            raise RefSetError("upload must be a PNG, JPEG, or WebP image")
+        data = image.file.read(MAX_UPLOAD_BYTES + 1) if image.file else b""
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise RefSetError("upload exceeds the 10 MB limit")
         service.add_image(ref_set_id, data, role, source_name=image.filename)
     except RefSetError as exc:
         error = str(exc)

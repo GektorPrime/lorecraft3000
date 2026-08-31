@@ -170,6 +170,7 @@ class CharacterService:
         lore never leaves the library.
         """
         c = self.get(character_id)
+        self._validate_visual_contract(c.visual_contract)
         return {
             "character_id": c.id,
             "name": c.name,
