@@ -21,27 +21,27 @@ load_dotenv()
 # Model price table (USD per image, by model and image size).
 #
 # Prices are stored as INTEGER minor units (cents) to avoid float drift.
-# Each value is round(price_usd * 100) cents from the verified API facts in
-# documentation/agents.md (e.g. Flash @ 1K ~= $0.067 -> 7 cents).
+# Values are conservatively rounded UP from the verified API facts in
+# documentation/agents.md so the local hard cap never undercounts a call.
 # Bump PRICE_TABLE_VERSION only if any value in the table changes.
 # Version identifier lets us detect when the table changes so provenance can
 # record which price table was in effect for a given generation.
 # ---------------------------------------------------------------------------
 
 # price_table_version: bump whenever the table below changes.
-PRICE_TABLE_VERSION = "2026-08-30.1"
+PRICE_TABLE_VERSION = "2026-08-31.1"
 
 # Prices in cents (minor units) per image.
 MODEL_PRICES_CENTS: dict[str, dict[str, int]] = {
-    "gemini-3.1-flash-lite-image": {"1K": 3},
+    "gemini-3.1-flash-lite-image": {"1K": 4},
     "gemini-3.1-flash-image": {
         "512": 5,
         "1K": 7,
-        "2K": 10,
-        "4K": 15,
+        "2K": 11,
+        "4K": 16,
     },
     "gemini-3-pro-image": {
-        "1K": 13,
+        "1K": 14,
         "2K": 20,
         "4K": 24,
     },

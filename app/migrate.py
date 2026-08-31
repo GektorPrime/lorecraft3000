@@ -16,6 +16,7 @@ from app.db import connect
 MIGRATIONS: list[str] = [
     "app.migrations.001_initial",
     "app.migrations.002_default_style",
+    "app.migrations.003_generation_core",
 ]
 
 

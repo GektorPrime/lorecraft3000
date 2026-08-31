@@ -63,6 +63,11 @@ def test_dedupe_preserves_first_sidecar(storage, png_bytes):
     assert data["source_name"] == "first.png"
 
 
+def test_read_rejects_non_hash_path_input(storage):
+    with pytest.raises(ImageStorageError, match="64 lowercase hexadecimal"):
+        storage.read("../../outside")
+
+
 def test_different_bytes_stored_separately(storage):
     a = make_png_bytes((200, 30, 30))
     b = make_png_bytes((30, 200, 30))

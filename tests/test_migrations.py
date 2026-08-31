@@ -64,3 +64,22 @@ def test_migrations_table_tracks_versions(tmp_path):
     finally:
         conn.close()
     assert versions == {m.rsplit(".", 1)[-1] for m in MIGRATIONS}
+
+
+def test_generation_core_columns_are_migrated(conn):
+    scene_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(scene)").fetchall()
+    }
+    generation_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(generation)").fetchall()
+    }
+    candidate_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(candidate)").fetchall()
+    }
+    assert "style_id" in scene_columns
+    assert {
+        "price_table_version", "response_json", "error_text", "completed_at"
+    } <= generation_columns
+    assert "review_status" in candidate_columns
