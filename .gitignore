@@ -7,6 +7,12 @@
 # Generated output
 out/
 
+# Content-addressed image store
+store/
+
+# Local SQLite database
+data/
+
 # OS metadata
 .DS_Store
 
