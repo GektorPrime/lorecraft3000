@@ -1,7 +1,8 @@
 # LoreCraft3000
 
-A local tool for generating Victorian oil-painting comic panels while keeping
-multiple characters recognizable across scenes.
+A local tool for generating comic panels while keeping multiple characters
+recognizable across scenes. Visual styles are editable; Victorian Oil Painting
+is included as the initial default.
 
 ## Features
 
