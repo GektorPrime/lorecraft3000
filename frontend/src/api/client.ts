@@ -133,7 +133,10 @@ export const previewPanel = (id: number) => request<PanelPreview>(`/panels/${id}
 export const listPanelGenerations = (id: number) =>
   request<GenerationSummary[]>(`/panels/${id}/generations`)
 export const generatePanel = (id: number) =>
-  request<Generation>(`/panels/${id}/generate`, { method: 'POST' })
+  request<Generation>(`/panels/${id}/generate`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
+  })
 
 // ---------------------------------------------------------------------------
 // generations / candidates

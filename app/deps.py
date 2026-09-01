@@ -39,4 +39,4 @@ def get_storage() -> ImageStorage:
 
 def get_provider():
     """Construct the real provider only for an explicit generation request."""
-    return GeminiProvider()
+    return GeminiProvider(timeout_seconds=settings.provider_timeout_seconds)

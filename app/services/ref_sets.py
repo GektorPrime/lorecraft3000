@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from typing import NoReturn
 
 from app.domain.models import RefImage, RefSet, RefSetSummary
 from app.services.validation import ALLOWED_ROLES
@@ -198,13 +199,16 @@ class RefSetService:
             )
         except ImageStorageError as exc:
             raise ImageRejectedError(f"image rejected: {exc}") from exc
-        cur = self.conn.execute(
-            """
-            INSERT INTO ref_image (ref_set_id, sha256, role, weight, quality_flags)
-            VALUES (?, ?, ?, 1.0, '[]')
-            """,
-            (ref_set_id, meta.sha256, role),
-        )
+        try:
+            cur = self.conn.execute(
+                """
+                INSERT INTO ref_image (ref_set_id, sha256, role, weight, quality_flags)
+                VALUES (?, ?, ?, 1.0, '[]')
+                """,
+                (ref_set_id, meta.sha256, role),
+            )
+        except sqlite3.IntegrityError as exc:
+            self._raise_image_immutability_error(ref_set_id, exc)
         self.conn.commit()
         return self._get_image(cur.lastrowid)
 
@@ -212,10 +216,13 @@ class RefSetService:
         """Remove an image from a draft. Canonical sets are untouchable."""
         self._require_draft(ref_set_id)
         self._get_image_in_set(ref_set_id, image_id)
-        self.conn.execute(
-            "DELETE FROM ref_image WHERE id = ? AND ref_set_id = ?",
-            (image_id, ref_set_id),
-        )
+        try:
+            self.conn.execute(
+                "DELETE FROM ref_image WHERE id = ? AND ref_set_id = ?",
+                (image_id, ref_set_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            self._raise_image_immutability_error(ref_set_id, exc)
         self.conn.commit()
 
     def set_image_role(self, ref_set_id: int, image_id: int, role: str) -> RefImage:
@@ -223,10 +230,13 @@ class RefSetService:
         self._require_draft(ref_set_id)
         self._validate_role(role)
         self._get_image_in_set(ref_set_id, image_id)
-        self.conn.execute(
-            "UPDATE ref_image SET role = ? WHERE id = ? AND ref_set_id = ?",
-            (role, image_id, ref_set_id),
-        )
+        try:
+            self.conn.execute(
+                "UPDATE ref_image SET role = ? WHERE id = ? AND ref_set_id = ?",
+                (role, image_id, ref_set_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            self._raise_image_immutability_error(ref_set_id, exc)
         self.conn.commit()
         return self._get_image_in_set(ref_set_id, image_id)
 
@@ -259,6 +269,12 @@ class RefSetService:
         try:
             conn.execute("SAVEPOINT promote_ref_set")
             savepoint_created = True
+            image = conn.execute(
+                "SELECT 1 FROM ref_image WHERE ref_set_id = ? LIMIT 1",
+                (ref_set_id,),
+            ).fetchone()
+            if image is None:
+                raise RefSetError("a reference set needs at least one image before promotion")
             conn.execute(
                 "UPDATE ref_set SET status = 'retired' "
                 "WHERE character_id = ? AND status = 'canonical'",
@@ -270,6 +286,11 @@ class RefSetService:
             )
             conn.execute("RELEASE SAVEPOINT promote_ref_set")
             savepoint_created = False
+        except RefSetError:
+            if savepoint_created:
+                conn.execute("ROLLBACK TO SAVEPOINT promote_ref_set")
+                conn.execute("RELEASE SAVEPOINT promote_ref_set")
+            raise
         except sqlite3.Error as exc:
             if savepoint_created:
                 conn.execute("ROLLBACK TO SAVEPOINT promote_ref_set")
@@ -296,6 +317,17 @@ class RefSetService:
                 f"ref_set {ref_set_id} is '{rs.status}'; edits are only allowed "
                 "while the set is a draft"
             )
+
+    def _raise_image_immutability_error(
+        self, ref_set_id: int, exc: sqlite3.IntegrityError
+    ) -> NoReturn:
+        message = str(exc)
+        if "draft ref_sets" in message or "ref_sets are immutable" in message:
+            self.conn.rollback()
+            raise RefSetNotDraftError(
+                f"ref_set {ref_set_id} became immutable while the image was edited"
+            ) from exc
+        raise exc
 
     @staticmethod
     def _validate_role(role: str) -> None:

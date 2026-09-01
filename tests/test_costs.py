@@ -6,7 +6,14 @@ import pytest
 
 from app.config import Settings
 from app.db import connect
-from app.services.costs import BudgetExceededError, CostLedger, UnknownPriceError
+from app.services.costs import (
+    BudgetExceededError,
+    CostLedger,
+    GenerationPendingError,
+    IdempotencyConflictError,
+    SceneChangedError,
+    UnknownPriceError,
+)
 
 
 def _scene(conn) -> int:
@@ -24,10 +31,11 @@ def _settings(tmp_path, cap=0.10):
 
 
 def test_reservation_blocks_before_exceeding_cap(conn, tmp_path):
-    scene_id = _scene(conn)
+    first_scene_id = _scene(conn)
+    second_scene_id = _scene(conn)
     ledger = CostLedger(conn, _settings(tmp_path))
     generation_id, estimate = ledger.reserve(
-        scene_id=scene_id,
+        scene_id=first_scene_id,
         model="gemini-3.1-flash-image",
         image_size="1K",
         prompt_hash="a" * 64,
@@ -37,7 +45,7 @@ def test_reservation_blocks_before_exceeding_cap(conn, tmp_path):
     assert generation_id > 0
     with pytest.raises(BudgetExceededError, match="daily budget"):
         ledger.reserve(
-            scene_id=scene_id,
+            scene_id=second_scene_id,
             model="gemini-3.1-flash-image",
             image_size="1K",
             prompt_hash="b" * 64,
@@ -50,10 +58,11 @@ def test_independent_connections_cannot_bypass_cap(db_path, tmp_path):
     first = connect(db_path)
     second = connect(db_path)
     try:
-        scene_id = _scene(first)
+        first_scene_id = _scene(first)
+        second_scene_id = _scene(first)
         settings = _settings(tmp_path)
         CostLedger(first, settings).reserve(
-            scene_id=scene_id,
+            scene_id=first_scene_id,
             model="gemini-3.1-flash-image",
             image_size="1K",
             prompt_hash="a" * 64,
@@ -61,7 +70,7 @@ def test_independent_connections_cannot_bypass_cap(db_path, tmp_path):
         )
         with pytest.raises(BudgetExceededError):
             CostLedger(second, settings).reserve(
-                scene_id=scene_id,
+                scene_id=second_scene_id,
                 model="gemini-3.1-flash-image",
                 image_size="1K",
                 prompt_hash="b" * 64,
@@ -164,3 +173,151 @@ def test_generation_cannot_be_finalized_twice(conn, tmp_path):
             candidate_sha256="c" * 64,
         )
     assert conn.execute("SELECT COUNT(*) FROM candidate").fetchone()[0] == 1
+
+
+def test_only_one_pending_generation_is_allowed_per_scene(conn, tmp_path):
+    scene_id = _scene(conn)
+    ledger = CostLedger(conn, _settings(tmp_path, cap=1.0))
+    ledger.reserve(
+        scene_id=scene_id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+    )
+    with pytest.raises(GenerationPendingError):
+        ledger.reserve(
+            scene_id=scene_id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            prompt_hash="b" * 64,
+            request_json={},
+        )
+
+
+def test_idempotency_key_replays_the_same_reservation(conn, tmp_path):
+    scene_id = _scene(conn)
+    ledger = CostLedger(conn, _settings(tmp_path))
+    first = ledger.reserve(
+        scene_id=scene_id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+        idempotency_key="request-1",
+    )
+    replay = ledger.reserve(
+        scene_id=scene_id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+        idempotency_key="request-1",
+    )
+    assert first.created is True
+    assert replay.created is False
+    assert replay.generation_id == first.generation_id
+    assert conn.execute("SELECT COUNT(*) FROM generation").fetchone()[0] == 1
+
+    with pytest.raises(IdempotencyConflictError):
+        ledger.reserve(
+            scene_id=scene_id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            prompt_hash="b" * 64,
+            request_json={},
+            idempotency_key="request-1",
+        )
+
+
+def test_stale_pending_recovery_releases_lock_but_retains_cost(conn, tmp_path):
+    scene_id = _scene(conn)
+    ledger = CostLedger(conn, _settings(tmp_path))
+    reservation = ledger.reserve(
+        scene_id=scene_id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+    )
+    conn.execute(
+        "UPDATE generation SET created_at = datetime('now', '-1 day') WHERE id = ?",
+        (reservation.generation_id,),
+    )
+    conn.commit()
+
+    assert ledger.recover_stale_pending() == 1
+    row = conn.execute(
+        "SELECT state, cost_usd_cents, reserved_cost_usd_cents FROM generation"
+    ).fetchone()
+    assert tuple(row) == ("failed", 7, 7)
+
+
+def test_actual_cost_is_recorded_separately(conn, tmp_path):
+    ledger = CostLedger(conn, _settings(tmp_path))
+    reservation = ledger.reserve(
+        scene_id=_scene(conn),
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+    )
+    ledger.succeed(
+        reservation.generation_id,
+        interaction_id=None,
+        response_json={},
+        candidate_sha256="b" * 64,
+        actual_cost_cents=5,
+    )
+    row = conn.execute(
+        "SELECT cost_usd_cents, reserved_cost_usd_cents, actual_cost_usd_cents FROM generation"
+    ).fetchone()
+    assert tuple(row) == (5, 7, 5)
+    assert ledger.spent_today() == 5
+
+
+def test_actual_cost_over_cap_is_recorded_and_blocks_more_spend(conn, tmp_path):
+    ledger = CostLedger(conn, _settings(tmp_path))
+    reservation = ledger.reserve(
+        scene_id=_scene(conn),
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+    )
+    ledger.succeed(
+        reservation.generation_id,
+        interaction_id=None,
+        response_json={},
+        candidate_sha256="b" * 64,
+        actual_cost_cents=11,
+    )
+    row = conn.execute(
+        "SELECT state, cost_usd_cents, actual_cost_usd_cents, warning_text FROM generation"
+    ).fetchone()
+    assert tuple(row[:3]) == ("succeeded", 11, 11)
+    assert "exceeded" in row["warning_text"]
+    with pytest.raises(BudgetExceededError):
+        ledger.reserve(
+            scene_id=_scene(conn),
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            prompt_hash="c" * 64,
+            request_json={},
+        )
+
+
+def test_reservation_rejects_a_panel_changed_after_preview(conn, tmp_path):
+    scene_id = _scene(conn)
+    conn.execute("UPDATE scene SET revision = revision + 1 WHERE id = ?", (scene_id,))
+    conn.commit()
+
+    with pytest.raises(SceneChangedError, match="changed after preview"):
+        CostLedger(conn, _settings(tmp_path)).reserve(
+            scene_id=scene_id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            prompt_hash="a" * 64,
+            request_json={},
+            scene_revision=0,
+        )

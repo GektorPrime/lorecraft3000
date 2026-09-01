@@ -24,15 +24,21 @@ class GeminiProviderError(Exception):
 
 
 class GeminiProvider:
-    def __init__(self, client=None, *, sleep=time.sleep) -> None:
+    def __init__(
+        self, client=None, *, timeout_seconds: int = 120, sleep=time.sleep
+    ) -> None:
         self.client = client
+        self.timeout_seconds = timeout_seconds
         self._sleep = sleep
 
     def _client(self):
         if self.client is None:
             from google import genai
+            from google.genai import types
 
-            self.client = genai.Client()
+            self.client = genai.Client(
+                http_options=types.HttpOptions(timeout=self.timeout_seconds * 1000)
+            )
         return self.client
 
     def build_api_request(self, request: ProviderRequest) -> dict:

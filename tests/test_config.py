@@ -90,6 +90,8 @@ def clean_env(monkeypatch):
         "LORECRAFT_STORE_ROOT",
         "LORECRAFT_DEFAULT_MODEL",
         "LORECRAFT_DEFAULT_IMAGE_SIZE",
+        "LORECRAFT_PROVIDER_TIMEOUT_SECONDS",
+        "LORECRAFT_PENDING_STALE_SECONDS",
     ):
         monkeypatch.delenv(key, raising=False)
     return monkeypatch
@@ -103,6 +105,8 @@ def test_from_env_defaults(clean_env):
     assert s.store_root == PROJECT_ROOT / "store"
     assert s.default_model == DEFAULT_MODEL
     assert s.default_image_size == DEFAULT_IMAGE_SIZE
+    assert s.provider_timeout_seconds == 120
+    assert s.pending_stale_seconds == 600
 
 
 def test_from_env_daily_cap(clean_env):
@@ -141,3 +145,10 @@ def test_from_env_relative_paths_resolve_as_given(clean_env):
     clean_env.setenv("LORECRAFT_DB_PATH", "data/custom.db")
     s = Settings.from_env()
     assert s.db_path == Path("data/custom.db")
+
+
+def test_from_env_rejects_stale_threshold_shorter_than_retry_window(clean_env):
+    clean_env.setenv("LORECRAFT_PROVIDER_TIMEOUT_SECONDS", "60")
+    clean_env.setenv("LORECRAFT_PENDING_STALE_SECONDS", "200")
+    with pytest.raises(ValueError, match="maximum provider retry duration"):
+        Settings.from_env()

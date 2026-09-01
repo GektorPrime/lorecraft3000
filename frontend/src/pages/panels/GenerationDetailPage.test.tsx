@@ -26,6 +26,8 @@ const GENERATION: Generation = {
   attachments: [],
   warnings: [],
   cost_usd_cents: 20,
+  reserved_cost_usd_cents: 20,
+  actual_cost_usd_cents: null,
   state: 'succeeded',
   interaction_id: null,
   error_text: null,

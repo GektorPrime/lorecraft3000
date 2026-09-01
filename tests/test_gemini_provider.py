@@ -7,6 +7,7 @@ import pytest
 
 from app.providers.base import ProviderReference, ProviderRequest
 from app.providers.gemini import GeminiProvider, GeminiProviderError
+from app.deps import get_provider, settings
 
 
 class _Interactions:
@@ -145,3 +146,7 @@ def test_consumer_api_400_is_not_retried():
     # 4xx fails fast: no retries, no backoff sleeps.
     assert interactions.calls == 1
     assert sleeps == []
+
+
+def test_default_provider_uses_configured_timeout():
+    assert get_provider().timeout_seconds == settings.provider_timeout_seconds

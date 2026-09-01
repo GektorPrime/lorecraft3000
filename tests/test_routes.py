@@ -33,7 +33,7 @@ def client(tmp_path):
 
     app.dependency_overrides[get_conn] = override_conn
     app.dependency_overrides[get_storage] = lambda: ImageStorage(store_root)
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://127.0.0.1") as c:
         yield c
     app.dependency_overrides.clear()
 

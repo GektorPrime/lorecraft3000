@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.services.avatars import AvatarService, select_avatar_image
 from app.services.characters import CharacterService
-from app.services.ref_sets import RefSetService
+from app.services.ref_sets import RefSetError, RefSetService
 from tests.conftest import make_png_bytes
 
 
@@ -96,13 +98,13 @@ def test_avatar_service_returns_none_without_canonical_ref_set(conn, storage):
     assert result is None
 
 
-def test_avatar_service_returns_none_for_canonical_set_with_no_images(conn, storage):
+def test_empty_set_cannot_become_canonical(conn, storage):
     character = CharacterService(conn).create(name="Elias", slug="elias")
     ref_sets = RefSetService(conn, storage)
     draft = ref_sets.create_draft(character.id)
-    ref_sets.promote(draft.id)
-    result = AvatarService(conn, storage).avatar_image_for(character.id)
-    assert result is None
+    with pytest.raises(RefSetError, match="at least one image"):
+        ref_sets.promote(draft.id)
+    assert AvatarService(conn, storage).avatar_image_for(character.id) is None
 
 
 def test_avatar_service_picks_face_front_from_canonical_set(conn, storage):

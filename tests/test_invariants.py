@@ -169,6 +169,44 @@ def test_canonical_ref_set_cannot_be_deleted(conn):
         conn.execute("DELETE FROM ref_set WHERE id=?", (rsid,))
 
 
+def test_images_in_canonical_ref_set_are_immutable(conn):
+    cid = _insert_character(conn)
+    rsid = _insert_ref_set(conn, cid, status="draft")
+    image_id = conn.execute(
+        "INSERT INTO ref_image (ref_set_id, sha256, role) VALUES (?, 'abc', 'face_front')",
+        (rsid,),
+    ).lastrowid
+    conn.execute("UPDATE ref_set SET status = 'canonical' WHERE id = ?", (rsid,))
+    conn.commit()
+
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("UPDATE ref_image SET role = 'outfit' WHERE id = ?", (image_id,))
+    conn.rollback()
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("DELETE FROM ref_image WHERE id = ?", (image_id,))
+    conn.rollback()
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO ref_image (ref_set_id, sha256, role) VALUES (?, 'def', 'outfit')",
+            (rsid,),
+        )
+
+
+def test_images_in_retired_ref_set_remain_immutable(conn):
+    cid = _insert_character(conn)
+    rsid = _insert_ref_set(conn, cid, status="draft")
+    image_id = conn.execute(
+        "INSERT INTO ref_image (ref_set_id, sha256, role) VALUES (?, 'abc', 'face_front')",
+        (rsid,),
+    ).lastrowid
+    conn.execute("UPDATE ref_set SET status = 'canonical' WHERE id = ?", (rsid,))
+    conn.execute("UPDATE ref_set SET status = 'retired' WHERE id = ?", (rsid,))
+    conn.commit()
+
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("DELETE FROM ref_image WHERE id = ?", (image_id,))
+
+
 def test_retired_ref_set_can_be_deleted(conn):
     """Once retired, a ref_set is no longer canonical and can be deleted."""
     cid = _insert_character(conn)

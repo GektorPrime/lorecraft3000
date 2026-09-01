@@ -25,16 +25,18 @@ class GenerationError(Exception):
 @dataclass(frozen=True)
 class GenerationOutcome:
     generation_id: int
-    candidate_id: int
-    candidate_sha256: str
+    candidate_id: int | None
+    candidate_sha256: str | None
     prompt_hash: str
     cost_cents: int
     warnings: tuple[str, ...]
+    replayed: bool = False
 
 
 @dataclass(frozen=True)
 class GenerationPreview:
     scene_id: int
+    scene_revision: int
     model: str
     image_size: str
     prompt: str
@@ -77,6 +79,7 @@ class GenerationService:
         *,
         model: str | None = None,
         image_size: str | None = None,
+        check_budget: bool = True,
     ) -> GenerationPreview:
         """Run the exact no-spend preflight used by generate()."""
         selected_model = model or self.settings.default_model
@@ -175,12 +178,13 @@ class GenerationService:
             "warnings": list(assembled.warnings),
             "labels": {"scene": str(scene_id)},
             "store": False,
+            "scene_revision": scene_row["revision"],
         }
         ledger = CostLedger(self.conn, self.settings)
         estimate = ledger.estimate(selected_model, selected_size)
         spent = ledger.spent_today()
         remaining = self.settings.daily_spend_cap_cents - spent - estimate
-        if remaining < 0:
+        if check_budget and remaining < 0:
             from app.services.costs import BudgetExceededError
 
             raise BudgetExceededError(
@@ -190,6 +194,7 @@ class GenerationService:
             )
         return GenerationPreview(
             scene_id=scene_id,
+            scene_revision=scene_row["revision"],
             model=selected_model,
             image_size=selected_size,
             prompt=assembled.text,
@@ -210,20 +215,30 @@ class GenerationService:
         model: str | None = None,
         image_size: str | None = None,
         parent_generation_id: int | None = None,
+        idempotency_key: str | None = None,
     ) -> GenerationOutcome:
         if self.provider is None:
             raise GenerationError("generation provider is not configured")
-        preview = self.preview(scene_id, model=model, image_size=image_size)
+        preview = self.preview(
+            scene_id, model=model, image_size=image_size, check_budget=False
+        )
         ledger = CostLedger(self.conn, self.settings)
-        generation_id, estimate = ledger.reserve(
+        reservation = ledger.reserve(
             scene_id=scene_id,
             model=preview.model,
             image_size=preview.image_size,
             prompt_hash=preview.prompt_hash,
             request_json=preview.request_capture,
             parent_generation_id=parent_generation_id,
+            idempotency_key=idempotency_key,
+            scene_revision=preview.scene_revision,
         )
+        generation_id, estimate = reservation
 
+        if not reservation.created:
+            return self._replayed_outcome(generation_id)
+
+        result = None
         try:
             result = self.provider.generate(preview.provider_request)
             stored = self.storage.store(
@@ -244,7 +259,11 @@ class GenerationService:
                 "slot_allocation": list(preview.attachments),
                 "prompt_hash": preview.prompt_hash,
                 "interaction_id": result.interaction_id,
-                "cost_cents": result.billed_cost_cents or estimate,
+                "cost_cents": (
+                    result.billed_cost_cents
+                    if result.billed_cost_cents is not None
+                    else estimate
+                ),
                 "price_table_version": self.settings.price_table_version,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
@@ -261,16 +280,51 @@ class GenerationService:
                 generation_id,
                 str(exc),
                 charge_expected=getattr(exc, "charge_expected", True),
+                actual_cost_cents=(
+                    result.billed_cost_cents if result is not None else None
+                ),
             )
             raise GenerationError(f"generation {generation_id} failed: {exc}") from exc
 
+        generation_row = self.conn.execute(
+            "SELECT warning_text FROM generation WHERE id = ?", (generation_id,)
+        ).fetchone()
+        warnings = preview.warnings
+        if generation_row["warning_text"]:
+            warnings = (*warnings, generation_row["warning_text"])
         return GenerationOutcome(
             generation_id,
             candidate_id,
             stored.sha256,
             preview.prompt_hash,
-            result.billed_cost_cents or estimate,
-            preview.warnings,
+            (
+                result.billed_cost_cents
+                if result.billed_cost_cents is not None
+                else estimate
+            ),
+            warnings,
+        )
+
+    def _replayed_outcome(self, generation_id: int) -> GenerationOutcome:
+        row = self.conn.execute(
+            "SELECT * FROM generation WHERE id = ?", (generation_id,)
+        ).fetchone()
+        candidate = self.conn.execute(
+            "SELECT id, sha256 FROM candidate WHERE generation_id = ? ORDER BY idx LIMIT 1",
+            (generation_id,),
+        ).fetchone()
+        request_data = json.loads(row["request_json"] or "{}")
+        warnings = tuple(request_data.get("warnings", []))
+        if row["warning_text"]:
+            warnings = (*warnings, row["warning_text"])
+        return GenerationOutcome(
+            generation_id=generation_id,
+            candidate_id=int(candidate["id"]) if candidate else None,
+            candidate_sha256=candidate["sha256"] if candidate else None,
+            prompt_hash=row["prompt_hash"],
+            cost_cents=row["cost_usd_cents"],
+            warnings=warnings,
+            replayed=True,
         )
 
     def _load_cast(self, cast_json: str) -> tuple[CastInput, ...]:

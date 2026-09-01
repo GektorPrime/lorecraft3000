@@ -185,6 +185,8 @@ export interface Generation {
   attachments: GenerationAttachment[]
   warnings: string[]
   cost_usd_cents: number
+  reserved_cost_usd_cents: number
+  actual_cost_usd_cents: number | null
   state: 'pending' | 'succeeded' | 'failed'
   interaction_id: string | null
   error_text: string | null
@@ -198,6 +200,8 @@ export interface GenerationSummary {
   scene_id: number
   model: string
   cost_usd_cents: number
+  reserved_cost_usd_cents: number
+  actual_cost_usd_cents: number | null
   state: 'pending' | 'succeeded' | 'failed'
   error_text: string | null
   completed_at: string | null
