@@ -25,7 +25,12 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 def get_conn():
     """Yield a SQLite connection (FK integrity on) for the request's lifetime."""
-    conn = connect(settings.db_path)
+    conn = connect(
+        settings.db_path,
+        journal_mode=settings.sqlite_journal_mode,
+        busy_timeout_ms=settings.sqlite_busy_timeout_ms,
+        synchronous=settings.sqlite_synchronous,
+    )
     try:
         yield conn
     finally:

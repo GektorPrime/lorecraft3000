@@ -6,10 +6,10 @@ import sqlite3
 
 
 def upgrade(conn: sqlite3.Connection) -> None:
-    # Do not use executescript here: it commits before running and can leave a
-    # partially applied migration. The runner records the version and commits
-    # this transaction only after every statement succeeds.
-    conn.execute("BEGIN IMMEDIATE")
+    # The runner owns the transaction (see 001_initial.upgrade): the whole run
+    # runs inside BEGIN IMMEDIATE and commits only after every statement here
+    # and in the schema_migrations insert succeeds, so a failure rolls back this
+    # entire migration and the run can be re-run cleanly.
     statements = (
         """
         ALTER TABLE scene ADD COLUMN revision INTEGER NOT NULL DEFAULT 0
@@ -96,9 +96,5 @@ def upgrade(conn: sqlite3.Connection) -> None:
         END
         """,
     )
-    try:
-        for statement in statements:
-            conn.execute(statement)
-    except Exception:
-        conn.rollback()
-        raise
+    for statement in statements:
+        conn.execute(statement)

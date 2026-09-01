@@ -24,7 +24,12 @@ import sqlite3
 
 
 def upgrade(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    # The runner owns the transaction: the whole run runs inside BEGIN IMMEDIATE
+    # and commits only after every statement succeeds, so a failure rolls back
+    # this entire migration. Each statement executes individually (no
+    # executescript, which would issue an implicit COMMIT first and could leave
+    # a partially applied, unrecorded schema).
+    statements = (
         """
         CREATE TABLE character (
             id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +41,8 @@ def upgrade(conn: sqlite3.Connection) -> None:
             default_style_id  INTEGER REFERENCES style(id),
             created_at        TEXT NOT NULL DEFAULT (datetime('now'))
         );
-
+        """,
+        """
         CREATE TABLE ref_set (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             character_id  INTEGER NOT NULL REFERENCES character(id),
@@ -46,18 +52,13 @@ def upgrade(conn: sqlite3.Connection) -> None:
             created_at    TEXT NOT NULL DEFAULT (datetime('now')),
             UNIQUE (character_id, version)
         );
-
-        -- Exactly one canonical ref_set per character.
+        """,
+        """
         CREATE UNIQUE INDEX idx_ref_set_one_canonical
             ON ref_set (character_id)
             WHERE status = 'canonical';
-
-        -- Canonical ref_sets are immutable EXCEPT for a status transition to
-        -- 'retired' (Milestone 5: promoting a new canonical set retires the
-        -- prior one). The trigger allows ONLY that transition: the ONLY column
-        -- permitted to change is status (to 'retired'); every other column
-        -- (id, character_id, version, created_at) must be unchanged, else the
-        -- update is blocked.
+        """,
+        """
         CREATE TRIGGER trg_ref_set_no_update_canonical
         BEFORE UPDATE ON ref_set
         FOR EACH ROW
@@ -70,8 +71,8 @@ def upgrade(conn: sqlite3.Connection) -> None:
         BEGIN
             SELECT RAISE(ABORT, 'canonical ref_set is immutable except status->retired');
         END;
-
-        -- Canonical ref_sets can never be deleted.
+        """,
+        """
         CREATE TRIGGER trg_ref_set_no_delete_canonical
         BEFORE DELETE ON ref_set
         FOR EACH ROW
@@ -79,7 +80,8 @@ def upgrade(conn: sqlite3.Connection) -> None:
         BEGIN
             SELECT RAISE(ABORT, 'canonical ref_set cannot be deleted');
         END;
-
+        """,
+        """
         CREATE TABLE ref_image (
             id             INTEGER PRIMARY KEY AUTOINCREMENT,
             ref_set_id     INTEGER NOT NULL REFERENCES ref_set(id),
@@ -94,7 +96,8 @@ def upgrade(conn: sqlite3.Connection) -> None:
             quality_flags  TEXT NOT NULL DEFAULT '[]',
             created_at     TEXT NOT NULL DEFAULT (datetime('now'))
         );
-
+        """,
+        """
         CREATE TABLE style (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             name            TEXT NOT NULL UNIQUE,
@@ -102,7 +105,8 @@ def upgrade(conn: sqlite3.Connection) -> None:
             ref_image_ids   TEXT NOT NULL DEFAULT '[]',
             created_at      TEXT NOT NULL DEFAULT (datetime('now'))
         );
-
+        """,
+        """
         CREATE TABLE scene (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id    INTEGER,
@@ -113,11 +117,11 @@ def upgrade(conn: sqlite3.Connection) -> None:
             framing       TEXT NOT NULL DEFAULT '',
             mood          TEXT NOT NULL DEFAULT '',
             aspect_ratio  TEXT NOT NULL DEFAULT '3:2',
-            -- Ordered list of characters (multi-character first-class).
             cast_json     TEXT NOT NULL DEFAULT '[]',
             created_at    TEXT NOT NULL DEFAULT (datetime('now'))
         );
-
+        """,
+        """
         CREATE TABLE generation (
             id                     INTEGER PRIMARY KEY AUTOINCREMENT,
             scene_id               INTEGER REFERENCES scene(id),
@@ -125,7 +129,6 @@ def upgrade(conn: sqlite3.Connection) -> None:
             params_json            TEXT NOT NULL DEFAULT '{}',
             prompt_hash            TEXT NOT NULL DEFAULT '',
             request_json           TEXT NOT NULL DEFAULT '{}',
-            -- Monetary value stored as INTEGER minor units (cents), never float.
             cost_usd_cents         INTEGER NOT NULL DEFAULT 0
                                    CHECK (cost_usd_cents = CAST(cost_usd_cents AS INTEGER)),
             parent_generation_id   INTEGER REFERENCES generation(id),
@@ -134,7 +137,8 @@ def upgrade(conn: sqlite3.Connection) -> None:
                                    CHECK (state IN ('pending', 'succeeded', 'failed')),
             created_at             TEXT NOT NULL DEFAULT (datetime('now'))
         );
-
+        """,
+        """
         CREATE TABLE candidate (
             id             INTEGER PRIMARY KEY AUTOINCREMENT,
             generation_id  INTEGER NOT NULL REFERENCES generation(id),
@@ -142,5 +146,7 @@ def upgrade(conn: sqlite3.Connection) -> None:
             idx            INTEGER NOT NULL DEFAULT 0,
             created_at     TEXT NOT NULL DEFAULT (datetime('now'))
         );
-        """
+        """,
     )
+    for statement in statements:
+        conn.execute(statement)

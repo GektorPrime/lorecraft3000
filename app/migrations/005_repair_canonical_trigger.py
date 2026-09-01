@@ -20,10 +20,10 @@ import sqlite3
 
 
 def upgrade(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    # The runner owns the transaction (see 001_initial.upgrade).
+    statements = (
+        "DROP TRIGGER IF EXISTS trg_ref_set_no_update_canonical",
         """
-        DROP TRIGGER IF EXISTS trg_ref_set_no_update_canonical;
-
         CREATE TRIGGER trg_ref_set_no_update_canonical
         BEFORE UPDATE ON ref_set
         FOR EACH ROW
@@ -36,5 +36,7 @@ def upgrade(conn: sqlite3.Connection) -> None:
         BEGIN
             SELECT RAISE(ABORT, 'canonical ref_set is immutable except status->retired');
         END;
-        """
+        """,
     )
+    for statement in statements:
+        conn.execute(statement)

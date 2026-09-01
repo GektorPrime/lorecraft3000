@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import sqlite3
+import threading
 
 import pytest
 
@@ -35,6 +36,7 @@ def test_fresh_init_creates_all_tables(tmp_path):
         "scene",
         "generation",
         "candidate",
+        "image_provenance",
         "schema_migrations",
     }
     assert expected <= tables
@@ -69,6 +71,164 @@ def test_migrations_table_tracks_versions(tmp_path):
     finally:
         conn.close()
     assert versions == {m.rsplit(".", 1)[-1] for m in MIGRATIONS}
+
+
+def test_fresh_initial_migration_rolls_back_completely_and_can_retry(tmp_path):
+    """A failure partway through the initial migration leaves nothing behind."""
+    db = tmp_path / "initial-retry.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        # Force CREATE TABLE character to collide.
+        conn.execute("CREATE TABLE character (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(sqlite3.OperationalError, match="already exists"):
+        run_migrations(db)
+
+    conn = connect(db)
+    try:
+        # The whole run rolled back: nothing recorded and the other fresh-schema
+        # tables must not exist, so the migration can be re-run cleanly.
+        assert applied_versions(conn) == set()
+        tables = {
+            r["name"]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        assert "ref_set" not in tables
+        assert "generation" not in tables
+        assert "candidate" not in tables
+    finally:
+        conn.close()
+
+    conn = connect(db)
+    try:
+        conn.execute("DROP TABLE character")
+        conn.commit()
+    finally:
+        conn.close()
+
+    applied = run_migrations(db)
+    assert applied == [m.rsplit(".", 1)[-1] for m in MIGRATIONS]
+
+
+def test_concurrent_migration_runs_converge(tmp_path):
+    """Two processes starting migrations at once settle on one consistent set."""
+    db = tmp_path / "concurrent.db"
+    results: list[list[str]] = []
+    errors: list[Exception] = []
+
+    def run() -> None:
+        try:
+            results.append(run_migrations(db))
+        except Exception as exc:  # pragma: no cover
+            errors.append(exc)
+
+    threads = [threading.Thread(target=run) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    conn = connect(db)
+    try:
+        assert applied_versions(conn) == {m.rsplit(".", 1)[-1] for m in MIGRATIONS}
+        # The whole run is one transaction, so exactly one runner applied the
+        # full set (in some order); the other applied nothing. No version can
+        # ever be applied twice or partially.
+        expected = [m.rsplit(".", 1)[-1] for m in MIGRATIONS]
+        assert results[0] + results[1] == expected
+    finally:
+        conn.close()
+
+
+def test_full_schema_matches_direct_upgrade_chain(tmp_path):
+    """A fresh DB built by the runner has an identical schema to one built by
+    chaining every migration module directly.
+
+    This guards against drift between the runner and the modules it executes:
+    whichever path constructs a fresh database, the resulting schema — tables,
+    columns, indexes, and triggers — must be byte-for-byte the same.
+    """
+    runner_db = tmp_path / "runner.db"
+    run_migrations(runner_db)
+
+    direct_db = tmp_path / "direct.db"
+    conn = connect(direct_db)
+    try:
+        for module_name in MIGRATIONS:
+            importlib.import_module(module_name).upgrade(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+    def schema_objects(db: object):
+        c = connect(db)
+        try:
+            return {
+                (r["type"], r["name"], r["tbl_name"], r["sql"])
+                for r in c.execute(
+                    "SELECT type, name, tbl_name, sql FROM sqlite_master "
+                    "WHERE name NOT LIKE 'sqlite_%' AND name != 'schema_migrations'"
+                ).fetchall()
+            }
+        finally:
+            c.close()
+
+    assert schema_objects(runner_db) == schema_objects(direct_db)
+
+
+def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
+    """The newest non-idempotent migration (010) is interrupt-and-retry safe:
+    a mid-run collision rolls back the whole run, and resuming after cleaning
+    up converges to a fully applied, intact schema."""
+    db = tmp_path / "provenance-retry.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        for module_name in MIGRATIONS[:9]:
+            version = module_name.rsplit(".", 1)[-1]
+            importlib.import_module(module_name).upgrade(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
+            )
+        # A pre-existing image_provenance table with a divergent definition
+        # forces 010's CREATE TABLE to collide mid-run.
+        conn.execute(
+            "CREATE TABLE image_provenance (id INTEGER PRIMARY KEY AUTOINCREMENT)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(sqlite3.OperationalError, match="already exists"):
+        run_migrations(db)
+
+    conn = connect(db)
+    try:
+        assert "010_image_provenance" not in applied_versions(conn)
+        # The whole run rolled back: the migration's schema_migrations insert
+        # is gone and only the pre-existing stub table remains.
+        count = conn.execute(
+            "SELECT COUNT(*) AS n FROM pragma_table_info('image_provenance')"
+        ).fetchone()
+        assert count["n"] == 1
+        conn.execute("DROP TABLE image_provenance")
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert run_migrations(db) == ["010_image_provenance"]
+    conn = connect(db)
+    try:
+        assert "010_image_provenance" in applied_versions(conn)
+    finally:
+        conn.close()
 
 
 def test_generation_core_columns_are_migrated(conn):
@@ -280,8 +440,7 @@ def test_phase1_migration_recovers_old_duplicate_pending_rows(tmp_path):
         conn.close()
 
     assert run_migrations(db) == [
-        "007_phase1_safety",
-        "008_phase1_reconciliation",
+        m.rsplit(".", 1)[-1] for m in MIGRATIONS[6:]
     ]
     conn = connect(db)
     try:
@@ -338,8 +497,7 @@ def test_phase1_migration_rolls_back_completely_and_can_retry(tmp_path):
         conn.close()
 
     assert run_migrations(db) == [
-        "007_phase1_safety",
-        "008_phase1_reconciliation",
+        m.rsplit(".", 1)[-1] for m in MIGRATIONS[6:]
     ]
 
 
@@ -387,7 +545,9 @@ def test_phase1_reconciliation_returns_legacy_empty_canon_to_draft(tmp_path):
     finally:
         conn.close()
 
-    assert run_migrations(db) == ["008_phase1_reconciliation"]
+    assert run_migrations(db) == [
+        m.rsplit(".", 1)[-1] for m in MIGRATIONS[7:]
+    ]
     conn = connect(db)
     try:
         row = conn.execute("SELECT status FROM ref_set WHERE id = 1").fetchone()

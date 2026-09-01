@@ -279,14 +279,26 @@ class GenerationService:
                 "price_table_version": self.settings.price_table_version,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
-            self.storage.append_provenance(stored.sha256, provenance)
             candidate_id = ledger.succeed(
                 generation_id,
                 interaction_id=result.interaction_id,
                 response_json=result.response_metadata,
                 candidate_sha256=stored.sha256,
                 actual_cost_cents=result.billed_cost_cents,
+                provenance_record={
+                    "prompt_hash": preview.prompt_hash,
+                    "price_table_version": self.settings.price_table_version,
+                    "input_images": list(preview.attachments),
+                },
             )
+            # The authoritative provenance record is committed to
+            # image_provenance above, in the same transaction as the candidate.
+            # The sidecar is a best-effort mirror; its failure must never turn a
+            # successful generation into a failed one.
+            try:
+                self.storage.append_provenance(stored.sha256, provenance)
+            except Exception:
+                pass
         except Exception as exc:
             ledger.fail(
                 generation_id,

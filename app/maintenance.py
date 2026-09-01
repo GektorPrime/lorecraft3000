@@ -1,0 +1,410 @@
+"""Storage consistency scan and repair command (Work Package 5).
+
+Usage::
+
+    python -m app.maintenance check                # read-only report
+    python -m app.maintenance repair [--yes]       # apply safe repairs
+
+``check`` scans the store and the database, reports each defect class, and
+exits nonzero when inconsistencies are found (so it can gate a backup or a
+manual review). It never writes.
+
+``repair`` is opt-in: without ``--yes`` it prints what it would do and changes
+nothing; with ``--yes`` it removes stale ``.tmp-*`` files and reconstructs
+missing or damaged sidecars — base metadata derived from the image file plus an
+extension map, with the ``provenance`` list rebuilt from the authoritative
+``image_provenance`` rows (Work Package 3). It never deletes user image bytes
+and clearly reports every defect it declines to fix.
+
+The scanner reuses ``ImageStorage``'s completeness definition so the scan and
+the store always agree about what a readable image looks like.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sqlite3
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+from app.config import Settings
+from app.db import connect
+from app.migrate import run_migrations
+from app.storage import ImageStorage, _FORMAT_FROM_EXT
+
+# ---------------------------------------------------------------------------
+# Reports
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConsistencyReport:
+    """Results of a read-only consistency scan."""
+
+    missing_sidecar: tuple[str, ...] = ()
+    malformed_sidecar: tuple[str, ...] = ()
+    hash_mismatch: tuple[str, ...] = ()
+    sidecar_without_image: tuple[str, ...] = ()
+    dangling_db_hashes: tuple[str, ...] = ()
+    stale_temp_files: tuple[str, ...] = ()
+
+    @property
+    def issue_count(self) -> int:
+        return (
+            len(self.missing_sidecar)
+            + len(self.malformed_sidecar)
+            + len(self.hash_mismatch)
+            + len(self.sidecar_without_image)
+            + len(self.dangling_db_hashes)
+            + len(self.stale_temp_files)
+        )
+
+
+@dataclass(frozen=True)
+class RepairReport:
+    """Results of a repair pass (``apply=False`` reports the plan only)."""
+
+    sidecars_rebuilt: tuple[str, ...] = ()
+    provenance_rebuilt_for: tuple[str, ...] = ()
+    temp_files_removed: int = 0
+    unfixable: tuple[str, ...] = ()
+
+
+# ---------------------------------------------------------------------------
+# Scan
+# ---------------------------------------------------------------------------
+
+
+def _sidecar_exists(storage: ImageStorage, sha256: str) -> bool:
+    return (storage.root / sha256[:2] / f"{sha256}.json").is_file()
+
+
+def _read_sidecar(
+    storage: ImageStorage, sha256: str
+) -> tuple[bool, dict | None]:
+    """Load a sidecar as (exists, metadata).
+
+    ``exists`` is True whenever the file is present, even when it cannot be
+    parsed — so an unreadable sidecar is reported as *malformed*, not as
+    *missing*.
+    """
+    sidecar_path = storage.root / sha256[:2] / f"{sha256}.json"
+    try:
+        text = sidecar_path.read_text(encoding="utf-8")
+    except (OSError, FileNotFoundError):
+        return False, None
+    try:
+        metadata = json.loads(text)
+    except json.JSONDecodeError:
+        return True, None
+    return True, metadata if isinstance(metadata, dict) else None
+
+
+def _bytes_match_hash(path: Path, sha256: str) -> bool:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest() == sha256
+    except OSError:
+        return False
+
+
+def run_check(conn: sqlite3.Connection, storage: ImageStorage) -> ConsistencyReport:
+    """Scan the store and database and classify every inconsistency found.
+
+    The database hashes come from every table that references stored objects
+    (``candidate``, ``ref_image``, and the authoritative ``image_provenance``).
+    """
+    db_hashes = {
+        row[0]
+        for row in conn.execute(
+            "SELECT DISTINCT sha256 FROM candidate "
+            "UNION SELECT DISTINCT sha256 FROM ref_image "
+            "UNION SELECT DISTINCT sha256 FROM image_provenance"
+        ).fetchall()
+    }
+
+    missing: list[str] = []
+    malformed: list[str] = []
+    hash_mismatch: list[str] = []
+    sidecar_orphans: list[str] = []
+
+    for sha in storage.iter_hashes():
+        image = storage.find_image(sha)
+        if image is None:
+            if _sidecar_exists(storage, sha):
+                sidecar_orphans.append(sha)
+            continue
+        exists, metadata = _read_sidecar(storage, sha)
+        if not exists:
+            missing.append(sha)
+            continue
+        if metadata is None:
+            malformed.append(sha)
+            continue
+        extension = metadata.get("extension")
+        if not isinstance(extension, str) or not extension:
+            malformed.append(sha)
+            continue
+        if image.name != f"{sha}.{extension}":
+            malformed.append(sha)
+            continue
+        if not _bytes_match_hash(image, sha):
+            hash_mismatch.append(sha)
+
+    dangling = [sha for sha in db_hashes if storage.find_image(sha) is None]
+
+    temp_files = (
+        [str(p) for p in storage.root.rglob(".tmp-*") if p.is_file()]
+        if storage.root.exists()
+        else []
+    )
+
+    return ConsistencyReport(
+        missing_sidecar=tuple(sorted(missing)),
+        malformed_sidecar=tuple(sorted(malformed)),
+        hash_mismatch=tuple(sorted(hash_mismatch)),
+        sidecar_without_image=tuple(sorted(sidecar_orphans)),
+        dangling_db_hashes=tuple(sorted(dangling)),
+        stale_temp_files=tuple(sorted(temp_files)),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Repair
+# ---------------------------------------------------------------------------
+
+
+def _provenance_from_db(conn: sqlite3.Connection, sha256: str) -> list[dict]:
+    """Rebuild a sidecar provenance list from the authoritative DB rows.
+
+    The database persists only the fields needed for accountability, so rebuilt
+    records are a subset of the full generation-time record. Order follows the
+    insert order (``id``); the sidecar is a mirror, never the source of truth.
+    """
+    rows = conn.execute(
+        "SELECT generation_id, interaction_id, prompt_hash, cost_cents, "
+        "price_table_version, input_images, created_at "
+        "FROM image_provenance WHERE sha256=? ORDER BY id",
+        (sha256,),
+    ).fetchall()
+    records: list[dict] = []
+    for row in rows:
+        try:
+            input_images = json.loads(row[5])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            input_images = []
+        records.append(
+            {
+                "generation_id": row[0],
+                "interaction_id": row[1],
+                "prompt_hash": row[2],
+                "cost_cents": row[3],
+                "price_table_version": row[4],
+                "input_images": input_images,
+                "created_at": row[6],
+            }
+        )
+    return records
+
+
+def _derive_sidecar(
+    sha256: str, image: Path, existing: dict | None
+) -> dict | None:
+    """Reconstruct parseable base sidecar metadata from the image file.
+
+    Returns None when the extension is unknown (no way to name the reconstructed
+    sidecar safely), leaving the object to be reported as unfixable.
+    """
+    ext = image.suffix.lower().lstrip(".")
+    fmt = _FORMAT_FROM_EXT.get(ext)
+    if fmt is None:
+        return None
+    source_name = existing.get("source_name") if existing else None
+    try:
+        size = image.stat().st_size
+    except OSError:
+        return None
+    return {
+        "sha256": sha256,
+        "extension": ext,
+        "size": size,
+        "format": fmt,
+        "source_name": source_name,
+    }
+
+
+def run_repair(
+    conn: sqlite3.Connection, storage: ImageStorage, *, apply: bool = False
+) -> RepairReport:
+    """Repair what is safe; report everything that is not.
+
+    With ``apply=False`` (the default, matching the read-only bias of the
+    command), nothing on disk is modified; the returned report describes what
+    ``apply=True`` would do. Repairs never delete user image bytes.
+    """
+    report = run_check(conn, storage)
+
+    rebuilt: list[str] = []
+    provenance_rebuilt: list[str] = []
+    for sha in sorted(set(report.missing_sidecar) | set(report.malformed_sidecar)):
+        image = storage.find_image(sha)
+        existing = _read_sidecar(storage, sha)[1]
+        metadata = _derive_sidecar(sha, image, existing) if image else None
+        if metadata is None:
+            # Unrecoverable: no image file, or an extension no map entry names.
+            continue
+        provenance = _provenance_from_db(conn, sha)
+        metadata["provenance"] = provenance
+        if apply:
+            storage.write_sidecar(sha, metadata)
+        rebuilt.append(sha)
+        if provenance:
+            provenance_rebuilt.append(sha)
+
+    temp_files = (
+        [p for p in storage.root.rglob(".tmp-*") if p.is_file()]
+        if storage.root.exists()
+        else []
+    )
+    temp_removed = 0
+    if apply:
+        for path in temp_files:
+            try:
+                path.unlink()
+                temp_removed += 1
+            except OSError:
+                pass
+
+    unfixable = set()
+    for sha in report.hash_mismatch:
+        unfixable.add(f"{sha}: stored bytes fail the hash check (restore from originals)")
+    for sha in set(report.dangling_db_hashes) | set(report.sidecar_without_image):
+        unfixable.add(f"{sha}: image bytes are absent (restore from back-up)")
+    for sha in sorted(set(report.missing_sidecar) | set(report.malformed_sidecar)):
+        image = storage.find_image(sha)
+        if image is None or _derive_sidecar(sha, image, None) is None:
+            unfixable.add(
+                f"{sha}: cannot reconstruct a sidecar (image missing or "
+                "extension unknown)"
+            )
+
+    return RepairReport(
+        sidecars_rebuilt=tuple(sorted(rebuilt)),
+        provenance_rebuilt_for=tuple(sorted(provenance_rebuilt)),
+        temp_files_removed=temp_removed,
+        unfixable=tuple(sorted(unfixable)),
+    )
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def _print_report(report: ConsistencyReport) -> None:
+    """Print a human-readable consistency report; count lines match issues."""
+    def emit(label: str, items) -> None:
+        for item in items:
+            print(f"  {label}: {item}")
+
+    if report.issue_count == 0:
+        print("store is consistent: no issues found")
+        return
+    print(f"{report.issue_count} issue(s) found:")
+    emit("missing sidecar", report.missing_sidecar)
+    emit("malformed sidecar", report.malformed_sidecar)
+    emit("hash mismatch", report.hash_mismatch)
+    emit("sidecar without image", report.sidecar_without_image)
+    emit("dangling database hash", report.dangling_db_hashes)
+    emit("stale temp file", report.stale_temp_files)
+
+
+def _print_repair(report: RepairReport) -> None:
+    if report.unfixable:
+        print(f"declined to fix {len(report.unfixable)} item(s):")
+        for item in report.unfixable:
+            print(f"  unfixable: {item}")
+    if report.sidecars_rebuilt:
+        print(f"rebuilt {len(report.sidecars_rebuilt)} sidecar(s):")
+        for sha in report.sidecars_rebuilt:
+            print(f"  sidecar: {sha}")
+    if report.provenance_rebuilt_for:
+        print(f"rebuilt provenance from database for {len(report.provenance_rebuilt_for)} object(s)")
+    if report.temp_files_removed:
+        print(f"removed {report.temp_files_removed} stale temp file(s)")
+
+
+def _describe_repair_plan(report: RepairReport) -> None:
+    if report.sidecars_rebuilt:
+        print(f"would rebuild {len(report.sidecars_rebuilt)} sidecar(s)")
+    if report.provenance_rebuilt_for:
+        print(f"would rebuild provenance for {len(report.provenance_rebuilt_for)} object(s)")
+    if report.temp_files_removed:
+        print(f"would remove {len(report.temp_files_removed)} stale temp file(s)")
+    if report.unfixable:
+        print(f"would decline to fix {len(report.unfixable)} item(s)")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Entrypoint for ``python -m app.maintenance``. Returns an exit code."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.maintenance",
+        description="LoreCraft3000 storage consistency scan and repair.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser_check = subparsers.add_parser("check", help="read-only consistency report")
+    parser_repair = subparsers.add_parser("repair", help="safe repairs (opt-in)")
+    for command_parser in (parser_check, parser_repair):
+        command_parser.add_argument("--db", help="SQLite database path (defaults to settings)")
+        command_parser.add_argument("--store", help="store root (defaults to settings)")
+    parser_check.set_defaults(apply=False)
+    parser_repair.add_argument(
+        "--yes",
+        action="store_true",
+        help="apply repairs; without this flag only a dry-run plan is printed",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        settings = Settings.from_env()
+    except ValueError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return 2
+
+    db_path = Path(args.db) if args.db else settings.db_path
+    store_root = Path(args.store) if args.store else settings.store_root
+
+    run_migrations(
+        db_path,
+        journal_mode=settings.sqlite_journal_mode,
+        busy_timeout_ms=settings.sqlite_busy_timeout_ms,
+        synchronous=settings.sqlite_synchronous,
+    )
+    conn = connect(
+        db_path,
+        journal_mode=settings.sqlite_journal_mode,
+        busy_timeout_ms=settings.sqlite_busy_timeout_ms,
+        synchronous=settings.sqlite_synchronous,
+    )
+    try:
+        storage = ImageStorage(store_root)
+        if args.command == "check":
+            report = run_check(conn, storage)
+            _print_report(report)
+            return 1 if report.issue_count else 0
+        plan = run_repair(conn, storage, apply=False)
+        if not args.yes:
+            print("dry run; pass --yes to apply")
+            _describe_repair_plan(plan)
+            return 0
+        result = run_repair(conn, storage, apply=True)
+        _print_repair(result)
+        return 1 if result.unfixable else 0
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
+    sys.exit(main())
