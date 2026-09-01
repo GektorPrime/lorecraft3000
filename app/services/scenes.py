@@ -8,6 +8,7 @@ import sqlite3
 from app.assembler.core import AssemblyError, capabilities_for
 from app.config import Settings
 from app.domain.scenes import Scene
+from app.models import ASPECT_RATIOS
 
 
 class SceneError(Exception):
@@ -27,7 +28,9 @@ class SceneImmutableError(SceneError):
     """
 
 
-ASPECT_RATIOS = ("3:2", "16:9", "4:3", "1:1", "3:4", "9:16")
+# Re-exported from the registry (app/models.py) so existing callers of
+# ``from app.services.scenes import ASPECT_RATIOS`` keep working; the registry
+# is the single source of truth for the value.
 
 
 class SceneService:
@@ -255,14 +258,10 @@ class SceneService:
     def _normalize_cast(cast: list[dict]) -> list[dict]:
         """Validate and normalize each cast entry's role/prominence.
 
-        Authoritative on the backend regardless of caller: the legacy HTML
-        form route enforced "prominence is a positive integer" at parse time
-        (app/routes/scenes.py::_parse_prominence), but that check lived only
-        in the HTML route, not here — so the /api/v1 JSON API accepted
-        prominence <= 0 despite Pydantic's `ge=1` normally catching it,
-        because any other caller of this service (or a future API bypassing
-        Pydantic) would not be protected. Every cast entry that reaches
-        persistence is validated and normalized here.
+        Authoritative on the backend regardless of caller: cast prominence is
+        enforced here in the service, not in any route, so the /api/v1 JSON API
+        and any future caller are protected equally. Every cast entry that
+        reaches persistence is validated and normalized here.
         """
         normalized: list[dict] = []
         for entry in cast:

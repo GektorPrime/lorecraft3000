@@ -26,6 +26,10 @@ class PreviewChangedError(GenerationError):
     """Raised when paid generation no longer matches the reviewed preview."""
 
 
+class GenerationNotFoundError(GenerationError):
+    """Raised when a generation id does not exist."""
+
+
 @dataclass(frozen=True)
 class GenerationOutcome:
     generation_id: int
@@ -328,6 +332,26 @@ class GenerationService:
             ),
             warnings,
         )
+
+    def list_for_scene(self, scene_id: int) -> list[sqlite3.Row]:
+        """All generation rows for a panel, newest first."""
+        return self.conn.execute(
+            "SELECT * FROM generation WHERE scene_id = ? ORDER BY id DESC",
+            (scene_id,),
+        ).fetchall()
+
+    def get_with_candidates(self, generation_id: int) -> tuple[sqlite3.Row, list[sqlite3.Row]]:
+        """A generation row and its candidates, or GenerationNotFoundError."""
+        row = self.conn.execute(
+            "SELECT * FROM generation WHERE id = ?", (generation_id,)
+        ).fetchone()
+        if row is None:
+            raise GenerationNotFoundError(f"generation {generation_id} not found")
+        candidates = self.conn.execute(
+            "SELECT * FROM candidate WHERE generation_id = ? ORDER BY idx",
+            (generation_id,),
+        ).fetchall()
+        return row, candidates
 
     def _replayed_outcome(self, generation_id: int) -> GenerationOutcome:
         row = self.conn.execute(

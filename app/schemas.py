@@ -27,7 +27,7 @@ class ErrorOut(BaseModel):
     type: str
 
 
-class OptionsSummaryOut(BaseModel):
+class OptionsSummary(BaseModel):
     """Static configuration + live budget for driving frontend forms."""
 
     models: list[str]
@@ -44,7 +44,7 @@ class OptionsSummaryOut(BaseModel):
     panel_immutability_explanation: str
 
 
-class BudgetOut(BaseModel):
+class Budget(BaseModel):
     daily_spend_cap_cents: int
     spent_today_cents: int
     remaining_today_cents: int
@@ -55,7 +55,7 @@ class BudgetOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class CharacterCreate(BaseModel):
+class CharacterInput(BaseModel):
     name: str
     slug: str | None = None
     lore_md: str = ""
@@ -64,11 +64,7 @@ class CharacterCreate(BaseModel):
     default_style_id: int | None = None
 
 
-class CharacterUpdate(CharacterCreate):
-    pass
-
-
-class CharacterOut(BaseModel):
+class Character(BaseModel):
     id: int
     name: str
     slug: str
@@ -87,16 +83,12 @@ class CharacterOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class StyleCreate(BaseModel):
+class StyleInput(BaseModel):
     name: str
     style_contract: str = ""
 
 
-class StyleUpdate(StyleCreate):
-    pass
-
-
-class StyleOut(BaseModel):
+class Style(BaseModel):
     id: int
     name: str
     style_contract: str
@@ -108,7 +100,7 @@ class StyleOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class RefImageOut(BaseModel):
+class RefImage(BaseModel):
     id: int
     ref_set_id: int
     role: str
@@ -122,16 +114,16 @@ class RefImageRoleUpdate(BaseModel):
     role: str
 
 
-class RefSetOut(BaseModel):
+class RefSet(BaseModel):
     id: int
     character_id: int
     version: int
     status: str
     created_at: str
-    images: list[RefImageOut]
+    images: list[RefImage]
 
 
-class RefSetSummaryOut(BaseModel):
+class RefSetSummary(BaseModel):
     id: int
     character_id: int
     version: int
@@ -145,13 +137,13 @@ class RefSetSummaryOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class CastMemberIn(BaseModel):
+class CastMemberInput(BaseModel):
     character_id: int
     role: str = ""
     prominence: int = Field(default=1, ge=1)
 
 
-class CastMemberOut(BaseModel):
+class CastMember(BaseModel):
     character_id: int
     role: str
     prominence: int
@@ -160,30 +152,26 @@ class CastMemberOut(BaseModel):
     avatar_initials: str
 
 
-class PanelCreate(BaseModel):
+class PanelInput(BaseModel):
     beat_text: str
     camera: str
     framing: str
     mood: str = ""
     aspect_ratio: str = "3:2"
-    cast: list[CastMemberIn]
+    cast: list[CastMemberInput]
     style_id: int
     model: str
     image_size: str
 
 
-class PanelUpdate(PanelCreate):
-    pass
-
-
-class PanelOut(BaseModel):
+class Panel(BaseModel):
     id: int
     beat_text: str
     camera: str
     framing: str
     mood: str
     aspect_ratio: str
-    cast: list[CastMemberOut]
+    cast: list[CastMember]
     style_id: int
     model: str
     image_size: str
@@ -197,7 +185,7 @@ class PanelOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class GenerationAttachmentOut(BaseModel):
+class GenerationAttachment(BaseModel):
     image_number: int
     character_id: int
     character_name: str
@@ -206,13 +194,13 @@ class GenerationAttachmentOut(BaseModel):
     role: str
 
 
-class PanelPreviewOut(BaseModel):
+class PanelPreview(BaseModel):
     scene_id: int
     model: str
     image_size: str
     prompt: str
     prompt_hash: str
-    attachments: list[GenerationAttachmentOut]
+    attachments: list[GenerationAttachment]
     warnings: list[str]
     estimated_cost_cents: int
     spent_today_cents: int
@@ -225,7 +213,7 @@ class GenerationCreate(BaseModel):
     expected_prompt_hash: str
 
 
-class CandidateOut(BaseModel):
+class Candidate(BaseModel):
     id: int
     generation_id: int
     idx: int
@@ -238,7 +226,7 @@ class CandidateReviewIn(BaseModel):
     verdict: str
 
 
-class GenerationOut(BaseModel):
+class Generation(BaseModel):
     id: int
     scene_id: int
     model: str
@@ -246,7 +234,7 @@ class GenerationOut(BaseModel):
     aspect_ratio: str
     prompt: str
     prompt_hash: str
-    attachments: list[GenerationAttachmentOut]
+    attachments: list[GenerationAttachment]
     warnings: list[str]
     cost_usd_cents: int
     reserved_cost_usd_cents: int
@@ -256,10 +244,10 @@ class GenerationOut(BaseModel):
     error_text: str | None
     completed_at: str | None
     created_at: str
-    candidates: list[CandidateOut]
+    candidates: list[Candidate]
 
 
-class GenerationSummaryOut(BaseModel):
+class GenerationSummary(BaseModel):
     id: int
     scene_id: int
     model: str

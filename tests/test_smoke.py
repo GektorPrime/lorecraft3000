@@ -19,9 +19,9 @@ def test_home_route_responds():
         # Primary UI: the built React app's shell.
         assert '<div id="root">' in resp.text
     else:
-        # Fallback: the legacy server-rendered landing page.
+        # No build present: a short notice, not a second interface.
         assert "LoreCraft3000" in resp.text
-        assert 'href="/scenes/new"' in resp.text
+        assert "npm run build" in resp.text
 
 
 def test_health_route():
