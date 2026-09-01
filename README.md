@@ -14,7 +14,7 @@ is included as the initial default.
 - Content-addressed images with complete generation provenance
 - Manual candidate review without automatically changing character canon
 - Typed `/api/v1` JSON API backing a separated React + Vite frontend
-  (`frontend/`), with a legacy server-rendered UI kept for compatibility
+  (`frontend/`), which is the only UI
 
 ## Setup
 
@@ -59,14 +59,19 @@ LORECRAFT_RUN_LIVE_TESTS=1 uv run pytest -m live
 
 ## Frontend (React + Vite)
 
-The primary browser UI is a separated React + TypeScript frontend in
-`frontend/`, talking to the backend over a typed JSON API under
-`/api/v1` (see `app/routes/api_v1.py` and `app/schemas.py`). Business logic
-stays in the Python services (`app/services/`) — the frontend only renders
-and calls the API. A legacy server-rendered Jinja UI (`app/templates/`)
-remains mounted at its original routes for backward compatibility; the React
-app uses hash-based client routes (e.g. `/#/characters`) specifically so it
-never collides with those paths.
+The browser UI is a React + TypeScript frontend in `frontend/`, talking to the
+backend over a typed JSON API under `/api/v1` (see `app/routes/api_v1/` and
+`app/schemas.py`). Business logic stays in the Python services
+(`app/services/`) — the frontend only renders and calls the API. The React
+app is the only UI; there is no server-rendered fallback.
+
+Frontend API types are generated from the backend's OpenAPI document, never
+typed by hand: `app/scripts/generate_openapi.py` writes the current schema to
+the committed snapshot `frontend/openapi.json`, and `npm run types` runs
+[openapi-typescript](https://npmjs.com/package/openapi-typescript) over it,
+producing `frontend/src/api/generated/types.d.ts`. `npm run build` regenerates
+types first, so a backend DTO change that is not committed together with a
+regenerated snapshot fails the build loudly instead of drifting.
 
 ### Run in development
 
@@ -91,10 +96,13 @@ VITE_BACKEND_URL=http://127.0.0.1:8010 npm run dev
 npm run build
 ```
 
-This writes `frontend/dist/`. When that directory exists, `app/main.py`
-serves it directly at `/` (and its assets at `/assets/*`) — FastAPI is then
-the single production server; no separate frontend server or reverse proxy
-is required. `frontend/dist/` is generated and gitignored, not committed.
+This regenerates the API types (see the Frontend section), then writes
+`frontend/dist/`. The frontend build is required to run the app: `app/main.py`
+serves `frontend/dist/` at `/` (and its assets at `/assets/*`) — FastAPI is
+then the single production server; no separate frontend server or reverse
+proxy is required. Without a build present, `/` returns a short notice
+pointing at `npm run build`. `frontend/dist/` is generated and gitignored, not
+committed.
 
 ### Frontend tests
 

@@ -3,18 +3,21 @@
 Organized by responsibility:
   - app/main.py        app startup + route wiring
   - app/config.py      settings from .env
-  - app/deps.py        shared dependencies (settings, templates, conn, storage)
+  - app/deps.py        shared dependencies (settings, conn, storage)
   - app/db.py          SQLite connection helpers
   - app/migrate.py     migration runner
   - app/storage.py     content-addressed image storage
   - app/maintenance.py storage consistency scan + repair CLI
   - app/domain/        domain models
-  - app/services/      business services (characters, styles, ref_sets)
-  - app/routes/        route modules (characters, styles, ref_sets)
+  - app/models.py      model capability and pricing registry
+  - app/services/      business services (characters, styles, ref_sets, ...)
+  - app/routes/        /api/v1 resource routers
   - app/providers/     provider adapters
   - app/assembler/     multi-character prompt assembler
-  - app/templates/     server-rendered Jinja2 templates
-  - app/static/        static assets (CSS, vendored htmx)
+
+The React frontend (frontend/) is the only UI. Serving it is fully optional at
+runtime: with no build present, "/" returns a short notice pointing at
+`npm run build` instead of a second interface.
 """
 
 from __future__ import annotations
@@ -27,31 +30,18 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.deps import settings, templates
+from app.deps import settings
 from app.db import connect
 from app.middleware import LocalRequestGuardMiddleware
 from app.migrate import run_migrations
 from app.routes import api_v1
-from app.routes import characters as character_routes
-from app.routes import ref_sets as ref_set_routes
-from app.routes import scenes as scene_routes
-from app.routes import styles as style_routes
 from app.services.costs import CostLedger
 
 logger = logging.getLogger("lorecraft")
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
-
-# The built React frontend (`npm run build` in frontend/, issue #15). Serving
-# it is entirely optional: with no build present, the app falls back to the
-# legacy server-rendered Jinja UI (app/templates/), kept for compatibility.
-# When frontend/dist exists it becomes the primary UI at "/". The frontend
-# uses hash-based client-side routing (e.g. "/#/characters") specifically so
-# its internal routes never collide with the legacy Jinja routes registered
-# below at the same-looking paths (e.g. GET /characters) — a hash fragment is
-# never sent to the server, so a browser refresh on any React route still
-# resolves to "/" and re-renders client-side. In dev, Vite's dev server
-# proxies /api to this backend instead (see frontend/vite.config.ts).
+# The built React frontend (`npm run build` in frontend/). The app serves it at
+# "/" when present. If it is absent, "/" returns a short notice instructing the
+# operator to build it.
 FRONTEND_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
@@ -101,12 +91,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="LoreCraft3000", lifespan=lifespan)
 app.add_middleware(LocalRequestGuardMiddleware)
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-app.include_router(character_routes.router)
-app.include_router(style_routes.router)
-app.include_router(ref_set_routes.router)
-app.include_router(scene_routes.router)
 app.include_router(api_v1.router)
 
 if (FRONTEND_DIST_DIR / "assets").is_dir():
@@ -121,14 +105,19 @@ if (FRONTEND_DIST_DIR / "assets").is_dir():
 def home(request: Request):
     """Landing page for the library-to-panel workflow.
 
-    Serves the built React app (see frontend/) when present; otherwise falls
-    back to the legacy server-rendered Jinja landing page so the app still
-    runs without a frontend build.
+    Serves the built React app (frontend/). The frontend is the only UI: when
+    it has not been built, "/" returns a short notice pointing at `npm run
+    build` instead of a second interface.
     """
     index_path = FRONTEND_DIST_DIR / "index.html"
     if index_path.is_file():
         return HTMLResponse(index_path.read_text(encoding="utf-8"))
-    return templates.TemplateResponse(request, "home.html", {})
+    return HTMLResponse(
+        "<h1>LoreCraft3000</h1>"
+        "<p>The React frontend has not been built yet. Run "
+        "<code>npm run build</code> in <code>frontend/</code> and restart "
+        "this server, or use the JSON API under <code>/api/v1</code>.</p>"
+    )
 
 
 @app.get("/health")

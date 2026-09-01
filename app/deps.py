@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: settings, templates, DB connection, storage.
+"""Shared FastAPI dependencies: settings, DB connection, storage.
 
 Routes declare `conn: sqlite3.Connection = Depends(get_conn)` and
 `storage: ImageStorage = Depends(get_storage)`; tests override these via
@@ -7,10 +7,6 @@ Routes declare `conn: sqlite3.Connection = Depends(get_conn)` and
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from fastapi.templating import Jinja2Templates
-
 from app.config import Settings
 from app.db import connect
 from app.providers.gemini import GeminiProvider
@@ -18,9 +14,6 @@ from app.storage import ImageStorage
 
 # Single Settings instance for the whole app (env/.env loaded in app.config).
 settings = Settings.from_env()
-
-TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 def get_conn():

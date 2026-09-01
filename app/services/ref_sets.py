@@ -39,6 +39,10 @@ class RefSetNotFoundError(RefSetError):
     """Raised when a ref_set id does not exist."""
 
 
+class RefImageNotFoundError(RefSetError):
+    """Raised when a ref_image id does not exist."""
+
+
 class RefSetNotDraftError(RefSetError):
     """Raised when an edit/promote targets a set that is not a draft."""
 
@@ -124,6 +128,19 @@ class RefSetService:
             (ref_set_id,),
         ).fetchall()
         return [RefImage.from_row(r) for r in rows]
+
+    def content_sha(self, image_id: int) -> str:
+        """Resolve a ref image id to its stored content hash.
+
+        Raises RefImageNotFoundError if the id does not exist; the caller uses
+        the hash to read bytes from the content-addressed store.
+        """
+        row = self.conn.execute(
+            "SELECT sha256 FROM ref_image WHERE id = ?", (image_id,)
+        ).fetchone()
+        if row is None:
+            raise RefImageNotFoundError(f"ref image {image_id} not found")
+        return row["sha256"]
 
     # ------------------------------------------------------------------
     # draft lifecycle

@@ -1,0 +1,2416 @@
+{
+  "components": {
+    "schemas": {
+      "Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post": {
+        "properties": {
+          "image": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Image",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "image"
+        ],
+        "title": "Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post",
+        "type": "object"
+      },
+      "Budget": {
+        "properties": {
+          "daily_spend_cap_cents": {
+            "title": "Daily Spend Cap Cents",
+            "type": "integer"
+          },
+          "remaining_today_cents": {
+            "title": "Remaining Today Cents",
+            "type": "integer"
+          },
+          "spent_today_cents": {
+            "title": "Spent Today Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "daily_spend_cap_cents",
+          "spent_today_cents",
+          "remaining_today_cents"
+        ],
+        "title": "Budget",
+        "type": "object"
+      },
+      "Candidate": {
+        "properties": {
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "generation_id": {
+            "title": "Generation Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "idx": {
+            "title": "Idx",
+            "type": "integer"
+          },
+          "review_status": {
+            "title": "Review Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "generation_id",
+          "idx",
+          "review_status",
+          "content_url",
+          "created_at"
+        ],
+        "title": "Candidate",
+        "type": "object"
+      },
+      "CandidateReviewIn": {
+        "properties": {
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict"
+        ],
+        "title": "CandidateReviewIn",
+        "type": "object"
+      },
+      "CastMember": {
+        "properties": {
+          "avatar_initials": {
+            "title": "Avatar Initials",
+            "type": "string"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prominence": {
+            "title": "Prominence",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "character_id",
+          "role",
+          "prominence",
+          "name",
+          "avatar_url",
+          "avatar_initials"
+        ],
+        "title": "CastMember",
+        "type": "object"
+      },
+      "CastMemberInput": {
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "prominence": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Prominence",
+            "type": "integer"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "character_id"
+        ],
+        "title": "CastMemberInput",
+        "type": "object"
+      },
+      "Character": {
+        "properties": {
+          "avatar_initials": {
+            "title": "Avatar Initials",
+            "type": "string"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "default_style_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Style Id"
+          },
+          "has_canonical_ref_set": {
+            "title": "Has Canonical Ref Set",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lore_md": {
+            "title": "Lore Md",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "negative_traits": {
+            "title": "Negative Traits",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "visual_contract": {
+            "title": "Visual Contract",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "lore_md",
+          "visual_contract",
+          "negative_traits",
+          "default_style_id",
+          "created_at",
+          "has_canonical_ref_set",
+          "avatar_url",
+          "avatar_initials"
+        ],
+        "title": "Character",
+        "type": "object"
+      },
+      "CharacterInput": {
+        "properties": {
+          "default_style_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Style Id"
+          },
+          "lore_md": {
+            "default": "",
+            "title": "Lore Md",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "negative_traits": {
+            "default": "",
+            "title": "Negative Traits",
+            "type": "string"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "visual_contract": {
+            "default": "",
+            "title": "Visual Contract",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CharacterInput",
+        "type": "object"
+      },
+      "Generation": {
+        "properties": {
+          "actual_cost_usd_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Cost Usd Cents"
+          },
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/GenerationAttachment"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "cost_usd_cents": {
+            "title": "Cost Usd Cents",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Text"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "prompt_hash": {
+            "title": "Prompt Hash",
+            "type": "string"
+          },
+          "reserved_cost_usd_cents": {
+            "title": "Reserved Cost Usd Cents",
+            "type": "integer"
+          },
+          "scene_id": {
+            "title": "Scene Id",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "scene_id",
+          "model",
+          "image_size",
+          "aspect_ratio",
+          "prompt",
+          "prompt_hash",
+          "attachments",
+          "warnings",
+          "cost_usd_cents",
+          "reserved_cost_usd_cents",
+          "actual_cost_usd_cents",
+          "state",
+          "interaction_id",
+          "error_text",
+          "completed_at",
+          "created_at",
+          "candidates"
+        ],
+        "title": "Generation",
+        "type": "object"
+      },
+      "GenerationAttachment": {
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "character_name": {
+            "title": "Character Name",
+            "type": "string"
+          },
+          "image_number": {
+            "title": "Image Number",
+            "type": "integer"
+          },
+          "ref_set_id": {
+            "title": "Ref Set Id",
+            "type": "integer"
+          },
+          "ref_set_version": {
+            "title": "Ref Set Version",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_number",
+          "character_id",
+          "character_name",
+          "ref_set_id",
+          "ref_set_version",
+          "role"
+        ],
+        "title": "GenerationAttachment",
+        "type": "object"
+      },
+      "GenerationCreate": {
+        "properties": {
+          "expected_prompt_hash": {
+            "title": "Expected Prompt Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_prompt_hash"
+        ],
+        "title": "GenerationCreate",
+        "type": "object"
+      },
+      "GenerationSummary": {
+        "properties": {
+          "actual_cost_usd_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Cost Usd Cents"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "cost_usd_cents": {
+            "title": "Cost Usd Cents",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Text"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "reserved_cost_usd_cents": {
+            "title": "Reserved Cost Usd Cents",
+            "type": "integer"
+          },
+          "scene_id": {
+            "title": "Scene Id",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "scene_id",
+          "model",
+          "cost_usd_cents",
+          "reserved_cost_usd_cents",
+          "actual_cost_usd_cents",
+          "state",
+          "error_text",
+          "completed_at",
+          "created_at"
+        ],
+        "title": "GenerationSummary",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "OptionsSummary": {
+        "description": "Static configuration + live budget for driving frontend forms.",
+        "properties": {
+          "aspect_ratios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aspect Ratios",
+            "type": "array"
+          },
+          "daily_spend_cap_cents": {
+            "title": "Daily Spend Cap Cents",
+            "type": "integer"
+          },
+          "default_image_size": {
+            "title": "Default Image Size",
+            "type": "string"
+          },
+          "default_model": {
+            "title": "Default Model",
+            "type": "string"
+          },
+          "image_sizes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Image Sizes",
+            "type": "array"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "panel_immutability_explanation": {
+            "title": "Panel Immutability Explanation",
+            "type": "string"
+          },
+          "ref_image_roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ref Image Roles",
+            "type": "array"
+          },
+          "ref_image_weight_explanation": {
+            "title": "Ref Image Weight Explanation",
+            "type": "string"
+          },
+          "ref_set_immutability_explanation": {
+            "title": "Ref Set Immutability Explanation",
+            "type": "string"
+          },
+          "remaining_today_cents": {
+            "title": "Remaining Today Cents",
+            "type": "integer"
+          },
+          "spent_today_cents": {
+            "title": "Spent Today Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "models",
+          "image_sizes",
+          "aspect_ratios",
+          "ref_image_roles",
+          "default_model",
+          "default_image_size",
+          "daily_spend_cap_cents",
+          "spent_today_cents",
+          "remaining_today_cents",
+          "ref_image_weight_explanation",
+          "ref_set_immutability_explanation",
+          "panel_immutability_explanation"
+        ],
+        "title": "OptionsSummary",
+        "type": "object"
+      },
+      "Panel": {
+        "properties": {
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "beat_text": {
+            "title": "Beat Text",
+            "type": "string"
+          },
+          "camera": {
+            "title": "Camera",
+            "type": "string"
+          },
+          "cast": {
+            "items": {
+              "$ref": "#/components/schemas/CastMember"
+            },
+            "title": "Cast",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "framing": {
+            "title": "Framing",
+            "type": "string"
+          },
+          "generation_count": {
+            "title": "Generation Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "is_editable": {
+            "title": "Is Editable",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "mood": {
+            "title": "Mood",
+            "type": "string"
+          },
+          "style_id": {
+            "title": "Style Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "beat_text",
+          "camera",
+          "framing",
+          "mood",
+          "aspect_ratio",
+          "cast",
+          "style_id",
+          "model",
+          "image_size",
+          "created_at",
+          "is_editable",
+          "generation_count"
+        ],
+        "title": "Panel",
+        "type": "object"
+      },
+      "PanelInput": {
+        "properties": {
+          "aspect_ratio": {
+            "default": "3:2",
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "beat_text": {
+            "title": "Beat Text",
+            "type": "string"
+          },
+          "camera": {
+            "title": "Camera",
+            "type": "string"
+          },
+          "cast": {
+            "items": {
+              "$ref": "#/components/schemas/CastMemberInput"
+            },
+            "title": "Cast",
+            "type": "array"
+          },
+          "framing": {
+            "title": "Framing",
+            "type": "string"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "mood": {
+            "default": "",
+            "title": "Mood",
+            "type": "string"
+          },
+          "style_id": {
+            "title": "Style Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "beat_text",
+          "camera",
+          "framing",
+          "cast",
+          "style_id",
+          "model",
+          "image_size"
+        ],
+        "title": "PanelInput",
+        "type": "object"
+      },
+      "PanelPreview": {
+        "properties": {
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/GenerationAttachment"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "can_generate": {
+            "title": "Can Generate",
+            "type": "boolean"
+          },
+          "estimated_cost_cents": {
+            "title": "Estimated Cost Cents",
+            "type": "integer"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "prompt_hash": {
+            "title": "Prompt Hash",
+            "type": "string"
+          },
+          "remaining_after_cents": {
+            "title": "Remaining After Cents",
+            "type": "integer"
+          },
+          "scene_id": {
+            "title": "Scene Id",
+            "type": "integer"
+          },
+          "spent_today_cents": {
+            "title": "Spent Today Cents",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scene_id",
+          "model",
+          "image_size",
+          "prompt",
+          "prompt_hash",
+          "attachments",
+          "warnings",
+          "estimated_cost_cents",
+          "spent_today_cents",
+          "remaining_after_cents",
+          "can_generate"
+        ],
+        "title": "PanelPreview",
+        "type": "object"
+      },
+      "RefImage": {
+        "properties": {
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "quality_flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Quality Flags",
+            "type": "array"
+          },
+          "ref_set_id": {
+            "title": "Ref Set Id",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "ref_set_id",
+          "role",
+          "weight",
+          "quality_flags",
+          "created_at",
+          "content_url"
+        ],
+        "title": "RefImage",
+        "type": "object"
+      },
+      "RefImageRoleUpdate": {
+        "properties": {
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "RefImageRoleUpdate",
+        "type": "object"
+      },
+      "RefSet": {
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/RefImage"
+            },
+            "title": "Images",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "character_id",
+          "version",
+          "status",
+          "created_at",
+          "images"
+        ],
+        "title": "RefSet",
+        "type": "object"
+      },
+      "RefSetSummary": {
+        "properties": {
+          "character_id": {
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "image_count": {
+            "title": "Image Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "character_id",
+          "version",
+          "status",
+          "created_at",
+          "image_count"
+        ],
+        "title": "RefSetSummary",
+        "type": "object"
+      },
+      "Style": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "style_contract": {
+            "title": "Style Contract",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "style_contract",
+          "created_at"
+        ],
+        "title": "Style",
+        "type": "object"
+      },
+      "StyleInput": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "style_contract": {
+            "default": "",
+            "title": "Style Contract",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "StyleInput",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "LoreCraft3000",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "description": "Landing page for the library-to-panel workflow.\n\nServes the built React app (frontend/). The frontend is the only UI: when\nit has not been built, \"/\" returns a short notice pointing at `npm run\nbuild` instead of a second interface.",
+        "operationId": "home__get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Home"
+      }
+    },
+    "/api/v1/budget": {
+      "get": {
+        "operationId": "budget_api_v1_budget_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Budget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Budget",
+        "tags": [
+          "api-v1",
+          "api-v1-options"
+        ]
+      }
+    },
+    "/api/v1/candidates/{candidate_id}/content": {
+      "get": {
+        "operationId": "candidate_content_api_v1_candidates__candidate_id__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Candidate Content",
+        "tags": [
+          "api-v1",
+          "api-v1-generations"
+        ]
+      }
+    },
+    "/api/v1/candidates/{candidate_id}/review": {
+      "post": {
+        "operationId": "review_candidate_api_v1_candidates__candidate_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Candidate"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Candidate",
+        "tags": [
+          "api-v1",
+          "api-v1-generations"
+        ]
+      }
+    },
+    "/api/v1/characters": {
+      "get": {
+        "operationId": "list_characters_api_v1_characters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Character"
+                  },
+                  "title": "Response List Characters Api V1 Characters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Characters",
+        "tags": [
+          "api-v1",
+          "api-v1-characters"
+        ]
+      },
+      "post": {
+        "operationId": "create_character_api_v1_characters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Character"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Character",
+        "tags": [
+          "api-v1",
+          "api-v1-characters"
+        ]
+      }
+    },
+    "/api/v1/characters/{character_id}": {
+      "get": {
+        "operationId": "get_character_api_v1_characters__character_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "character_id",
+            "required": true,
+            "schema": {
+              "title": "Character Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Character"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Character",
+        "tags": [
+          "api-v1",
+          "api-v1-characters"
+        ]
+      },
+      "put": {
+        "operationId": "update_character_api_v1_characters__character_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "character_id",
+            "required": true,
+            "schema": {
+              "title": "Character Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Character"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Character",
+        "tags": [
+          "api-v1",
+          "api-v1-characters"
+        ]
+      }
+    },
+    "/api/v1/characters/{character_id}/ref-sets": {
+      "get": {
+        "operationId": "list_ref_sets_api_v1_characters__character_id__ref_sets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "character_id",
+            "required": true,
+            "schema": {
+              "title": "Character Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RefSetSummary"
+                  },
+                  "title": "Response List Ref Sets Api V1 Characters  Character Id  Ref Sets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Ref Sets",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      },
+      "post": {
+        "operationId": "create_ref_set_draft_api_v1_characters__character_id__ref_sets_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "character_id",
+            "required": true,
+            "schema": {
+              "title": "Character Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Ref Set Draft",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/generations/{generation_id}": {
+      "get": {
+        "operationId": "get_generation_api_v1_generations__generation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "generation_id",
+            "required": true,
+            "schema": {
+              "title": "Generation Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Generation",
+        "tags": [
+          "api-v1",
+          "api-v1-generations"
+        ]
+      }
+    },
+    "/api/v1/options/summary": {
+      "get": {
+        "operationId": "options_summary_api_v1_options_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionsSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Options Summary",
+        "tags": [
+          "api-v1",
+          "api-v1-options"
+        ]
+      }
+    },
+    "/api/v1/panels": {
+      "get": {
+        "operationId": "list_panels_api_v1_panels_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Panel"
+                  },
+                  "title": "Response List Panels Api V1 Panels Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Panels",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      },
+      "post": {
+        "operationId": "create_panel_api_v1_panels_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}": {
+      "get": {
+        "operationId": "get_panel_api_v1_panels__panel_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      },
+      "put": {
+        "operationId": "update_panel_api_v1_panels__panel_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}/duplicate": {
+      "post": {
+        "operationId": "duplicate_panel_api_v1_panels__panel_id__duplicate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Duplicate Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}/generate": {
+      "post": {
+        "operationId": "generate_panel_api_v1_panels__panel_id__generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}/generations": {
+      "get": {
+        "operationId": "list_panel_generations_api_v1_panels__panel_id__generations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationSummary"
+                  },
+                  "title": "Response List Panel Generations Api V1 Panels  Panel Id  Generations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Panel Generations",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}/preview": {
+      "get": {
+        "operationId": "preview_panel_api_v1_panels__panel_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/ref-images/{image_id}/content": {
+      "get": {
+        "operationId": "ref_image_content_api_v1_ref_images__image_id__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ref Image Content",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/ref-sets/{ref_set_id}": {
+      "get": {
+        "operationId": "get_ref_set_api_v1_ref_sets__ref_set_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ref_set_id",
+            "required": true,
+            "schema": {
+              "title": "Ref Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ref Set",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/ref-sets/{ref_set_id}/copy": {
+      "post": {
+        "operationId": "copy_ref_set_api_v1_ref_sets__ref_set_id__copy_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ref_set_id",
+            "required": true,
+            "schema": {
+              "title": "Ref Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Copy Ref Set",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/ref-sets/{ref_set_id}/images": {
+      "post": {
+        "operationId": "upload_ref_image_api_v1_ref_sets__ref_set_id__images_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ref_set_id",
+            "required": true,
+            "schema": {
+              "title": "Ref Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefImage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Ref Image",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/ref-sets/{ref_set_id}/images/{image_id}": {
+      "delete": {
+        "operationId": "remove_ref_image_api_v1_ref_sets__ref_set_id__images__image_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ref_set_id",
+            "required": true,
+            "schema": {
+              "title": "Ref Set Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Ref Image",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      },
+      "patch": {
+        "operationId": "re_role_ref_image_api_v1_ref_sets__ref_set_id__images__image_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ref_set_id",
+            "required": true,
+            "schema": {
+              "title": "Ref Set Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefImageRoleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefImage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Re Role Ref Image",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/ref-sets/{ref_set_id}/promote": {
+      "post": {
+        "operationId": "promote_ref_set_api_v1_ref_sets__ref_set_id__promote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ref_set_id",
+            "required": true,
+            "schema": {
+              "title": "Ref Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote Ref Set",
+        "tags": [
+          "api-v1",
+          "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/styles": {
+      "get": {
+        "operationId": "list_styles_api_v1_styles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Style"
+                  },
+                  "title": "Response List Styles Api V1 Styles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Styles",
+        "tags": [
+          "api-v1",
+          "api-v1-styles"
+        ]
+      },
+      "post": {
+        "operationId": "create_style_api_v1_styles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StyleInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Style"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Style",
+        "tags": [
+          "api-v1",
+          "api-v1-styles"
+        ]
+      }
+    },
+    "/api/v1/styles/{style_id}": {
+      "get": {
+        "operationId": "get_style_api_v1_styles__style_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "style_id",
+            "required": true,
+            "schema": {
+              "title": "Style Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Style"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Style",
+        "tags": [
+          "api-v1",
+          "api-v1-styles"
+        ]
+      },
+      "put": {
+        "operationId": "update_style_api_v1_styles__style_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "style_id",
+            "required": true,
+            "schema": {
+              "title": "Style Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StyleInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Style"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Style",
+        "tags": [
+          "api-v1",
+          "api-v1-styles"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Health check.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    }
+  }
+}
