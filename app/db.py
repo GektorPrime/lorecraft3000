@@ -10,6 +10,7 @@ writer waits briefly instead of failing immediately), and synchronous=NORMAL
 from __future__ import annotations
 
 import sqlite3
+import time
 from pathlib import Path
 
 # Defaults mirror app.config.Settings so every caller (including tests that pass
@@ -43,13 +44,45 @@ def connect(
     # busy_timeout must be set before any contended statement so a second writer
     # waits rather than failing immediately with "database is locked".
     conn.execute(f"PRAGMA busy_timeout = {int(busy_timeout_ms)}")
-    applied_mode = conn.execute(
-        f"PRAGMA journal_mode = {journal_mode}"
-    ).fetchone()[0]
+    # Reading journal_mode is lock-free; setting it acquires a database lock
+    # that IGNORES the busy handler (a WAL conversion needs more than a normal
+    # lock). Only set when the database actually differs, and retry briefly so
+    # two connections racing to initialize a fresh database do not fail with a
+    # spurious "database is locked".
+    current_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+    if current_mode.lower() != journal_mode.lower():
+        _set_journal_mode(conn, journal_mode)
+    conn.execute(f"PRAGMA synchronous = {synchronous}")
+    return conn
+
+
+def _set_journal_mode(conn: sqlite3.Connection, journal_mode: str) -> None:
+    """Set journal_mode, retrying while another connection owns the write lock.
+
+    ``PRAGMA journal_mode`` does not respect ``busy_timeout`` when converting an
+    existing database, so without retry a concurrent initializer can fail with
+    "database is locked". The retry target is small: the racing connection (for
+    example, a concurrent migration run on a fresh database) releases within
+    milliseconds.
+    """
+    deadline = time.monotonic() + 5.0
+    while True:
+        try:
+            applied_mode = conn.execute(
+                f"PRAGMA journal_mode = {journal_mode}"
+            ).fetchone()[0]
+            break
+        except sqlite3.OperationalError as exc:
+            message = str(exc).lower()
+            if "busy" not in message and "locked" not in message:
+                conn.close()
+                raise
+            if time.monotonic() >= deadline:
+                conn.close()
+                raise
+            time.sleep(0.02)
     if journal_mode.lower() == "wal" and applied_mode.lower() != "wal":
         conn.close()
         raise RuntimeError(
             f"requested WAL journal mode but database reported {applied_mode!r}"
         )
-    conn.execute(f"PRAGMA synchronous = {synchronous}")
-    return conn

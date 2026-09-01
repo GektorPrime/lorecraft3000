@@ -51,13 +51,25 @@ def run_migrations(
     busy_timeout_ms: int = 5000,
     synchronous: str = "normal",
 ) -> list[str]:
-    """Apply all pending migrations. Returns the list of versions applied."""
+    """Apply all pending migrations. Returns the list of versions applied.
+
+    The whole run executes inside one BEGIN IMMEDIATE transaction, so a second
+    process starting concurrently either waits within the busy timeout or joins
+    after this run commits (and observes the versions already applied). Because
+    the transaction is committed only after every pending migration and its
+    schema_migrations insert succeeds, an interrupted or failed run leaves no
+    partially applied migration: re-running resumes cleanly from the same state.
+    """
     conn = connect(
         db_path,
         journal_mode=journal_mode,
         busy_timeout_ms=busy_timeout_ms,
         synchronous=synchronous,
     )
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+    except sqlite3.OperationalError:
+        raise
     try:
         _ensure_migrations_table(conn)
         done = applied_versions(conn)
@@ -71,8 +83,11 @@ def run_migrations(
             conn.execute(
                 "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
             )
-            conn.commit()
             applied.append(version)
+        conn.commit()
         return applied
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()

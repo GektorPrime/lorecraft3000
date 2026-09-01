@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import sqlite3
+import threading
 
 import pytest
 
@@ -70,6 +71,80 @@ def test_migrations_table_tracks_versions(tmp_path):
     finally:
         conn.close()
     assert versions == {m.rsplit(".", 1)[-1] for m in MIGRATIONS}
+
+
+def test_fresh_initial_migration_rolls_back_completely_and_can_retry(tmp_path):
+    """A failure partway through the initial migration leaves nothing behind."""
+    db = tmp_path / "initial-retry.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        # Force CREATE TABLE character to collide.
+        conn.execute("CREATE TABLE character (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(sqlite3.OperationalError, match="already exists"):
+        run_migrations(db)
+
+    conn = connect(db)
+    try:
+        # The whole run rolled back: nothing recorded and the other fresh-schema
+        # tables must not exist, so the migration can be re-run cleanly.
+        assert applied_versions(conn) == set()
+        tables = {
+            r["name"]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        assert "ref_set" not in tables
+        assert "generation" not in tables
+        assert "candidate" not in tables
+    finally:
+        conn.close()
+
+    conn = connect(db)
+    try:
+        conn.execute("DROP TABLE character")
+        conn.commit()
+    finally:
+        conn.close()
+
+    applied = run_migrations(db)
+    assert applied == [m.rsplit(".", 1)[-1] for m in MIGRATIONS]
+
+
+def test_concurrent_migration_runs_converge(tmp_path):
+    """Two processes starting migrations at once settle on one consistent set."""
+    db = tmp_path / "concurrent.db"
+    results: list[list[str]] = []
+    errors: list[Exception] = []
+
+    def run() -> None:
+        try:
+            results.append(run_migrations(db))
+        except Exception as exc:  # pragma: no cover
+            errors.append(exc)
+
+    threads = [threading.Thread(target=run) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    conn = connect(db)
+    try:
+        assert applied_versions(conn) == {m.rsplit(".", 1)[-1] for m in MIGRATIONS}
+        # The whole run is one transaction, so exactly one runner applied the
+        # full set (in some order); the other applied nothing. No version can
+        # ever be applied twice or partially.
+        expected = [m.rsplit(".", 1)[-1] for m in MIGRATIONS]
+        assert results[0] + results[1] == expected
+    finally:
+        conn.close()
 
 
 def test_generation_core_columns_are_migrated(conn):

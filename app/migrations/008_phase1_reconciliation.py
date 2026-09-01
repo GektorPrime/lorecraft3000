@@ -6,7 +6,7 @@ import sqlite3
 
 
 def upgrade(conn: sqlite3.Connection) -> None:
-    conn.execute("BEGIN IMMEDIATE")
+    # The runner owns the transaction (see 001_initial.upgrade).
     statements = (
         "ALTER TABLE generation ADD COLUMN warning_text TEXT",
         """
@@ -42,9 +42,5 @@ def upgrade(conn: sqlite3.Connection) -> None:
         END
         """,
     )
-    try:
-        for statement in statements:
-            conn.execute(statement)
-    except Exception:
-        conn.rollback()
-        raise
+    for statement in statements:
+        conn.execute(statement)

@@ -11,10 +11,7 @@ import sqlite3
 
 
 def upgrade(conn: sqlite3.Connection) -> None:
-    # Do not use executescript here: it commits before running and can leave a
-    # partially applied migration. The runner records the version and commits
-    # this transaction only after every statement succeeds.
-    conn.execute("BEGIN IMMEDIATE")
+    # The runner owns the transaction (see 001_initial.upgrade).
     statements = (
         """
         CREATE TABLE image_provenance (
@@ -36,9 +33,5 @@ def upgrade(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_image_provenance_generation_id "
         "ON image_provenance (generation_id)",
     )
-    try:
-        for statement in statements:
-            conn.execute(statement)
-    except Exception:
-        conn.rollback()
-        raise
+    for statement in statements:
+        conn.execute(statement)
