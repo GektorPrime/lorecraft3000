@@ -104,3 +104,73 @@ def test_path_for(storage, png_bytes):
     meta = storage.store(png_bytes)
     expected = storage.root / meta.sha256[:2] / f"{meta.sha256}.png"
     assert storage.path_for(meta.sha256, "png") == expected
+
+
+# ---------------------------------------------------------------------------
+# Atomic, durable, self-healing publish (Phase 3 Work Package 2)
+# ---------------------------------------------------------------------------
+
+def test_orphaned_image_without_sidecar_is_healed_on_restore(storage, png_bytes):
+    """A crash-orphaned image (no sidecar) is completed by the next store."""
+    meta = storage.store(png_bytes, source_name="ref.png")
+    sidecar = storage.root / meta.sha256[:2] / f"{meta.sha256}.json"
+
+    # Simulate a crash between writing the image and its sidecar.
+    sidecar.unlink()
+    with pytest.raises(ImageStorageError):
+        storage.read(meta.sha256)
+
+    # Re-storing the same bytes must heal the object rather than skip it.
+    again = storage.store(png_bytes, source_name="ref.png")
+    assert again.deduplicated is False
+    assert sidecar.exists()
+    data, metadata = storage.read(meta.sha256)
+    assert data == png_bytes
+    assert metadata["extension"] == "png"
+
+
+def test_orphaned_image_with_malformed_sidecar_is_healed(storage, png_bytes):
+    meta = storage.store(png_bytes)
+    sidecar = storage.root / meta.sha256[:2] / f"{meta.sha256}.json"
+    sidecar.write_text("{ not valid json")
+
+    again = storage.store(png_bytes)
+    assert again.deduplicated is False
+    data, metadata = storage.read(meta.sha256)
+    assert data == png_bytes
+    assert metadata["extension"] == "png"
+
+
+def test_complete_object_is_deduplicated_not_republished(storage, png_bytes):
+    """A genuinely complete duplicate is skipped and keeps the first sidecar."""
+    first = storage.store(png_bytes, source_name="first.png")
+    image = storage.root / first.sha256[:2] / f"{first.sha256}.png"
+    sidecar = storage.root / first.sha256[:2] / f"{first.sha256}.json"
+    image_mtime = image.stat().st_mtime_ns
+    sidecar_mtime = sidecar.stat().st_mtime_ns
+
+    second = storage.store(png_bytes, source_name="second.png")
+    assert second.deduplicated is True
+    # No republish: files are untouched and the first sidecar is preserved.
+    assert image.stat().st_mtime_ns == image_mtime
+    assert sidecar.stat().st_mtime_ns == sidecar_mtime
+    assert json.loads(sidecar.read_text())["source_name"] == "first.png"
+
+
+def test_publish_leaves_no_temp_files(storage, png_bytes):
+    meta = storage.store(png_bytes)
+    leftovers = [
+        p
+        for p in (storage.root / meta.sha256[:2]).iterdir()
+        if p.name.startswith(".tmp-")
+    ]
+    assert leftovers == []
+
+
+def test_reader_never_sees_image_without_sidecar(storage, png_bytes):
+    """After a successful store, image and sidecar are both present."""
+    meta = storage.store(png_bytes)
+    image = storage.root / meta.sha256[:2] / f"{meta.sha256}.png"
+    sidecar = storage.root / meta.sha256[:2] / f"{meta.sha256}.json"
+    assert image.exists()
+    assert sidecar.exists()

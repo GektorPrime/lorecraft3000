@@ -94,12 +94,16 @@ class ImageStorage:
         dest_path = dest_dir / f"{digest}.{ext}"
         sidecar_path = dest_dir / f"{digest}.json"
 
-        deduplicated = dest_path.exists()
+        # A prior crash can leave an image file without its sidecar (or with a
+        # damaged one). Deduplicate only on a COMPLETE object; otherwise finish
+        # publishing so the orphan is healed rather than skipped forever.
+        deduplicated = self._is_complete(dest_path, sidecar_path)
 
         if not deduplicated:
             dest_dir.mkdir(parents=True, exist_ok=True)
-            self._atomic_write(dest_path, data)
-            self._write_sidecar(sidecar_path, digest, ext, len(data), fmt, source_name)
+            self._publish(
+                dest_dir, dest_path, sidecar_path, data, digest, ext, fmt, source_name
+            )
 
         return StoredImage(
             sha256=digest,
@@ -111,28 +115,122 @@ class ImageStorage:
             deduplicated=deduplicated,
         )
 
+    def _is_complete(self, dest_path: Path, sidecar_path: Path) -> bool:
+        """Return True only if both the image and a valid sidecar are present.
+
+        A valid sidecar is readable JSON whose ``extension`` matches the image
+        file. An image without a usable sidecar is treated as incomplete so the
+        caller re-publishes and heals it.
+        """
+        if not dest_path.exists():
+            return False
+        try:
+            metadata = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        extension = metadata.get("extension")
+        if not extension:
+            return False
+        return dest_path.name == f"{dest_path.stem}.{extension}"
+
+    def _publish(
+        self,
+        dest_dir: Path,
+        dest_path: Path,
+        sidecar_path: Path,
+        data: bytes,
+        digest: str,
+        ext: str,
+        fmt: str,
+        source_name: str | None,
+    ) -> None:
+        """Publish the image and sidecar as a durable unit.
+
+        Both files are written to temporary files, fsynced, then renamed into
+        place; finally the directory entry is fsynced. A reader never observes
+        an image without its sidecar, and a crash cannot leave a half-published
+        pair that survives on stable storage.
+
+        When healing an orphaned image (image present, sidecar missing), the
+        image bytes are identical (content-addressed), so re-writing them is
+        safe and idempotent.
+        """
+        sidecar_bytes = self._sidecar_bytes(digest, ext, len(data), fmt, source_name)
+        tmp_image = self._write_temp(dest_dir, data)
+        try:
+            tmp_sidecar = self._write_temp(dest_dir, sidecar_bytes)
+        except BaseException:
+            self._remove_quietly(tmp_image)
+            raise
+        try:
+            os.replace(tmp_image, dest_path)
+            os.replace(tmp_sidecar, sidecar_path)
+        except BaseException:
+            self._remove_quietly(tmp_image)
+            self._remove_quietly(tmp_sidecar)
+            raise
+        self._fsync_dir(dest_dir)
+
     def _atomic_write(self, path: Path, data: bytes) -> None:
-        """Write bytes atomically (write temp file in same dir, then rename)."""
-        fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-")
+        """Write bytes atomically and durably (temp file + fsync, then rename).
+
+        Used for single-file updates such as provenance appends. Publishing a
+        new image plus sidecar pair uses ``_publish`` instead so the two files
+        become visible together.
+        """
+        tmp = self._write_temp(path.parent, data)
+        try:
+            os.replace(tmp, path)
+        except BaseException:
+            self._remove_quietly(tmp)
+            raise
+        self._fsync_dir(path.parent)
+
+    def _write_temp(self, directory: Path, data: bytes) -> str:
+        """Write bytes to a fsynced temp file in ``directory``; return its path."""
+        fd, tmp = tempfile.mkstemp(dir=str(directory), prefix=".tmp-")
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
-            os.replace(tmp, path)
+                f.flush()
+                os.fsync(f.fileno())
         except BaseException:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
+            self._remove_quietly(tmp)
             raise
+        return tmp
 
-    def _write_sidecar(
+    @staticmethod
+    def _fsync_dir(directory: Path) -> None:
+        """Fsync a directory so a rename into it survives a crash."""
+        try:
+            fd = os.open(str(directory), os.O_RDONLY)
+        except OSError:
+            # Some filesystems disallow opening directories; the rename is still
+            # atomic even if the directory entry is not separately fsynced.
+            return
+        try:
+            os.fsync(fd)
+        except OSError:
+            pass
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _remove_quietly(path: str | Path) -> None:
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+
+    def _sidecar_bytes(
         self,
-        sidecar_path: Path,
         digest: str,
         ext: str,
         size: int,
         fmt: str,
         source_name: str | None,
-    ) -> None:
-        """Write the JSON sidecar atomically. No secrets, ever."""
+    ) -> bytes:
+        """Serialize the JSON sidecar. No secrets, ever."""
         sidecar = {
             "sha256": digest,
             "extension": ext,
@@ -140,8 +238,7 @@ class ImageStorage:
             "format": fmt,
             "source_name": source_name,
         }
-        data = json.dumps(sidecar, indent=2, sort_keys=True).encode("utf-8")
-        self._atomic_write(sidecar_path, data)
+        return json.dumps(sidecar, indent=2, sort_keys=True).encode("utf-8")
 
     def path_for(self, sha256: str, ext: str) -> Path:
         """Return the expected on-disk path for a stored image."""
