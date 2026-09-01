@@ -199,6 +199,7 @@ class CostLedger:
         response_json: dict,
         candidate_sha256: str,
         actual_cost_cents: int | None = None,
+        provenance_record: dict | None = None,
     ) -> int:
         with self.conn:
             row = self.conn.execute(
@@ -251,6 +252,26 @@ class CostLedger:
                 "INSERT INTO candidate (generation_id, sha256, idx) VALUES (?, ?, 0)",
                 (generation_id, candidate_sha256),
             )
+            if provenance_record is not None:
+                self.conn.execute(
+                    """
+                    INSERT INTO image_provenance
+                        (sha256, generation_id, interaction_id, prompt_hash,
+                         cost_cents, price_table_version, input_images)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        candidate_sha256,
+                        generation_id,
+                        interaction_id,
+                        provenance_record["prompt_hash"],
+                        effective_cost,
+                        provenance_record["price_table_version"],
+                        json.dumps(
+                            provenance_record["input_images"], sort_keys=True
+                        ),
+                    ),
+                )
         return int(cursor.lastrowid)
 
     def fail(

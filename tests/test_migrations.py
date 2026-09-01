@@ -35,6 +35,7 @@ def test_fresh_init_creates_all_tables(tmp_path):
         "scene",
         "generation",
         "candidate",
+        "image_provenance",
         "schema_migrations",
     }
     assert expected <= tables
@@ -280,9 +281,7 @@ def test_phase1_migration_recovers_old_duplicate_pending_rows(tmp_path):
         conn.close()
 
     assert run_migrations(db) == [
-        "007_phase1_safety",
-        "008_phase1_reconciliation",
-        "009_storage_indexes",
+        m.rsplit(".", 1)[-1] for m in MIGRATIONS[6:]
     ]
     conn = connect(db)
     try:
@@ -339,9 +338,7 @@ def test_phase1_migration_rolls_back_completely_and_can_retry(tmp_path):
         conn.close()
 
     assert run_migrations(db) == [
-        "007_phase1_safety",
-        "008_phase1_reconciliation",
-        "009_storage_indexes",
+        m.rsplit(".", 1)[-1] for m in MIGRATIONS[6:]
     ]
 
 
@@ -390,8 +387,7 @@ def test_phase1_reconciliation_returns_legacy_empty_canon_to_draft(tmp_path):
         conn.close()
 
     assert run_migrations(db) == [
-        "008_phase1_reconciliation",
-        "009_storage_indexes",
+        m.rsplit(".", 1)[-1] for m in MIGRATIONS[7:]
     ]
     conn = connect(db)
     try:

@@ -23,6 +23,7 @@ MIGRATIONS: list[str] = [
     "app.migrations.007_phase1_safety",
     "app.migrations.008_phase1_reconciliation",
     "app.migrations.009_storage_indexes",
+    "app.migrations.010_image_provenance",
 ]
 
 

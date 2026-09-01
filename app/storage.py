@@ -16,6 +16,7 @@ import io
 import json
 import os
 import tempfile
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -55,6 +56,10 @@ class ImageStorage:
 
     def __init__(self, root: Path | str) -> None:
         self.root = Path(root)
+        # Serializes provenance read-modify-write so concurrent appends to the
+        # same content hash (e.g. two generations producing identical bytes)
+        # never lose a record. One lock for the store is plenty at this scale.
+        self._provenance_lock = threading.Lock()
 
     def store(
         self,
@@ -260,21 +265,28 @@ class ImageStorage:
         return data, metadata
 
     def append_provenance(self, sha256: str, record: dict) -> None:
-        """Append a secret-free provenance record to an image sidecar."""
+        """Append a secret-free provenance record to an image sidecar.
+
+        The sidecar is a best-effort mirror; the authoritative provenance lives
+        in the ``image_provenance`` database table. The read-modify-write is
+        serialized so concurrent appends to the same content hash cannot lose
+        a record.
+        """
         self._validate_sha256(sha256)
         sidecar_path = self.root / sha256[:2] / f"{sha256}.json"
-        try:
-            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise ImageStorageError(f"cannot read sidecar for {sha256}: {exc}") from exc
-        provenance = sidecar.setdefault("provenance", [])
-        if not isinstance(provenance, list):
-            raise ImageStorageError(f"invalid provenance data for {sha256}")
-        provenance.append(record)
-        self._atomic_write(
-            sidecar_path,
-            json.dumps(sidecar, indent=2, sort_keys=True).encode("utf-8"),
-        )
+        with self._provenance_lock:
+            try:
+                sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ImageStorageError(f"cannot read sidecar for {sha256}: {exc}") from exc
+            provenance = sidecar.setdefault("provenance", [])
+            if not isinstance(provenance, list):
+                raise ImageStorageError(f"invalid provenance data for {sha256}")
+            provenance.append(record)
+            self._atomic_write(
+                sidecar_path,
+                json.dumps(sidecar, indent=2, sort_keys=True).encode("utf-8"),
+            )
 
     @staticmethod
     def _validate_sha256(sha256: str) -> None:
