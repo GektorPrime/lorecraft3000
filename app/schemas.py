@@ -247,6 +247,8 @@ class GenerationOut(BaseModel):
     attachments: list[GenerationAttachmentOut]
     warnings: list[str]
     cost_usd_cents: int
+    reserved_cost_usd_cents: int
+    actual_cost_usd_cents: int | None
     state: str
     interaction_id: str | None
     error_text: str | None
@@ -260,6 +262,8 @@ class GenerationSummaryOut(BaseModel):
     scene_id: int
     model: str
     cost_usd_cents: int
+    reserved_cost_usd_cents: int
+    actual_cost_usd_cents: int | None
     state: str
     error_text: str | None
     completed_at: str | None

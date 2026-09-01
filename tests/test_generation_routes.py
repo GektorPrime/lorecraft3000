@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.db import connect
-from app.deps import get_conn, get_provider, get_storage
+from app.deps import get_conn, get_provider, get_storage, settings
 from app.main import app
 from app.migrate import run_migrations
 from app.providers.base import ProviderResult
@@ -59,7 +59,7 @@ def route_app(tmp_path):
     app.dependency_overrides[get_conn] = override_conn
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_provider] = lambda: provider
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         yield RouteApp(client, db_path, storage, provider)
     app.dependency_overrides.clear()
 
@@ -210,14 +210,16 @@ def test_preview_blocks_when_daily_cap_would_be_exceeded(route_app):
     scene_id = int(preview_url.split("/")[2])
     conn = route_app.conn()
     try:
+        spent = settings.daily_spend_cap_cents - 1
         conn.execute(
             """
-            INSERT INTO generation
-                (scene_id, model, cost_usd_cents, state)
-            VALUES (?, 'gemini-3.1-flash-image', 299, 'succeeded')
-            """,
-            (scene_id,),
-        )
+                INSERT INTO generation
+                    (scene_id, model, cost_usd_cents, reserved_cost_usd_cents,
+                     actual_cost_usd_cents, state)
+                VALUES (?, 'gemini-3.1-flash-image', ?, ?, ?, 'succeeded')
+                """,
+                (scene_id, spent, spent, spent),
+            )
         conn.commit()
     finally:
         conn.close()

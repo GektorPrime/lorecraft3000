@@ -26,12 +26,15 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.deps import settings, templates
+from app.db import connect
+from app.middleware import LocalRequestGuardMiddleware
 from app.migrate import run_migrations
 from app.routes import api_v1
 from app.routes import characters as character_routes
 from app.routes import ref_sets as ref_set_routes
 from app.routes import scenes as scene_routes
 from app.routes import styles as style_routes
+from app.services.costs import CostLedger
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -54,10 +57,16 @@ async def lifespan(app: FastAPI):
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     settings.store_root.mkdir(parents=True, exist_ok=True)
     run_migrations(settings.db_path)
+    conn = connect(settings.db_path)
+    try:
+        CostLedger(conn, settings).recover_stale_pending()
+    finally:
+        conn.close()
     yield
 
 
 app = FastAPI(title="LoreCraft3000", lifespan=lifespan)
+app.add_middleware(LocalRequestGuardMiddleware)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

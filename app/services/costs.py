@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import dataclass
 
 from app.config import Settings
 
@@ -18,6 +19,30 @@ class BudgetExceededError(CostError):
 
 class UnknownPriceError(CostError):
     pass
+
+
+class GenerationPendingError(CostError):
+    pass
+
+
+class IdempotencyConflictError(CostError):
+    pass
+
+
+class SceneChangedError(CostError):
+    pass
+
+
+@dataclass(frozen=True)
+class Reservation:
+    generation_id: int
+    reserved_cost_cents: int
+    created: bool
+
+    def __iter__(self):
+        """Keep the existing two-value unpacking API compatible."""
+        yield self.generation_id
+        yield self.reserved_cost_cents
 
 
 class CostLedger:
@@ -41,7 +66,9 @@ class CostLedger:
     def spent_today(self) -> int:
         row = self.conn.execute(
             """
-            SELECT COALESCE(SUM(cost_usd_cents), 0) AS spent
+            SELECT COALESCE(SUM(
+                       COALESCE(actual_cost_usd_cents, reserved_cost_usd_cents)
+                   ), 0) AS spent
               FROM generation
              WHERE date(created_at) = date('now')
             """
@@ -57,10 +84,64 @@ class CostLedger:
         prompt_hash: str,
         request_json: dict,
         parent_generation_id: int | None = None,
-    ) -> tuple[int, int]:
+        idempotency_key: str | None = None,
+        scene_revision: int | None = None,
+    ) -> Reservation:
         estimate = self.estimate(model, image_size)
+        normalized_key = idempotency_key.strip() if idempotency_key else None
+        if normalized_key is not None and len(normalized_key) > 200:
+            raise IdempotencyConflictError("idempotency key is too long")
         try:
             self.conn.execute("BEGIN IMMEDIATE")
+            self._recover_stale_pending()
+
+            if normalized_key is not None:
+                existing = self.conn.execute(
+                    """
+                    SELECT * FROM generation
+                     WHERE scene_id = ? AND idempotency_key = ?
+                    """,
+                    (scene_id, normalized_key),
+                ).fetchone()
+                if existing is not None:
+                    params = json.loads(existing["params_json"] or "{}")
+                    if (
+                        existing["model"] != model
+                        or existing["prompt_hash"] != prompt_hash
+                        or params.get("image_size") != image_size
+                        or (
+                            scene_revision is not None
+                            and existing["scene_revision"] != scene_revision
+                        )
+                    ):
+                        raise IdempotencyConflictError(
+                            "idempotency key was already used for a different request"
+                        )
+                    self.conn.commit()
+                    return Reservation(
+                        int(existing["id"]),
+                        int(existing["reserved_cost_usd_cents"]),
+                        False,
+                    )
+
+            if scene_revision is not None:
+                scene = self.conn.execute(
+                    "SELECT revision FROM scene WHERE id = ?", (scene_id,)
+                ).fetchone()
+                if scene is None or int(scene["revision"]) != scene_revision:
+                    raise SceneChangedError(
+                        "panel changed after preview; preview it again before generating"
+                    )
+
+            pending = self.conn.execute(
+                "SELECT id FROM generation WHERE scene_id = ? AND state = 'pending'",
+                (scene_id,),
+            ).fetchone()
+            if pending is not None:
+                raise GenerationPendingError(
+                    f"panel {scene_id} already has a generation in progress"
+                )
+
             spent = self.spent_today()
             if spent + estimate > self.settings.daily_spend_cap_cents:
                 raise BudgetExceededError(
@@ -72,9 +153,10 @@ class CostLedger:
                 """
                 INSERT INTO generation
                     (scene_id, model, params_json, prompt_hash, request_json,
-                     cost_usd_cents, parent_generation_id, state,
-                     price_table_version)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                     cost_usd_cents, reserved_cost_usd_cents,
+                     parent_generation_id, state, price_table_version,
+                     idempotency_key, scene_revision)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
                 """,
                 (
                     scene_id,
@@ -89,12 +171,22 @@ class CostLedger:
                     prompt_hash,
                     json.dumps(request_json, sort_keys=True),
                     estimate,
+                    estimate,
                     parent_generation_id,
                     self.settings.price_table_version,
+                    normalized_key,
+                    scene_revision or 0,
                 ),
             )
             self.conn.commit()
-            return int(cursor.lastrowid), estimate
+            return Reservation(int(cursor.lastrowid), estimate, True)
+        except sqlite3.IntegrityError as exc:
+            self.conn.rollback()
+            if "generation.scene_id" in str(exc):
+                raise GenerationPendingError(
+                    f"panel {scene_id} already has a generation in progress"
+                ) from exc
+            raise
         except Exception:
             self.conn.rollback()
             raise
@@ -109,19 +201,47 @@ class CostLedger:
         actual_cost_cents: int | None = None,
     ) -> int:
         with self.conn:
-            if actual_cost_cents is not None:
-                self.conn.execute(
-                    "UPDATE generation SET cost_usd_cents = ? WHERE id = ?",
-                    (actual_cost_cents, generation_id),
+            row = self.conn.execute(
+                "SELECT * FROM generation WHERE id = ? AND state = 'pending'",
+                (generation_id,),
+            ).fetchone()
+            if row is None:
+                raise CostError(
+                    f"generation {generation_id} is not pending and cannot succeed"
+                )
+            effective_cost = (
+                actual_cost_cents
+                if actual_cost_cents is not None
+                else int(row["reserved_cost_usd_cents"])
+            )
+            over_cap = (
+                self.spent_today()
+                - int(row["reserved_cost_usd_cents"])
+                + effective_cost
+                > self.settings.daily_spend_cap_cents
+            )
+            warning = None
+            if over_cap:
+                warning = (
+                    "Provider-reported actual cost exceeded the reserved daily budget. "
+                    "The charge is recorded and further generation is blocked."
                 )
             updated = self.conn.execute(
                 """
                 UPDATE generation
                    SET state = 'succeeded', interaction_id = ?, response_json = ?,
-                       completed_at = datetime('now')
+                       completed_at = datetime('now'), cost_usd_cents = ?,
+                       actual_cost_usd_cents = ?, warning_text = ?
                  WHERE id = ? AND state = 'pending'
                 """,
-                (interaction_id, json.dumps(response_json, sort_keys=True), generation_id),
+                (
+                    interaction_id,
+                    json.dumps(response_json, sort_keys=True),
+                    effective_cost,
+                    actual_cost_cents,
+                    warning,
+                    generation_id,
+                ),
             )
             if updated.rowcount != 1:
                 raise CostError(
@@ -134,7 +254,12 @@ class CostLedger:
         return int(cursor.lastrowid)
 
     def fail(
-        self, generation_id: int, error: str, *, charge_expected: bool = True
+        self,
+        generation_id: int,
+        error: str,
+        *,
+        charge_expected: bool = True,
+        actual_cost_cents: int | None = None,
     ) -> None:
         """Reconcile a failure, retaining cost unless it is known non-billable."""
         with self.conn:
@@ -142,13 +267,54 @@ class CostLedger:
                 """
                 UPDATE generation
                    SET state = 'failed', error_text = ?,
-                       cost_usd_cents = CASE WHEN ? THEN cost_usd_cents ELSE 0 END,
+                       cost_usd_cents = CASE
+                           WHEN ? IS NOT NULL THEN ?
+                           WHEN ? THEN reserved_cost_usd_cents ELSE 0
+                       END,
+                       actual_cost_usd_cents = CASE
+                           WHEN ? IS NOT NULL THEN ?
+                           WHEN ? THEN NULL ELSE 0
+                       END,
                        completed_at = datetime('now')
                  WHERE id = ? AND state = 'pending'
                 """,
-                (error, charge_expected, generation_id),
+                (
+                    error,
+                    actual_cost_cents,
+                    actual_cost_cents,
+                    charge_expected,
+                    actual_cost_cents,
+                    actual_cost_cents,
+                    charge_expected,
+                    generation_id,
+                ),
             )
             if updated.rowcount != 1:
                 raise CostError(
                     f"generation {generation_id} is not pending and cannot fail"
                 )
+
+    def recover_stale_pending(self) -> int:
+        """Release panel locks left by interrupted calls, retaining reserved cost."""
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            recovered = self._recover_stale_pending()
+            self.conn.commit()
+            return recovered
+        except Exception:
+            self.conn.rollback()
+            raise
+
+    def _recover_stale_pending(self) -> int:
+        cursor = self.conn.execute(
+            """
+            UPDATE generation
+               SET state = 'failed',
+                   error_text = 'Recovered stale pending generation after an interrupted request; reserved cost retained because billing is unknown.',
+                   completed_at = datetime('now')
+             WHERE state = 'pending'
+               AND created_at <= datetime('now', ?)
+            """,
+            (f"-{self.settings.pending_stale_seconds} seconds",),
+        )
+        return cursor.rowcount

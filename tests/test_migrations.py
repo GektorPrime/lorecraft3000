@@ -110,10 +110,8 @@ def test_005_repairs_legacy_unconditional_canonical_trigger(tmp_path):
         # have (each applied directly, bypassing the runner's version list so
         # this test does not depend on 005 already existing).
         _ensure_migrations_table(conn)
-        for module_name in MIGRATIONS:
+        for module_name in MIGRATIONS[:4]:
             version = module_name.rsplit(".", 1)[-1]
-            if version == "005_repair_canonical_trigger":
-                continue
             module = importlib.import_module(module_name)
             module.upgrade(conn)
             conn.execute(
@@ -225,3 +223,179 @@ def test_006_reconciles_only_explicit_high_demand_failures(conn):
     }
     assert costs[explicit] == 0
     assert costs[unknown] == 20
+
+
+def test_phase1_safety_columns_and_indexes_are_migrated(conn):
+    scene_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(scene)").fetchall()
+    }
+    generation_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(generation)").fetchall()
+    }
+    indexes = {
+        row["name"]
+        for row in conn.execute("PRAGMA index_list(generation)").fetchall()
+    }
+    assert "revision" in scene_columns
+    assert {
+        "idempotency_key",
+        "scene_revision",
+        "reserved_cost_usd_cents",
+        "actual_cost_usd_cents",
+        "warning_text",
+    } <= generation_columns
+    assert {
+        "idx_generation_one_pending_per_scene",
+        "idx_generation_scene_idempotency",
+    } <= indexes
+
+
+def test_phase1_migration_recovers_old_duplicate_pending_rows(tmp_path):
+    db = tmp_path / "duplicate-pending.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        for module_name in MIGRATIONS[:6]:
+            version = module_name.rsplit(".", 1)[-1]
+            importlib.import_module(module_name).upgrade(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
+            )
+        style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+        scene_id = conn.execute(
+            "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+        ).lastrowid
+        for prompt_hash in ("old", "new"):
+            conn.execute(
+                """
+                INSERT INTO generation
+                    (scene_id, model, prompt_hash, cost_usd_cents, state)
+                VALUES (?, 'gemini-3.1-flash-image', ?, 7, 'pending')
+                """,
+                (scene_id, prompt_hash),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert run_migrations(db) == [
+        "007_phase1_safety",
+        "008_phase1_reconciliation",
+    ]
+    conn = connect(db)
+    try:
+        rows = conn.execute(
+            "SELECT state, reserved_cost_usd_cents, error_text FROM generation ORDER BY id"
+        ).fetchall()
+        assert rows[0]["state"] == "failed"
+        assert "duplicate pending" in rows[0]["error_text"]
+        assert rows[1]["state"] == "pending"
+        assert [row["reserved_cost_usd_cents"] for row in rows] == [7, 7]
+    finally:
+        conn.close()
+
+
+def test_phase1_migration_rolls_back_completely_and_can_retry(tmp_path):
+    db = tmp_path / "phase1-retry.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        for module_name in MIGRATIONS[:6]:
+            version = module_name.rsplit(".", 1)[-1]
+            importlib.import_module(module_name).upgrade(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
+            )
+        conn.execute(
+            """
+            CREATE TRIGGER trg_ref_image_insert_draft_only
+            BEFORE INSERT ON ref_image BEGIN SELECT 1; END
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(sqlite3.OperationalError, match="already exists"):
+        run_migrations(db)
+
+    conn = connect(db)
+    try:
+        scene_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(scene)").fetchall()
+        }
+        generation_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(generation)").fetchall()
+        }
+        assert "revision" not in scene_columns
+        assert "reserved_cost_usd_cents" not in generation_columns
+        assert "007_phase1_safety" not in applied_versions(conn)
+        conn.execute("DROP TRIGGER trg_ref_image_insert_draft_only")
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert run_migrations(db) == [
+        "007_phase1_safety",
+        "008_phase1_reconciliation",
+    ]
+
+
+def test_phase1_reconciliation_returns_legacy_empty_canon_to_draft(tmp_path):
+    db = tmp_path / "empty-canon.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        for module_name in MIGRATIONS[:6]:
+            version = module_name.rsplit(".", 1)[-1]
+            importlib.import_module(module_name).upgrade(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
+            )
+        conn.execute("INSERT INTO character (name, slug) VALUES ('Elias', 'elias')")
+        conn.execute(
+            "INSERT INTO ref_set (character_id, version, status) VALUES (1, 1, 'canonical')"
+        )
+        conn.commit()
+
+        migration_007 = MIGRATIONS[6]
+        importlib.import_module(migration_007).upgrade(conn)
+        conn.execute(
+            "INSERT INTO schema_migrations (version) VALUES (?)",
+            (migration_007.rsplit(".", 1)[-1],),
+        )
+        style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+        scene_id = conn.execute(
+            "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+        ).lastrowid
+        warning = (
+            "Provider-reported actual cost exceeded the reserved daily budget. "
+            "The charge is recorded and further generation is blocked."
+        )
+        conn.execute(
+            """
+            INSERT INTO generation
+                (scene_id, model, state, cost_usd_cents,
+                 reserved_cost_usd_cents, actual_cost_usd_cents, error_text)
+            VALUES (?, 'gemini-3.1-flash-image', 'succeeded', 301, 7, 301, ?)
+            """,
+            (scene_id, warning),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert run_migrations(db) == ["008_phase1_reconciliation"]
+    conn = connect(db)
+    try:
+        row = conn.execute("SELECT status FROM ref_set WHERE id = 1").fetchone()
+        assert row["status"] == "draft"
+        generation = conn.execute(
+            "SELECT error_text, warning_text FROM generation"
+        ).fetchone()
+        assert generation["error_text"] is None
+        assert "exceeded" in generation["warning_text"]
+    finally:
+        conn.close()

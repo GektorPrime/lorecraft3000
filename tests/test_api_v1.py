@@ -28,12 +28,18 @@ class FakeProvider:
     def __init__(self):
         self.requests = []
         self.error = None
+        self.billed_cost_cents = None
 
     def generate(self, request):
         self.requests.append(request)
         if self.error:
             raise self.error
-        return ProviderResult(make_png_bytes((30, 60, 90)), "api-interaction", {"fake": True})
+        return ProviderResult(
+            make_png_bytes((30, 60, 90)),
+            "api-interaction",
+            {"fake": True},
+            self.billed_cost_cents,
+        )
 
 
 @dataclass
@@ -64,7 +70,7 @@ def api(tmp_path):
     app.dependency_overrides[get_conn] = override_conn
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_provider] = lambda: provider
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         yield ApiApp(client, db_path, storage, provider)
     app.dependency_overrides.clear()
 
@@ -505,6 +511,40 @@ def test_panel_editable_until_generation_succeeds_then_backend_rejects_update(ap
     # The original beat_text from before the rejected update is preserved.
     still = api.client.get(f"/api/v1/panels/{panel['id']}").json()
     assert still["beat_text"] == "Updated beat."
+
+
+def test_generation_idempotency_key_returns_existing_attempt(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    headers = {"Idempotency-Key": "browser-request-1"}
+
+    first = api.client.post(
+        f"/api/v1/panels/{panel['id']}/generate", headers=headers
+    )
+    replay = api.client.post(
+        f"/api/v1/panels/{panel['id']}/generate", headers=headers
+    )
+
+    assert first.status_code == 201
+    assert replay.status_code == 200
+    assert replay.json()["id"] == first.json()["id"]
+    assert len(api.provider.requests) == 1
+
+
+def test_actual_cost_overrun_is_returned_as_a_warning(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    from app.deps import settings
+
+    api.provider.billed_cost_cents = settings.daily_spend_cap_cents + 1
+    response = api.client.post(f"/api/v1/panels/{panel['id']}/generate")
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["actual_cost_usd_cents"] == settings.daily_spend_cap_cents + 1
+    assert any("exceeded" in warning for warning in body["warnings"])
 
 
 def test_failed_generation_remains_editable_and_is_preserved_in_history(api):

@@ -8,6 +8,7 @@ from app.config import Settings
 from app.providers.base import ProviderResult
 from app.services.characters import CharacterService
 from app.services.generation import GenerationError, GenerationService
+from app.services.costs import CostLedger, IdempotencyConflictError
 from app.services.ref_sets import RefSetService
 from app.services.styles import StyleService
 from tests.conftest import make_png_bytes
@@ -146,6 +147,156 @@ def test_provider_failure_marks_generation_failed_and_keeps_reservation(
     row = conn.execute("SELECT state, cost_usd_cents FROM generation").fetchone()
     assert tuple(row) == ("failed", 7)
     assert conn.execute("SELECT COUNT(*) FROM candidate").fetchone()[0] == 0
+
+
+def test_idempotent_replay_does_not_call_provider_twice(conn, storage, tmp_path):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+
+    first = service.generate(scene_id, idempotency_key="request-1")
+    replay = service.generate(scene_id, idempotency_key="request-1")
+
+    assert replay.replayed is True
+    assert replay.generation_id == first.generation_id
+    assert replay.candidate_id == first.candidate_id
+    assert len(provider.requests) == 1
+
+
+def test_storage_failure_records_known_actual_provider_cost(
+    conn, storage, tmp_path, monkeypatch
+):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+
+    class BilledProvider:
+        def generate(self, request):
+            return ProviderResult(
+                make_png_bytes(), "interaction", {}, billed_cost_cents=11
+            )
+
+    def fail_store(*args, **kwargs):
+        raise RuntimeError("disk unavailable")
+
+    monkeypatch.setattr(storage, "store", fail_store)
+    with pytest.raises(GenerationError, match="disk unavailable"):
+        GenerationService(
+            conn, storage, _settings(tmp_path), BilledProvider()
+        ).generate(scene_id)
+
+    row = conn.execute(
+        "SELECT state, cost_usd_cents, actual_cost_usd_cents FROM generation"
+    ).fetchone()
+    assert tuple(row) == ("failed", 11, 11)
+
+
+def test_idempotency_key_cannot_be_reused_after_panel_edit(
+    conn, storage, tmp_path
+):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+    provider = FakeProvider(error=RuntimeError("provider unavailable"))
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+    with pytest.raises(GenerationError):
+        service.generate(scene_id, idempotency_key="request-1")
+
+    conn.execute("UPDATE scene SET revision = revision + 1 WHERE id = ?", (scene_id,))
+    conn.commit()
+    with pytest.raises(IdempotencyConflictError, match="different request"):
+        service.generate(scene_id, idempotency_key="request-1")
+    assert len(provider.requests) == 1
+
+
+def test_idempotency_key_detects_changed_style_prompt(conn, storage, tmp_path):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+    provider = FakeProvider(error=RuntimeError("provider unavailable"))
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+    with pytest.raises(GenerationError):
+        service.generate(scene_id, idempotency_key="request-1")
+
+    styles = StyleService(conn)
+    style = styles.get_default()
+    styles.update(
+        style.id,
+        name=style.name,
+        style_contract=f"{style.style_contract}\nChanged after the first attempt.",
+    )
+    with pytest.raises(IdempotencyConflictError, match="different request"):
+        service.generate(scene_id, idempotency_key="request-1")
+    assert len(provider.requests) == 1
+
+
+def test_stale_idempotent_attempt_is_recovered_before_replay(
+    conn, storage, tmp_path
+):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+    provider = FakeProvider()
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, provider)
+    preview = service.preview(scene_id, check_budget=False)
+    reservation = CostLedger(conn, settings).reserve(
+        scene_id=scene_id,
+        model=preview.model,
+        image_size=preview.image_size,
+        prompt_hash=preview.prompt_hash,
+        request_json=preview.request_capture,
+        idempotency_key="request-1",
+        scene_revision=preview.scene_revision,
+    )
+    conn.execute(
+        "UPDATE generation SET created_at = datetime('now', '-1 day') WHERE id = ?",
+        (reservation.generation_id,),
+    )
+    conn.commit()
+
+    replay = service.generate(scene_id, idempotency_key="request-1")
+    assert replay.replayed is True
+    row = conn.execute(
+        "SELECT state FROM generation WHERE id = ?", (reservation.generation_id,)
+    ).fetchone()
+    assert row["state"] == "failed"
+    assert provider.requests == []
+
+
+def test_accounting_warning_is_returned_for_new_and_replayed_outcome(
+    conn, storage, tmp_path
+):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+
+    class BilledProvider:
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, request):
+            self.calls += 1
+            return ProviderResult(
+                make_png_bytes(), "interaction", {}, billed_cost_cents=301
+            )
+
+    provider = BilledProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+    first = service.generate(scene_id, idempotency_key="request-1")
+    replay = service.generate(scene_id, idempotency_key="request-1")
+
+    assert any("exceeded" in warning for warning in first.warnings)
+    assert any("exceeded" in warning for warning in replay.warnings)
+    assert provider.calls == 1
 
 
 def test_missing_canonical_fails_before_provider_or_ledger(conn, storage, tmp_path):

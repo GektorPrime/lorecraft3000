@@ -122,12 +122,6 @@ class SceneService:
         The backend is the enforcement point (not just the UI): even a
         request that bypasses a disabled form control is rejected here.
         """
-        self.get(scene_id)  # raises SceneNotFoundError if missing
-        if not self.is_editable(scene_id):
-            raise SceneImmutableError(
-                f"panel {scene_id} has a pending or successful generation and can "
-                "no longer be edited — duplicate it instead"
-            )
         fields = self._validate(
             beat_text=beat_text,
             camera=camera,
@@ -139,13 +133,18 @@ class SceneService:
             model=model,
             image_size=image_size,
         )
-        self.conn.execute(
+        cursor = self.conn.execute(
             """
             UPDATE scene
                SET beat_text = ?, camera = ?, framing = ?, mood = ?,
-                   aspect_ratio = ?, cast_json = ?, style_id = ?, model = ?,
-                   image_size = ?
+                    aspect_ratio = ?, cast_json = ?, style_id = ?, model = ?,
+                    image_size = ?, revision = revision + 1
              WHERE id = ?
+               AND NOT EXISTS (
+                   SELECT 1 FROM generation
+                    WHERE scene_id = scene.id
+                      AND state IN ('pending', 'succeeded')
+               )
             """,
             (
                 fields["beat_text"], fields["camera"], fields["framing"],
@@ -154,6 +153,16 @@ class SceneService:
                 scene_id,
             ),
         )
+        if cursor.rowcount != 1:
+            self.conn.rollback()
+            if self.conn.execute(
+                "SELECT 1 FROM scene WHERE id = ?", (scene_id,)
+            ).fetchone() is None:
+                raise SceneNotFoundError(f"scene {scene_id} not found")
+            raise SceneImmutableError(
+                f"panel {scene_id} has a pending or successful generation and can "
+                "no longer be edited; duplicate it instead"
+            )
         self.conn.commit()
         return self.get(scene_id)
 

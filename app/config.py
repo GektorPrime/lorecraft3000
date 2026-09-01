@@ -90,6 +90,10 @@ class Settings:
     # Content-addressed store root (resolved relative to project root by default).
     store_root: Path = field(default_factory=lambda: PROJECT_ROOT / "store")
 
+    # Bound provider calls and recover attempts left pending by process failure.
+    provider_timeout_seconds: int = 120
+    pending_stale_seconds: int = 600
+
     @property
     def daily_spend_cap_cents(self) -> int:
         """Daily spend cap expressed as integer minor units (cents)."""
@@ -107,10 +111,28 @@ class Settings:
         default_image_size = os.environ.get(
             "LORECRAFT_DEFAULT_IMAGE_SIZE", DEFAULT_IMAGE_SIZE
         )
+        provider_timeout_seconds = int(
+            os.environ.get("LORECRAFT_PROVIDER_TIMEOUT_SECONDS", "120")
+        )
+        pending_stale_seconds = int(
+            os.environ.get("LORECRAFT_PENDING_STALE_SECONDS", "600")
+        )
+        if provider_timeout_seconds <= 0:
+            raise ValueError("LORECRAFT_PROVIDER_TIMEOUT_SECONDS must be positive")
+        # Gemini capacity retries can make up to four calls with 11 seconds of
+        # total backoff. Recovery must not expire an attempt still in that loop.
+        minimum_stale_seconds = provider_timeout_seconds * 4 + 11
+        if pending_stale_seconds <= minimum_stale_seconds:
+            raise ValueError(
+                "LORECRAFT_PENDING_STALE_SECONDS must exceed the maximum provider "
+                "retry duration"
+            )
         return cls(
             daily_spend_cap_usd=daily_cap,
             db_path=db_path,
             store_root=store_root,
             default_model=default_model,
             default_image_size=default_image_size,
+            provider_timeout_seconds=provider_timeout_seconds,
+            pending_stale_seconds=pending_stale_seconds,
         )

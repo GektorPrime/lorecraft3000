@@ -20,6 +20,8 @@ MIGRATIONS: list[str] = [
     "app.migrations.004_scene_generation_settings",
     "app.migrations.005_repair_canonical_trigger",
     "app.migrations.006_reconcile_high_demand_failures",
+    "app.migrations.007_phase1_safety",
+    "app.migrations.008_phase1_reconciliation",
 ]
 
 

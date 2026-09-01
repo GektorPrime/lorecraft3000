@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app.deps import get_conn, get_provider, get_storage, settings
@@ -54,7 +54,15 @@ from app.services.characters import (
     SlugCollisionError,
     VisualContractTooLongError,
 )
-from app.services.costs import BudgetExceededError, CostError, CostLedger, UnknownPriceError
+from app.services.costs import (
+    BudgetExceededError,
+    CostError,
+    CostLedger,
+    GenerationPendingError,
+    IdempotencyConflictError,
+    SceneChangedError,
+    UnknownPriceError,
+)
 from app.services.generation import GenerationError, GenerationService
 from app.services.ref_sets import (
     ImageRejectedError,
@@ -118,6 +126,9 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (StyleNameCollisionError, 409),
     (RefSetNotDraftError, 409),
     (SceneImmutableError, 409),
+    (GenerationPendingError, 409),
+    (IdempotencyConflictError, 409),
+    (SceneChangedError, 409),
     (BudgetExceededError, 402),
     (VisualContractTooLongError, 422),
     (InvalidStyleReferenceError, 422),
@@ -262,6 +273,9 @@ def _candidate_out(row) -> CandidateOut:
 
 def _generation_out(conn, row) -> GenerationOut:
     request_data = json.loads(row["request_json"] or "{}")
+    warnings = list(request_data.get("warnings", []))
+    if row["warning_text"]:
+        warnings.append(row["warning_text"])
     candidates = conn.execute(
         "SELECT * FROM candidate WHERE generation_id = ? ORDER BY idx", (row["id"],)
     ).fetchall()
@@ -274,8 +288,10 @@ def _generation_out(conn, row) -> GenerationOut:
         prompt=request_data.get("prompt", ""),
         prompt_hash=row["prompt_hash"],
         attachments=[_attachment_out(a) for a in request_data.get("attachments", [])],
-        warnings=list(request_data.get("warnings", [])),
+        warnings=warnings,
         cost_usd_cents=row["cost_usd_cents"],
+        reserved_cost_usd_cents=row["reserved_cost_usd_cents"],
+        actual_cost_usd_cents=row["actual_cost_usd_cents"],
         state=row["state"],
         interaction_id=row["interaction_id"],
         error_text=row["error_text"],
@@ -686,6 +702,8 @@ def list_panel_generations(
             scene_id=row["scene_id"],
             model=row["model"],
             cost_usd_cents=row["cost_usd_cents"],
+            reserved_cost_usd_cents=row["reserved_cost_usd_cents"],
+            actual_cost_usd_cents=row["actual_cost_usd_cents"],
             state=row["state"],
             error_text=row["error_text"],
             completed_at=row["completed_at"],
@@ -698,6 +716,8 @@ def list_panel_generations(
 @router.post("/panels/{panel_id}/generate", response_model=GenerationOut, status_code=201)
 def generate_panel(
     panel_id: int,
+    response: Response,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     conn=Depends(get_conn),
     storage=Depends(get_storage),
     provider: ImageProvider = Depends(get_provider),
@@ -705,13 +725,18 @@ def generate_panel(
     try:
         scene = SceneService(conn, settings).get(panel_id)
         outcome = GenerationService(conn, storage, settings, provider).generate(
-            panel_id, model=scene.model, image_size=scene.image_size
+            panel_id,
+            model=scene.model,
+            image_size=scene.image_size,
+            idempotency_key=idempotency_key,
         )
     except (SceneError, GenerationError, CostError, ImageStorageError) as exc:
         _raise_for(exc)
     row = conn.execute(
         "SELECT * FROM generation WHERE id = ?", (outcome.generation_id,)
     ).fetchone()
+    if outcome.replayed:
+        response.status_code = 200
     return _generation_out(conn, row)
 
 

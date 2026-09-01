@@ -74,6 +74,7 @@ def test_create_draft_after_promotion_continues_numbering(conn, storage):
     service = _service(conn, storage)
     cid = _character(conn)
     d1 = service.create_draft(cid)
+    service.add_image(d1.id, make_png_bytes(), "face_front")
     service.promote(d1.id)
     d2 = service.create_draft(cid)
     assert d2.version == 2
@@ -212,6 +213,7 @@ def test_edit_blocked_on_retired(conn, storage):
     service.add_image(v1.id, make_png_bytes(), "face_front")
     service.promote(v1.id)
     v2 = service.create_draft(cid)
+    service.add_image(v2.id, make_png_bytes((20, 30, 40)), "face_front")
     service.promote(v2.id)  # v1 is now retired
 
     with pytest.raises(RefSetNotDraftError):
@@ -258,6 +260,7 @@ def test_promote_non_draft_rejected(conn, storage):
     service = _service(conn, storage)
     cid = _character(conn)
     draft = service.create_draft(cid)
+    service.add_image(draft.id, make_png_bytes(), "face_front")
     service.promote(draft.id)
     with pytest.raises(RefSetNotDraftError):
         service.promote(draft.id)  # already canonical
@@ -296,6 +299,7 @@ def test_promotion_is_atomic_on_failure(conn, storage):
     service.add_image(v1.id, make_png_bytes(), "face_front")
     service.promote(v1.id)
     v2 = service.create_draft(cid)
+    service.add_image(v2.id, make_png_bytes((30, 40, 50)), "face_front")
 
     flaky = _FlakyConn(conn, "UPDATE ref_set SET status = 'canonical'")
     flaky_service = RefSetService(flaky, storage)
@@ -315,8 +319,10 @@ def test_promote_works_with_open_outer_transaction(conn, storage):
     service = _service(conn, storage)
     cid = _character(conn)
     v1 = service.create_draft(cid)
+    service.add_image(v1.id, make_png_bytes(), "face_front")
     service.promote(v1.id)
     v2 = service.create_draft(cid)
+    service.add_image(v2.id, make_png_bytes((30, 40, 50)), "face_front")
 
     # Open an outer transaction with an unrelated write.
     conn.execute("UPDATE character SET name = name WHERE id = ?", (cid,))
@@ -333,6 +339,46 @@ def test_promote_works_with_open_outer_transaction(conn, storage):
     conn.rollback()
     assert _status(conn, v1.id) == "canonical"
     assert _status(conn, v2.id) == "draft"
+
+
+def test_empty_draft_cannot_replace_canonical(conn, storage):
+    service = _service(conn, storage)
+    cid = _character(conn)
+    canonical = service.create_draft(cid)
+    service.add_image(canonical.id, make_png_bytes(), "face_front")
+    service.promote(canonical.id)
+    empty = service.create_draft(cid)
+
+    with pytest.raises(RefSetError, match="at least one image"):
+        service.promote(empty.id)
+
+    assert _status(conn, canonical.id) == "canonical"
+    assert _status(conn, empty.id) == "draft"
+
+
+class _ImmutableImageConn:
+    def __init__(self, real) -> None:
+        self._real = real
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def execute(self, sql, *args, **kwargs):
+        if "INSERT INTO ref_image" in sql:
+            raise sqlite3.IntegrityError(
+                "images can only be added to draft ref_sets"
+            )
+        return self._real.execute(sql, *args, **kwargs)
+
+
+def test_concurrent_image_immutability_error_becomes_domain_error(conn, storage):
+    service = _service(conn, storage)
+    cid = _character(conn)
+    draft = service.create_draft(cid)
+    raced_service = RefSetService(_ImmutableImageConn(conn), storage)
+
+    with pytest.raises(RefSetNotDraftError, match="became immutable"):
+        raced_service.add_image(draft.id, make_png_bytes(), "face_front")
 
 
 def test_image_edit_rejects_image_from_another_ref_set(conn, storage):
