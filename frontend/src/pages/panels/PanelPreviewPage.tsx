@@ -9,6 +9,7 @@ import {
   previewPanel,
 } from '../../api/client'
 import type { GenerationSummary, Panel, PanelPreview } from '../../api/types'
+import { useBudget } from '../../api/useBudget'
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
@@ -22,6 +23,9 @@ function friendlyGenerationError(error: string): string {
   if (normalized.includes('media resolution is not supported')) {
     return 'Gemini rejected an unsupported reference setting. The application has been corrected; try again.'
   }
+  if (normalized.includes('assembled prompt changed after preview')) {
+    return 'The generation inputs changed. Review the updated prompt before trying again.'
+  }
   return 'Generation failed before an image was produced. Open the technical details for the provider response.'
 }
 
@@ -29,6 +33,7 @@ export function PanelPreviewPage() {
   const { id } = useParams()
   const panelId = Number(id)
   const navigate = useNavigate()
+  const { refreshBudget } = useBudget()
 
   const [panel, setPanel] = useState<Panel | null>(null)
   const [preview, setPreview] = useState<PanelPreview | null>(null)
@@ -47,6 +52,7 @@ export function PanelPreviewPage() {
       setPanel(nextPanel)
       setPreview(nextPreview)
       setAttempts(history)
+      await refreshBudget()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err))
     }
@@ -68,11 +74,20 @@ export function PanelPreviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPendingAttempt, panelId])
 
+  useEffect(() => {
+    if (!generating) return
+    void refreshBudget()
+    const timer = window.setInterval(() => void refreshBudget(), 2000)
+    return () => window.clearInterval(timer)
+  }, [generating, refreshBudget])
+
   const handleGenerate = async () => {
     setGenerating(true)
     setError(null)
     try {
-      const generation = await generatePanel(panelId)
+      if (!preview) return
+      const generation = await generatePanel(panelId, preview.prompt_hash)
+      await refreshBudget()
       navigate(`/generations/${generation.id}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err))
@@ -128,6 +143,9 @@ export function PanelPreviewPage() {
               ))}
             </div>
           )}
+
+          <h2>Exact prompt sent to Gemini</h2>
+          <pre className="prompt-preview">{preview.prompt}</pre>
 
           <p>
             Estimated cost: <strong>{formatCents(preview.estimated_cost_cents)}</strong> · Spent or

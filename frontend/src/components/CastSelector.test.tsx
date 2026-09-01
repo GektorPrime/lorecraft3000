@@ -34,6 +34,15 @@ const CHARACTERS: Character[] = [
   },
 ]
 
+const UNREADY_CHARACTER: Character = {
+  ...CHARACTERS[1],
+  id: 3,
+  name: 'Tomas',
+  slug: 'tomas',
+  has_canonical_ref_set: false,
+  avatar_initials: 'TO',
+}
+
 function Harness() {
   const [cast, setCast] = useState<CastMemberInput[]>([])
   return <CastSelector characters={CHARACTERS} value={cast} onChange={setCast} />
@@ -96,5 +105,31 @@ describe('CastSelector', () => {
     const stagingInput = screen.getByRole('textbox', { name: /Staging role for Elias/ })
     expect(stagingInput).toHaveAttribute('aria-describedby', 'staging-hint')
     expect(document.getElementById('staging-hint')).toHaveTextContent(/Staging:/)
+  })
+
+  it('shows noncanonical characters as disabled in a mixed list', () => {
+    render(
+      <CastSelector
+        characters={[CHARACTERS[0], UNREADY_CHARACTER]}
+        value={[]}
+        onChange={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /Tomas - Needs a canonical reference set/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Elias/ })).toBeEnabled()
+  })
+
+  it('keeps an already selected noncanonical character in the editable cast', () => {
+    render(
+      <CastSelector
+        characters={[CHARACTERS[0], UNREADY_CHARACTER]}
+        value={[{ character_id: UNREADY_CHARACTER.id, role: 'watching', prominence: 2 }]}
+        onChange={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Staging role for Tomas' })).toHaveValue('watching')
+    expect(screen.getByRole('spinbutton', { name: 'Prominence for Tomas' })).toHaveValue(2)
   })
 })

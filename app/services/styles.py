@@ -7,7 +7,6 @@ are the single source of truth for the seed values.
 
 from __future__ import annotations
 
-import json
 import sqlite3
 
 from app.domain.models import Style
@@ -81,15 +80,14 @@ class StyleService:
         *,
         name: str,
         style_contract: str = "",
-        ref_image_ids: list[int] | None = None,
     ) -> Style:
         """Create a style. Raises StyleNameCollisionError on duplicate name."""
         if not name.strip():
             raise StyleError("style name is required")
         try:
             cur = self.conn.execute(
-                "INSERT INTO style (name, style_contract, ref_image_ids) VALUES (?, ?, ?)",
-                (name.strip(), style_contract, json.dumps(ref_image_ids or [])),
+                "INSERT INTO style (name, style_contract) VALUES (?, ?)",
+                (name.strip(), style_contract),
             )
             self.conn.commit()
         except sqlite3.IntegrityError as exc:
@@ -105,7 +103,6 @@ class StyleService:
         *,
         name: str,
         style_contract: str = "",
-        ref_image_ids: list[int] | None = None,
     ) -> Style:
         """Update a style. Raises StyleNameCollisionError on duplicate name."""
         self.get(style_id)  # raises StyleNotFoundError if missing
@@ -115,10 +112,10 @@ class StyleService:
             self.conn.execute(
                 """
                 UPDATE style
-                   SET name = ?, style_contract = ?, ref_image_ids = ?
+                   SET name = ?, style_contract = ?
                  WHERE id = ?
                 """,
-                (name.strip(), style_contract, json.dumps(ref_image_ids or []), style_id),
+                (name.strip(), style_contract, style_id),
             )
             self.conn.commit()
         except sqlite3.IntegrityError as exc:

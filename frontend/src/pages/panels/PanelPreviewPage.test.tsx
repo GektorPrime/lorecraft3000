@@ -6,6 +6,12 @@ import * as client from '../../api/client'
 import type { Generation, GenerationSummary, Panel, PanelPreview } from '../../api/types'
 import { PanelPreviewPage } from './PanelPreviewPage'
 
+const { refreshBudget } = vi.hoisted(() => ({ refreshBudget: vi.fn() }))
+
+vi.mock('../../api/useBudget', () => ({
+  useBudget: () => ({ refreshBudget, budget: {}, refreshError: null }),
+}))
+
 vi.mock('../../api/client', async () => {
   const actual = await vi.importActual<typeof import('../../api/client')>('../../api/client')
   return {
@@ -53,6 +59,16 @@ const BLOCKED_PREVIEW: PanelPreview = {
   remaining_after_cents: 0,
   can_generate: false,
   blocked_reason: 'no canonical reference set',
+}
+
+const READY_PREVIEW: PanelPreview = {
+  ...BLOCKED_PREVIEW,
+  prompt: 'REFERENCE IMAGE DECLARATIONS\nImage 1 is Elias.\n\nSCENE\nElias opens the door.',
+  prompt_hash: 'reviewed-prompt-hash',
+  estimated_cost_cents: 7,
+  remaining_after_cents: 293,
+  can_generate: true,
+  blocked_reason: null,
 }
 
 const FAILED_ATTEMPT: GenerationSummary = {
@@ -123,6 +139,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     vi.mocked(client.listPanelGenerations).mockReset().mockResolvedValue([])
     vi.mocked(client.duplicatePanel).mockReset()
     vi.mocked(client.generatePanel).mockReset()
+    refreshBudget.mockReset().mockResolvedValue(undefined)
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -166,6 +183,27 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(screen.queryByRole('button', { name: /Duplicate & edit/ })).not.toBeInTheDocument()
   })
 
+  it('shows the complete exact prompt before the paid generation button', async () => {
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      is_editable: true,
+      generation_count: 0,
+    })
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+
+    renderPreview()
+
+    await screen.findByRole('heading', { name: 'Exact prompt sent to Gemini' })
+    const prompt = document.querySelector('.prompt-preview')
+    const button = screen.getByRole('button', { name: /Generate one candidate/ })
+    if (!(prompt instanceof HTMLElement)) throw new Error('prompt preview was not rendered')
+    expect(prompt.tagName).toBe('PRE')
+    expect(prompt).toHaveTextContent(READY_PREVIEW.prompt, { normalizeWhitespace: false })
+    expect(
+      prompt.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
   it('shows preserved failed generation attempts with a details link', async () => {
     vi.mocked(client.getPanel).mockResolvedValue({
       ...LOCKED_PANEL,
@@ -193,11 +231,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
       generation_count: 1,
     })
     vi.mocked(client.listPanelGenerations).mockResolvedValue([HIGH_DEMAND_ATTEMPT])
-    vi.mocked(client.previewPanel).mockResolvedValue({
-      ...BLOCKED_PREVIEW,
-      can_generate: true,
-      blocked_reason: null,
-    })
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
     vi.mocked(client.generatePanel).mockResolvedValue(GENERATED)
 
     renderPreview()
@@ -206,10 +240,38 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
       await screen.findByText(/Gemini Pro is temporarily busy/),
     ).toBeInTheDocument()
     expect(screen.getByText('Technical details')).toBeInTheDocument()
+    refreshBudget.mockClear()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(client.generatePanel).toHaveBeenCalledWith(3)
+    expect(client.generatePanel).toHaveBeenCalledWith(3, READY_PREVIEW.prompt_hash)
+    expect(refreshBudget).toHaveBeenCalled()
     expect(mockNavigate).toHaveBeenCalledWith('/generations/8')
+  })
+
+  it('reloads and explains when the reviewed prompt changed', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      is_editable: true,
+      generation_count: 0,
+    })
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.generatePanel).mockRejectedValue(
+      new client.ApiError(
+        'the assembled prompt changed after preview; review the updated prompt before generating',
+        'PreviewChangedError',
+        409,
+      ),
+    )
+
+    renderPreview()
+    await user.click(await screen.findByRole('button', { name: /Generate one candidate/ }))
+
+    expect(
+      await screen.findByText(/inputs changed.*review the updated prompt/i),
+    ).toBeInTheDocument()
+    expect(client.previewPanel).toHaveBeenCalledTimes(2)
+    expect(mockNavigate).not.toHaveBeenCalled()
   })
 
   it('disables paid generation while an attempt is pending', async () => {
@@ -217,11 +279,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
       ...LOCKED_PANEL,
       generation_count: 1,
     })
-    vi.mocked(client.previewPanel).mockResolvedValue({
-      ...BLOCKED_PREVIEW,
-      can_generate: true,
-      blocked_reason: null,
-    })
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
     vi.mocked(client.listPanelGenerations).mockResolvedValue([PENDING_ATTEMPT])
 
     renderPreview()

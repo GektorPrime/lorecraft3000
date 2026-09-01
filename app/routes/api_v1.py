@@ -30,6 +30,7 @@ from app.schemas import (
     CharacterOut,
     CharacterUpdate,
     GenerationAttachmentOut,
+    GenerationCreate,
     GenerationOut,
     GenerationSummaryOut,
     OptionsSummaryOut,
@@ -63,7 +64,7 @@ from app.services.costs import (
     SceneChangedError,
     UnknownPriceError,
 )
-from app.services.generation import GenerationError, GenerationService
+from app.services.generation import GenerationError, GenerationService, PreviewChangedError
 from app.services.ref_sets import (
     ImageRejectedError,
     InvalidRoleError,
@@ -129,6 +130,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (GenerationPendingError, 409),
     (IdempotencyConflictError, 409),
     (SceneChangedError, 409),
+    (PreviewChangedError, 409),
     (BudgetExceededError, 402),
     (VisualContractTooLongError, 422),
     (InvalidStyleReferenceError, 422),
@@ -416,7 +418,6 @@ def create_style(payload: StyleCreate, conn=Depends(get_conn)):
         style = StyleService(conn).create(
             name=payload.name,
             style_contract=payload.style_contract,
-            ref_image_ids=payload.ref_image_ids,
         )
     except StyleError as exc:
         _raise_for(exc)
@@ -439,7 +440,6 @@ def update_style(style_id: int, payload: StyleUpdate, conn=Depends(get_conn)):
             style_id,
             name=payload.name,
             style_contract=payload.style_contract,
-            ref_image_ids=payload.ref_image_ids,
         )
     except StyleError as exc:
         _raise_for(exc)
@@ -716,6 +716,7 @@ def list_panel_generations(
 @router.post("/panels/{panel_id}/generate", response_model=GenerationOut, status_code=201)
 def generate_panel(
     panel_id: int,
+    payload: GenerationCreate,
     response: Response,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     conn=Depends(get_conn),
@@ -729,6 +730,7 @@ def generate_panel(
             model=scene.model,
             image_size=scene.image_size,
             idempotency_key=idempotency_key,
+            expected_prompt_hash=payload.expected_prompt_hash,
         )
     except (SceneError, GenerationError, CostError, ImageStorageError) as exc:
         _raise_for(exc)

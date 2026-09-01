@@ -25,11 +25,10 @@ const EXISTING_STYLE = {
   id: 5,
   name: 'Ink Wash',
   style_contract: 'Loose ink wash.',
-  ref_image_ids: [12, 15],
   created_at: '',
 }
 
-describe('StyleFormPage — reference image IDs', () => {
+describe('StyleFormPage', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
     // mockReset (not just mockResolvedValue) so each test starts with a
@@ -43,7 +42,7 @@ describe('StyleFormPage — reference image IDs', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders an editable control for reference image IDs on a new style', async () => {
+  it('does not render a reference image control', async () => {
     render(
       <MemoryRouter initialEntries={['/styles/new']}>
         <Routes>
@@ -51,25 +50,10 @@ describe('StyleFormPage — reference image IDs', () => {
         </Routes>
       </MemoryRouter>,
     )
-    const field = await screen.findByLabelText('Reference image IDs')
-    expect(field).toHaveValue('')
+    expect(screen.queryByLabelText('Reference image IDs')).not.toBeInTheDocument()
   })
 
-  it('preserves existing reference image IDs when editing a style', async () => {
-    render(
-      <MemoryRouter initialEntries={['/styles/5/edit']}>
-        <Routes>
-          <Route path="/styles/:id/edit" element={<StyleFormPage />} />
-        </Routes>
-      </MemoryRouter>,
-    )
-    const field = await screen.findByLabelText('Reference image IDs')
-    expect(field).toHaveValue('12, 15')
-    // No sha/hash text ever appears anywhere on the page.
-    expect(document.body.textContent).not.toMatch(/[0-9a-f]{64}/)
-  })
-
-  it('submits edited reference image IDs as parsed integers, not raw text', async () => {
+  it('loads and updates a style without reference image IDs', async () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter initialEntries={['/styles/5/edit']}>
@@ -78,52 +62,16 @@ describe('StyleFormPage — reference image IDs', () => {
         </Routes>
       </MemoryRouter>,
     )
-    const field = await screen.findByLabelText('Reference image IDs')
-    await user.clear(field)
-    await user.type(field, '3, 4, 5')
+    const contract = await screen.findByLabelText('Style contract')
+    await user.clear(contract)
+    await user.type(contract, 'Updated wash.')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(client.updateStyle).toHaveBeenCalled())
-    expect(client.updateStyle).toHaveBeenCalledWith(
-      5,
-      expect.objectContaining({ ref_image_ids: [3, 4, 5] }),
-    )
+    expect(client.updateStyle).toHaveBeenCalledWith(5, {
+      name: 'Ink Wash',
+      style_contract: 'Updated wash.',
+    })
     expect(mockNavigate).toHaveBeenCalledWith('/styles')
-  })
-
-  it('rejects non-integer reference image IDs without submitting', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter initialEntries={['/styles/5/edit']}>
-        <Routes>
-          <Route path="/styles/:id/edit" element={<StyleFormPage />} />
-        </Routes>
-      </MemoryRouter>,
-    )
-    const field = await screen.findByLabelText('Reference image IDs')
-    await user.clear(field)
-    await user.type(field, 'abc')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-
-    expect(await screen.findByText(/must be comma-separated integers/)).toBeInTheDocument()
-    expect(client.updateStyle).not.toHaveBeenCalled()
-    expect(mockNavigate).not.toHaveBeenCalled()
-  })
-
-  it('treats a blank reference-image-ID field as optional (empty list)', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter initialEntries={['/styles/5/edit']}>
-        <Routes>
-          <Route path="/styles/:id/edit" element={<StyleFormPage />} />
-        </Routes>
-      </MemoryRouter>,
-    )
-    const field = await screen.findByLabelText('Reference image IDs')
-    await user.clear(field)
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(client.updateStyle).toHaveBeenCalled())
-    expect(client.updateStyle).toHaveBeenCalledWith(5, expect.objectContaining({ ref_image_ids: [] }))
   })
 })

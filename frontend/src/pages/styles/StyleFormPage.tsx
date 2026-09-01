@@ -2,9 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ApiError, createStyle, getStyle, updateStyle } from '../../api/client'
 import type { StyleInput } from '../../api/types'
-import { parseRefImageIds } from './refImageIds'
 
-const EMPTY: StyleInput = { name: '', style_contract: '', ref_image_ids: [] }
+const EMPTY: StyleInput = { name: '', style_contract: '' }
 
 export function StyleFormPage() {
   const { id } = useParams()
@@ -12,10 +11,6 @@ export function StyleFormPage() {
   const navigate = useNavigate()
 
   const [values, setValues] = useState<StyleInput>(EMPTY)
-  // Reference-image IDs are edited as raw comma-separated text so a user can
-  // type "1, 2, 3" freely; it is parsed/validated on submit (see
-  // parseRefImageIds above) rather than on every keystroke.
-  const [refImageIdsText, setRefImageIdsText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [loaded, setLoaded] = useState(styleId === null)
@@ -24,10 +19,7 @@ export function StyleFormPage() {
     if (styleId === null) return
     getStyle(styleId)
       .then((style) => {
-        setValues({ name: style.name, style_contract: style.style_contract, ref_image_ids: style.ref_image_ids })
-        // Preserve the existing IDs in the editable text control so editing
-        // a style never silently drops its reference-image associations.
-        setRefImageIdsText(style.ref_image_ids.join(', '))
+        setValues({ name: style.name, style_contract: style.style_contract })
         setLoaded(true)
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : String(err)))
@@ -36,17 +28,9 @@ export function StyleFormPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
-    let refImageIds: number[]
-    try {
-      refImageIds = parseRefImageIds(refImageIdsText)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-      return
-    }
     setSubmitting(true)
     try {
-      const payload: StyleInput = { ...values, ref_image_ids: refImageIds }
-      const saved = styleId === null ? await createStyle(payload) : await updateStyle(styleId, payload)
+      const saved = styleId === null ? await createStyle(values) : await updateStyle(styleId, values)
       navigate('/styles')
       void saved
     } catch (err) {
@@ -84,23 +68,6 @@ export function StyleFormPage() {
           <span className="field__hint" id="style_contract-hint">
             Sent verbatim with every generation using this style. Example: "Victorian-era oil
             painting. Rich chiaroscuro lighting; visible brushwork."
-          </span>
-        </div>
-        <div className="field">
-          <label htmlFor="ref_image_ids">Reference image IDs</label>
-          <input
-            id="ref_image_ids"
-            type="text"
-            aria-describedby="ref_image_ids-hint"
-            placeholder="e.g. 12, 15"
-            value={refImageIdsText}
-            onChange={(e) => setRefImageIdsText(e.target.value)}
-          />
-          <span className="field__hint" id="ref_image_ids-hint">
-            Optional. A comma-separated list of reference image IDs (from a character's
-            reference set) that best represent this style, e.g. "12, 15". Leave blank if this
-            style has no example images. IDs are the same opaque IDs shown throughout the app —
-            never a content hash.
           </span>
         </div>
         <div className="btn-row">

@@ -306,7 +306,7 @@ def test_new_style_form_page(client):
     resp = client.get("/styles/new")
     assert resp.status_code == 200
     assert 'name="style_contract"' in resp.text
-    assert 'name="ref_image_ids"' in resp.text
+    assert "ref_image_ids" not in resp.text
 
 
 def test_create_style_via_route(client):
@@ -315,7 +315,6 @@ def test_create_style_via_route(client):
         data={
             "name": "Ink Wash",
             "style_contract": "Loose ink wash.",
-            "ref_image_ids": "1, 2",
         },
         follow_redirects=False,
     )
@@ -341,7 +340,6 @@ def test_failed_style_edit_keeps_edit_action(client):
         data={
             "name": "Ink Wash",
             "style_contract": "New contract text.",
-            "ref_image_ids": "",
         },
     )
     assert resp.status_code == 422
@@ -357,7 +355,6 @@ def test_failed_style_edit_keeps_edit_action(client):
         data={
             "name": "Victorian Oil Painting",
             "style_contract": "Updated contract.",
-            "ref_image_ids": "",
         },
         follow_redirects=False,
     )
@@ -373,7 +370,6 @@ def test_styles_list_escapes_user_html(client):
         data={
             "name": "Ink Wash",
             "style_contract": "<script>alert('style')</script>",
-            "ref_image_ids": "",
         },
     )
     page = client.get("/styles").text

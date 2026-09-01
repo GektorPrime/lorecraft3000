@@ -16,27 +16,10 @@ from app.services.styles import (
 router = APIRouter(prefix="/styles", tags=["styles"])
 
 
-def _parse_ref_image_ids(raw: str) -> list[int]:
-    """Parse the comma-separated ref_image_ids form field into ints."""
-    ids: list[int] = []
-    for part in raw.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        try:
-            ids.append(int(part))
-        except ValueError:
-            raise StyleError(
-                f"ref_image_ids must be comma-separated integers, got '{part}'"
-            )
-    return ids
-
-
-def _values_from_form(name: str, style_contract: str, ref_image_ids: str) -> dict:
+def _values_from_form(name: str, style_contract: str) -> dict:
     return {
         "name": name,
         "style_contract": style_contract,
-        "ref_image_ids": ref_image_ids,
     }
 
 
@@ -44,7 +27,6 @@ def _values_from_style(style) -> dict:
     return {
         "name": style.name,
         "style_contract": style.style_contract,
-        "ref_image_ids": ", ".join(str(i) for i in style.ref_image_ids),
     }
 
 
@@ -64,7 +46,7 @@ def new_style_form(request: Request, conn=Depends(get_conn)) -> HTMLResponse:
         {
             "style": None,
             "error": None,
-            "values": {"name": "", "style_contract": "", "ref_image_ids": ""},
+            "values": {"name": "", "style_contract": ""},
         },
     )
 
@@ -74,7 +56,6 @@ def create_style(
     request: Request,
     name: str = Form(...),
     style_contract: str = Form(""),
-    ref_image_ids: str = Form(""),
     conn=Depends(get_conn),
 ):
     service = StyleService(conn)
@@ -82,7 +63,6 @@ def create_style(
         style = service.create(
             name=name,
             style_contract=style_contract,
-            ref_image_ids=_parse_ref_image_ids(ref_image_ids),
         )
     except (StyleNameCollisionError, StyleError) as exc:
         return templates.TemplateResponse(
@@ -91,7 +71,7 @@ def create_style(
             {
                 "style": None,
                 "error": str(exc),
-                "values": _values_from_form(name, style_contract, ref_image_ids),
+                "values": _values_from_form(name, style_contract),
             },
             status_code=422,
         )
@@ -124,7 +104,6 @@ def update_style(
     request: Request,
     name: str = Form(...),
     style_contract: str = Form(""),
-    ref_image_ids: str = Form(""),
     conn=Depends(get_conn),
 ):
     service = StyleService(conn)
@@ -137,7 +116,6 @@ def update_style(
             style_id,
             name=name,
             style_contract=style_contract,
-            ref_image_ids=_parse_ref_image_ids(ref_image_ids),
         )
     except (StyleNameCollisionError, StyleError) as exc:
         return templates.TemplateResponse(
@@ -149,7 +127,7 @@ def update_style(
                 # duplicate; values below preserve the user's submission.
                 "style": style,
                 "error": str(exc),
-                "values": _values_from_form(name, style_contract, ref_image_ids),
+                "values": _values_from_form(name, style_contract),
             },
             status_code=422,
         )

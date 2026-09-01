@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { useOptions } from '../api/useOptions'
+import { useBudget } from '../api/useBudget'
 
 /**
  * The single app header, rendered once by the top-level layout in App.tsx
@@ -8,9 +8,9 @@ import { useOptions } from '../api/useOptions'
  * spend budget everywhere, since it gates every generation.
  */
 export function Header() {
-  const options = useOptions()
-  const spent = (options.spent_today_cents / 100).toFixed(2)
-  const cap = (options.daily_spend_cap_cents / 100).toFixed(2)
+  const { budget, refreshError } = useBudget()
+  const spent = (budget.spent_today_cents / 100).toFixed(2)
+  const cap = (budget.daily_spend_cap_cents / 100).toFixed(2)
 
   return (
     <header className="app-header">
@@ -27,6 +27,11 @@ export function Header() {
         <span className="field__hint" title="Daily spend budget">
           Budget: ${spent} / ${cap}
         </span>
+        {refreshError && (
+          <span className="field__hint" title={refreshError}>
+            Budget may be out of date
+          </span>
+        )}
       </div>
     </header>
   )

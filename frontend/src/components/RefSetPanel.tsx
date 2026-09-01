@@ -71,6 +71,22 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
     })
   }
 
+  const handlePromote = () => {
+    if (
+      !window.confirm(
+        'Promote this draft to canonical? The draft will become immutable, and the current canonical, if any, will be retired.',
+      )
+    ) {
+      return
+    }
+    void runAction(() => promoteRefSet(refSetId))
+  }
+
+  const handleRemove = (imageId: number) => {
+    if (!window.confirm('Remove this image from the draft?')) return
+    void runAction(() => removeRefImage(refSetId, imageId))
+  }
+
   return (
     <div className="card" style={{ marginTop: '0.75rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -91,7 +107,7 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
               type="button"
               className="btn btn--primary"
               disabled={busy || refSet.images.length === 0}
-              onClick={() => void runAction(() => promoteRefSet(refSetId))}
+              onClick={handlePromote}
             >
               Promote to canonical
             </button>
@@ -119,7 +135,7 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
               onReRole={(imageId, newRole) =>
                 void runAction(() => reRoleRefImage(refSetId, imageId, newRole))
               }
-              onRemove={(imageId) => void runAction(() => removeRefImage(refSetId, imageId))}
+              onRemove={handleRemove}
             />
           ))}
         </div>

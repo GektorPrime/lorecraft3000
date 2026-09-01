@@ -10,7 +10,6 @@
     <tr>
       <th>Name</th>
       <th>Style contract</th>
-      <th>Ref image ids</th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -19,9 +18,6 @@
     <tr>
       <td>{{ s.name }}</td>
       <td>{{ s.style_contract }}</td>
-      <td>
-        {% if s.ref_image_ids %}{{ s.ref_image_ids | join(', ') }}{% else %}<span class="muted">none</span>{% endif %}
-      </td>
       <td><a href="/styles/{{ s.id }}/edit">Edit</a></td>
     </tr>
     {% endfor %}

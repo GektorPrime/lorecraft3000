@@ -18,7 +18,8 @@
 <p class="hint">Drafts are editable. Promote to make this the canonical reference set
   (the prior canonical, if any, is retired and kept forever).</p>
 <div class="actions">
-  <form class="inline" method="post" action="/ref-sets/{{ ref_set.id }}/promote">
+  <form class="inline" method="post" action="/ref-sets/{{ ref_set.id }}/promote"
+        onsubmit="return confirm('Promote this draft to canonical? The draft will become immutable, and the current canonical, if any, will be retired.');">
     <button type="submit">Promote to canonical</button>
   </form>
   <form class="inline" method="post" action="/ref-sets/{{ ref_set.id }}/copy">
