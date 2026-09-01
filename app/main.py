@@ -7,6 +7,7 @@ Organized by responsibility:
   - app/db.py          SQLite connection helpers
   - app/migrate.py     migration runner
   - app/storage.py     content-addressed image storage
+  - app/maintenance.py storage consistency scan + repair CLI
   - app/domain/        domain models
   - app/services/      business services (characters, styles, ref_sets)
   - app/routes/        route modules (characters, styles, ref_sets)
@@ -18,6 +19,7 @@ Organized by responsibility:
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -35,6 +37,8 @@ from app.routes import ref_sets as ref_set_routes
 from app.routes import scenes as scene_routes
 from app.routes import styles as style_routes
 from app.services.costs import CostLedger
+
+logger = logging.getLogger("lorecraft")
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -70,6 +74,25 @@ async def lifespan(app: FastAPI):
     )
     try:
         CostLedger(conn, settings).recover_stale_pending()
+        if settings.consistency_check_on_startup:
+            # Optional, off by default, and separated from the stale-pending
+            # recovery above. A consistency problem must never block startup:
+            # log a summary and continue.
+            from app.maintenance import run_check
+            from app.storage import ImageStorage
+
+            try:
+                report = run_check(conn, ImageStorage(settings.store_root))
+                if report.issue_count:
+                    logger.warning(
+                        "startup consistency check found %d issue(s); run "
+                        "`python -m app.maintenance` to inspect and repair",
+                        report.issue_count,
+                    )
+                else:
+                    logger.info("startup consistency check: clean")
+            except Exception:
+                logger.exception("startup consistency check failed")
     finally:
         conn.close()
     yield

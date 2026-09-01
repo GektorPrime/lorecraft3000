@@ -17,6 +17,7 @@ import json
 import os
 import tempfile
 import threading
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,6 +46,10 @@ _FORMAT_EXT = {
     "BMP": "bmp",
     "TIFF": "tiff",
 }
+
+# Reverse map (extension -> Pillow format name) used to reconstruct base sidecar
+# metadata when a sidecar is missing or damaged.
+_FORMAT_FROM_EXT = {ext: fmt for fmt, ext in _FORMAT_EXT.items()}
 
 
 class ImageStorageError(Exception):
@@ -287,6 +292,72 @@ class ImageStorage:
                 sidecar_path,
                 json.dumps(sidecar, indent=2, sort_keys=True).encode("utf-8"),
             )
+
+    def iter_hashes(self) -> Iterator[str]:
+        """Yield every content hash referenced on disk (image or sidecar).
+
+        Walks the store and reports the 64-hex stems that appear as either an
+        image file (``<sha256>.<ext>``) or a sidecar (``<sha256>.json``); stale
+        ``.tmp-*`` files are ignored. Used by the consistency scanner.
+        """
+        found: set[str] = set()
+        if self.root.exists():
+            for path in self.root.rglob("*"):
+                if not path.is_file():
+                    continue
+                stem = path.name.rpartition(".")[0]
+                if len(stem) == 64 and all(c in "0123456789abcdef" for c in stem):
+                    found.add(stem)
+        yield from sorted(found)
+
+    def find_image(self, sha256: str) -> Path | None:
+        """Return the stored image file for ``sha256``, or None if absent.
+
+        Ambiguity is impossible in this layout: exactly one non-sidecar file is
+        named ``<sha256>.<ext>`` inside the prefix directory.
+        """
+        self._validate_sha256(sha256)
+        prefix_dir = self.root / sha256[:2]
+        if not prefix_dir.is_dir():
+            return None
+        matches = [
+            p
+            for p in prefix_dir.iterdir()
+            if p.name.startswith(f"{sha256}.") and p.suffix.lower() != ".json"
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
+    def is_complete(self, sha256: str) -> bool:
+        """Return True if a valid image plus matching sidecar exists."""
+        self._validate_sha256(sha256)
+        image = self.find_image(sha256)
+        if image is None:
+            return False
+        sidecar_path = self.root / sha256[:2] / f"{sha256}.json"
+        try:
+            metadata = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        extension = metadata.get("extension")
+        if not extension:
+            return False
+        return image.name == f"{sha256}.{extension}"
+
+    def write_sidecar(self, sha256: str, metadata: dict) -> None:
+        """Atomically rewrite `<sha256>.json` with the given metadata.
+
+        Used by the repair command to reconstruct a missing or damaged sidecar
+        (base metadata plus provenance rebuilt from the database). No secrets.
+        """
+        self._validate_sha256(sha256)
+        sidecar_path = self.root / sha256[:2] / f"{sha256}.json"
+        sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+        self._atomic_write(
+            sidecar_path,
+            json.dumps(metadata, indent=2, sort_keys=True).encode("utf-8"),
+        )
 
     @staticmethod
     def _validate_sha256(sha256: str) -> None:

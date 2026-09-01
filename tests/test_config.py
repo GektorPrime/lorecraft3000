@@ -95,6 +95,7 @@ def clean_env(monkeypatch):
         "LORECRAFT_SQLITE_JOURNAL_MODE",
         "LORECRAFT_SQLITE_BUSY_TIMEOUT_MS",
         "LORECRAFT_SQLITE_SYNCHRONOUS",
+        "LORECRAFT_CONSISTENCY_CHECK_ON_STARTUP",
     ):
         monkeypatch.delenv(key, raising=False)
     return monkeypatch
@@ -113,6 +114,7 @@ def test_from_env_defaults(clean_env):
     assert s.sqlite_journal_mode == "wal"
     assert s.sqlite_busy_timeout_ms == 5000
     assert s.sqlite_synchronous == "normal"
+    assert s.consistency_check_on_startup is False
 
 
 def test_sqlite_defaults_on_bare_settings():
@@ -120,6 +122,7 @@ def test_sqlite_defaults_on_bare_settings():
     assert s.sqlite_journal_mode == "wal"
     assert s.sqlite_busy_timeout_ms == 5000
     assert s.sqlite_synchronous == "normal"
+    assert s.consistency_check_on_startup is False
 
 
 def test_from_env_sqlite_overrides(clean_env):
@@ -130,6 +133,19 @@ def test_from_env_sqlite_overrides(clean_env):
     assert s.sqlite_journal_mode == "delete"
     assert s.sqlite_busy_timeout_ms == 1234
     assert s.sqlite_synchronous == "full"
+
+
+def test_from_env_consistency_check_toggle(clean_env):
+    s = Settings.from_env()
+    assert s.consistency_check_on_startup is False
+
+    for truthy in ("1", "true", "TRUE", "yes", "on"):
+        clean_env.setenv("LORECRAFT_CONSISTENCY_CHECK_ON_STARTUP", truthy)
+        assert Settings.from_env().consistency_check_on_startup is True
+
+    for falsy in ("0", "false", "no", "off", ""):
+        clean_env.setenv("LORECRAFT_CONSISTENCY_CHECK_ON_STARTUP", falsy)
+        assert Settings.from_env().consistency_check_on_startup is False
 
 
 def test_from_env_rejects_bad_journal_mode(clean_env):

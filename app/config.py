@@ -103,6 +103,11 @@ class Settings:
     sqlite_busy_timeout_ms: int = 5000
     sqlite_synchronous: str = "normal"
 
+    # When True, run a lightweight storage consistency scan during app startup
+    # and log a summary. The scan never modifies anything; operators who want
+    # repairs run `python -m app.maintenance repair` explicitly.
+    consistency_check_on_startup: bool = False
+
     @property
     def daily_spend_cap_cents(self) -> int:
         """Daily spend cap expressed as integer minor units (cents)."""
@@ -135,6 +140,9 @@ class Settings:
         synchronous = os.environ.get(
             "LORECRAFT_SQLITE_SYNCHRONOUS", "normal"
         ).strip().lower()
+        consistency_check = os.environ.get(
+            "LORECRAFT_CONSISTENCY_CHECK_ON_STARTUP", "false"
+        ).strip().lower() in {"1", "true", "yes", "on"}
         if provider_timeout_seconds <= 0:
             raise ValueError("LORECRAFT_PROVIDER_TIMEOUT_SECONDS must be positive")
         allowed_journal_modes = {
@@ -172,4 +180,5 @@ class Settings:
             sqlite_journal_mode=journal_mode,
             sqlite_busy_timeout_ms=busy_timeout_ms,
             sqlite_synchronous=synchronous,
+            consistency_check_on_startup=consistency_check,
         )
