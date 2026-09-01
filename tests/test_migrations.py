@@ -147,6 +147,90 @@ def test_concurrent_migration_runs_converge(tmp_path):
         conn.close()
 
 
+def test_full_schema_matches_direct_upgrade_chain(tmp_path):
+    """A fresh DB built by the runner has an identical schema to one built by
+    chaining every migration module directly.
+
+    This guards against drift between the runner and the modules it executes:
+    whichever path constructs a fresh database, the resulting schema — tables,
+    columns, indexes, and triggers — must be byte-for-byte the same.
+    """
+    runner_db = tmp_path / "runner.db"
+    run_migrations(runner_db)
+
+    direct_db = tmp_path / "direct.db"
+    conn = connect(direct_db)
+    try:
+        for module_name in MIGRATIONS:
+            importlib.import_module(module_name).upgrade(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+    def schema_objects(db: object):
+        c = connect(db)
+        try:
+            return {
+                (r["type"], r["name"], r["tbl_name"], r["sql"])
+                for r in c.execute(
+                    "SELECT type, name, tbl_name, sql FROM sqlite_master "
+                    "WHERE name NOT LIKE 'sqlite_%' AND name != 'schema_migrations'"
+                ).fetchall()
+            }
+        finally:
+            c.close()
+
+    assert schema_objects(runner_db) == schema_objects(direct_db)
+
+
+def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
+    """The newest non-idempotent migration (010) is interrupt-and-retry safe:
+    a mid-run collision rolls back the whole run, and resuming after cleaning
+    up converges to a fully applied, intact schema."""
+    db = tmp_path / "provenance-retry.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        for module_name in MIGRATIONS[:9]:
+            version = module_name.rsplit(".", 1)[-1]
+            importlib.import_module(module_name).upgrade(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
+            )
+        # A pre-existing image_provenance table with a divergent definition
+        # forces 010's CREATE TABLE to collide mid-run.
+        conn.execute(
+            "CREATE TABLE image_provenance (id INTEGER PRIMARY KEY AUTOINCREMENT)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(sqlite3.OperationalError, match="already exists"):
+        run_migrations(db)
+
+    conn = connect(db)
+    try:
+        assert "010_image_provenance" not in applied_versions(conn)
+        # The whole run rolled back: the migration's schema_migrations insert
+        # is gone and only the pre-existing stub table remains.
+        count = conn.execute(
+            "SELECT COUNT(*) AS n FROM pragma_table_info('image_provenance')"
+        ).fetchone()
+        assert count["n"] == 1
+        conn.execute("DROP TABLE image_provenance")
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert run_migrations(db) == ["010_image_provenance"]
+    conn = connect(db)
+    try:
+        assert "010_image_provenance" in applied_versions(conn)
+    finally:
+        conn.close()
+
+
 def test_generation_core_columns_are_migrated(conn):
     scene_columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(scene)").fetchall()
