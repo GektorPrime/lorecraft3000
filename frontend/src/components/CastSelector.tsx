@@ -71,18 +71,22 @@ export function CastSelector({ characters, value, onChange, labelledBy }: CastSe
       <ol className="cast-list" aria-describedby="cast-order-hint">
         {value.map((member, index) => {
           const character = byId.get(member.character_id)
+          const characterName = character?.name ?? `Unknown #${member.character_id}`
           return (
             <li className="cast-list__item" key={member.character_id}>
-              <Avatar
-                url={character?.avatar_url ?? null}
-                initials={character?.avatar_initials ?? '?'}
-                name={character?.name ?? `#${member.character_id}`}
-                size={32}
-              />
-              <strong>{character?.name ?? `Unknown #${member.character_id}`}</strong>
+              <div className="cast-list__identity">
+                <Avatar
+                  url={character?.avatar_url ?? null}
+                  initials={character?.avatar_initials ?? '?'}
+                  name={characterName}
+                  size={32}
+                />
+                <strong>{characterName}</strong>
+              </div>
               <input
                 type="text"
-                aria-label={`Staging role for ${character?.name ?? member.character_id}`}
+                className="cast-list__staging"
+                aria-label={`Staging role for ${characterName}`}
                 aria-describedby="staging-hint"
                 placeholder={'Staging role, e.g. "kneeling by the fire"'}
                 value={member.role ?? ''}
@@ -90,43 +94,52 @@ export function CastSelector({ characters, value, onChange, labelledBy }: CastSe
               />
               <input
                 type="number"
+                className="cast-list__prominence"
                 min={1}
-                aria-label={`Prominence for ${character?.name ?? member.character_id}`}
+                aria-label={`Prominence for ${characterName}`}
                 aria-describedby="prominence-hint"
                 value={member.prominence ?? 1}
                 onChange={(e) => updateProminence(member.character_id, Number(e.target.value) || 1)}
-                style={{ width: '4.5em' }}
               />
-              <button
-                type="button"
-                className="btn"
-                aria-describedby="cast-order-hint"
-                onClick={() => move(index, -1)}
-                disabled={index === 0}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="btn"
-                aria-describedby="cast-order-hint"
-                onClick={() => move(index, 1)}
-                disabled={index === value.length - 1}
-              >
-                ↓
-              </button>
-              <button type="button" className="btn btn--danger" onClick={() => remove(member.character_id)}>
-                Remove
-              </button>
+              <div className="cast-list__actions">
+                <button
+                  type="button"
+                  className="btn"
+                  aria-label={`Move ${characterName} up`}
+                  aria-describedby="cast-order-hint"
+                  onClick={() => move(index, -1)}
+                  disabled={index === 0}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  aria-label={`Move ${characterName} down`}
+                  aria-describedby="cast-order-hint"
+                  onClick={() => move(index, 1)}
+                  disabled={index === value.length - 1}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  aria-label={`Remove ${characterName} from cast`}
+                  onClick={() => remove(member.character_id)}
+                >
+                  Remove
+                </button>
+              </div>
             </li>
           )
         })}
       </ol>
 
       {available.length > 0 && (
-        <div style={{ marginTop: '0.75rem' }}>
+        <div className="cast-selector__available">
           <p className="field__hint">Add to cast:</p>
-          <div className="btn-row" style={{ marginTop: 0 }}>
+          <div className="btn-row cast-selector__available-actions">
             {available.map((character) => (
               <button
                 key={character.id}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ApiError,
   copyRefSet,
@@ -11,10 +11,11 @@ import {
 import { useOptions } from '../api/useOptions'
 import type { RefSet } from '../api/types'
 import { RefImageCard } from './RefImageCard'
+import { AsyncMessage } from './AsyncMessage'
 
 interface RefSetPanelProps {
   refSetId: number
-  onChanged: () => void
+  onChanged: () => void | string | null | Promise<void | string | null>
 }
 
 const STATUS_LABEL: Record<RefSet['status'], string> = {
@@ -27,48 +28,111 @@ const STATUS_LABEL: Record<RefSet['status'], string> = {
 export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
   const options = useOptions()
   const [refSet, setRefSet] = useState<RefSet | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState<{
+    kind: 'success' | 'error'
+    text: string
+  } | null>(null)
   const [role, setRole] = useState(options.ref_image_roles[0] ?? 'face_front')
   const [file, setFile] = useState<File | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busyAction, setBusyAction] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const mounted = useRef(true)
+  const requestVersion = useRef(0)
 
-  const reload = () =>
-    getRefSet(refSetId)
-      .then(setRefSet)
-      .catch((err) => setError(err instanceof ApiError ? err.message : String(err)))
+  const reload = async () => {
+    const version = ++requestVersion.current
+    try {
+      const nextRefSet = await getRefSet(refSetId)
+      if (!mounted.current || version !== requestVersion.current) return null
+      setRefSet(nextRefSet)
+      setLoadError(null)
+      return null
+    } catch (err) {
+      if (!mounted.current || version !== requestVersion.current) return null
+      const message = err instanceof ApiError ? err.message : String(err)
+      setLoadError(message)
+      return message
+    }
+  }
 
   useEffect(() => {
-    reload()
+    mounted.current = true
+    void reload()
+    return () => {
+      mounted.current = false
+      requestVersion.current += 1
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refSetId])
 
   if (!refSet) {
-    return error ? <p className="banner banner--error">{error}</p> : <p>Loading…</p>
+    return loadError ? (
+      <div>
+        <AsyncMessage kind="error">Could not load reference set: {loadError}</AsyncMessage>
+        <button type="button" className="btn" onClick={() => void reload()}>Retry</button>
+      </div>
+    ) : <AsyncMessage kind="loading">Loading reference set…</AsyncMessage>
   }
 
   const isDraft = refSet.status === 'draft'
 
-  const runAction = async (action: () => Promise<unknown>) => {
-    setBusy(true)
-    setError(null)
+  const runAction = async (
+    label: string,
+    successText: string,
+    action: () => Promise<unknown>,
+    onSucceeded?: () => void,
+  ) => {
+    if (busyAction) return
+    setBusyAction(label)
+    setActionMessage(null)
     try {
       await action()
-      await reload()
-      onChanged()
+      if (!mounted.current) return
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err))
-    } finally {
-      setBusy(false)
+      if (!mounted.current) return
+      setActionMessage({
+        kind: 'error',
+        text: `Could not ${label}: ${err instanceof ApiError ? err.message : String(err)}`,
+      })
+      setBusyAction(null)
+      return
     }
+
+    onSucceeded?.()
+    const ownRefreshError = await reload()
+    if (!mounted.current) return
+    let parentRefreshError: string | null = null
+    try {
+      const result = await onChanged()
+      if (!mounted.current) return
+      if (typeof result === 'string') parentRefreshError = result
+    } catch (err) {
+      if (!mounted.current) return
+      parentRefreshError = err instanceof ApiError ? err.message : String(err)
+    }
+    const refreshError = ownRefreshError ?? parentRefreshError
+    if (refreshError) setLoadError(null)
+    setActionMessage(
+      refreshError
+        ? { kind: 'error', text: `${successText} However, reference-set data could not be refreshed: ${refreshError}` }
+        : { kind: 'success', text: successText },
+    )
+    setBusyAction(null)
   }
 
   const handleUpload = (e: FormEvent) => {
     e.preventDefault()
     if (!file) return
-    void runAction(async () => {
-      await uploadRefImage(refSetId, file, role)
-      setFile(null)
-    })
+    void runAction(
+      'upload reference image',
+      'Reference image uploaded.',
+      () => uploadRefImage(refSetId, file, role),
+      () => {
+        setFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      },
+    )
   }
 
   const handlePromote = () => {
@@ -79,16 +143,16 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
     ) {
       return
     }
-    void runAction(() => promoteRefSet(refSetId))
+    void runAction('promote reference set', 'Reference set promoted to canonical.', () => promoteRefSet(refSetId))
   }
 
   const handleRemove = (imageId: number) => {
     if (!window.confirm('Remove this image from the draft?')) return
-    void runAction(() => removeRefImage(refSetId, imageId))
+    void runAction('remove reference image', 'Reference image removed.', () => removeRefImage(refSetId, imageId))
   }
 
   return (
-    <div className="card" style={{ marginTop: '0.75rem' }}>
+    <div className="card" style={{ marginTop: '0.75rem' }} aria-busy={busyAction !== null || undefined}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0 }}>
           v{refSet.version} <span className={`badge badge--${refSet.status}`}>{STATUS_LABEL[refSet.status]}</span>
@@ -97,8 +161,8 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
           <button
             type="button"
             className="btn"
-            disabled={busy}
-            onClick={() => void runAction(() => copyRefSet(refSetId))}
+            disabled={busyAction !== null}
+            onClick={() => void runAction('copy reference set', 'Reference set copied to a new draft.', () => copyRefSet(refSetId))}
           >
             Copy to new draft
           </button>
@@ -106,7 +170,7 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
             <button
               type="button"
               className="btn btn--primary"
-              disabled={busy || refSet.images.length === 0}
+              disabled={busyAction !== null || refSet.images.length === 0}
               onClick={handlePromote}
             >
               Promote to canonical
@@ -119,7 +183,9 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
         <p className="field__hint">{options.ref_set_immutability_explanation}</p>
       )}
 
-      {error && <p className="banner banner--error">{error}</p>}
+      {busyAction && <AsyncMessage kind="loading">Working: {busyAction}…</AsyncMessage>}
+      {loadError && <AsyncMessage kind="error">Could not refresh reference set: {loadError}</AsyncMessage>}
+      {actionMessage && <AsyncMessage kind={actionMessage.kind}>{actionMessage.text}</AsyncMessage>}
 
       {refSet.images.length === 0 ? (
         <p className="field__hint">No images yet.</p>
@@ -132,8 +198,9 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
               roles={options.ref_image_roles}
               editable={isDraft}
               weightExplanation={options.ref_image_weight_explanation}
+              disabled={busyAction !== null}
               onReRole={(imageId, newRole) =>
-                void runAction(() => reRoleRefImage(refSetId, imageId, newRole))
+                void runAction('change reference image role', 'Reference image role changed.', () => reRoleRefImage(refSetId, imageId, newRole))
               }
               onRemove={handleRemove}
             />
@@ -143,7 +210,12 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
 
       {isDraft && (
         <form onSubmit={handleUpload} className="btn-row" style={{ alignItems: 'center' }}>
-          <select value={role} onChange={(e) => setRole(e.target.value)} aria-label="New image role">
+          <select
+            value={role}
+            disabled={busyAction !== null}
+            onChange={(e) => setRole(e.target.value)}
+            aria-label="New image role"
+          >
             {options.ref_image_roles.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -152,11 +224,13 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
           </select>
           <input
             type="file"
+            ref={fileInputRef}
+            disabled={busyAction !== null}
             accept="image/png,image/jpeg,image/webp"
             aria-label="Reference image file"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
-          <button type="submit" className="btn" disabled={busy || !file}>
+          <button type="submit" className="btn" disabled={busyAction !== null || !file}>
             Upload
           </button>
         </form>

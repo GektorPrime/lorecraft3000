@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { getBudget } from './client'
 import { BudgetContext } from './budgetContext'
 import { useOptions } from './useOptions'
@@ -12,12 +12,17 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     remaining_today_cents: options.remaining_today_cents,
   })
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  const requestVersion = useRef(0)
 
   const refreshBudget = useCallback(async () => {
+    const version = ++requestVersion.current
     try {
-      setBudget(await getBudget())
+      const nextBudget = await getBudget()
+      if (version !== requestVersion.current) return
+      setBudget(nextBudget)
       setRefreshError(null)
     } catch (err) {
+      if (version !== requestVersion.current) return
       setRefreshError(err instanceof Error ? err.message : String(err))
     }
   }, [])
@@ -25,7 +30,10 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleFocus = () => void refreshBudget()
     window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+    return () => {
+      requestVersion.current += 1
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [refreshBudget])
 
   return (

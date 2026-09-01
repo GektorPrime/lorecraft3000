@@ -13,7 +13,7 @@ import { Header } from '../components/Header'
 function RefreshButton() {
   const { refreshBudget } = useBudget()
   return (
-    <button type="button" onClick={() => refreshBudget()}>
+    <button type="button" onClick={() => void refreshBudget()}>
       Refresh budget
     </button>
   )
@@ -83,7 +83,7 @@ describe('BudgetProvider', () => {
     await screen.findByText('Budget: $0.42 / $3.00')
   })
 
-  it('shows a stale-budget warning while keeping the last budget in the header', () => {
+  it('shows an alert for a stale budget while keeping the last budget in the header', () => {
     const value: BudgetContextValue = {
       budget: { daily_spend_cap_cents: 300, spent_today_cents: 7, remaining_today_cents: 293 },
       refreshBudget: async () => {},
@@ -98,6 +98,8 @@ describe('BudgetProvider', () => {
     )
 
     expect(screen.getByText('Budget may be out of date')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Budget may be out of date')
     expect(screen.getByText('Budget: $0.07 / $3.00')).toBeInTheDocument()
   })
+
 })

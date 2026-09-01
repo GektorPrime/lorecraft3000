@@ -1,44 +1,64 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, duplicatePanel, listPanels } from '../../api/client'
 import type { Panel } from '../../api/types'
+import { AsyncMessage } from '../../components/AsyncMessage'
 
 export function PanelListPage() {
   const navigate = useNavigate()
   const [panels, setPanels] = useState<Panel[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
+  const mounted = useRef(true)
 
   const reload = () =>
     listPanels()
-      .then(setPanels)
-      .catch((err) => setError(err instanceof ApiError ? err.message : String(err)))
+      .then((value) => {
+        if (!mounted.current) return
+        setPanels(value)
+        setError(null)
+      })
+      .catch((err) => {
+        if (mounted.current) setError(err instanceof ApiError ? err.message : String(err))
+      })
 
   useEffect(() => {
+    mounted.current = true
     reload()
+    return () => {
+      mounted.current = false
+    }
   }, [])
 
   // Duplicate a locked panel and go straight to editing the new, editable
   // copy — duplicating alone does not let the user edit anything, so this
   // must navigate, not just refresh the list (issue #15 follow-up).
   const handleDuplicateAndEdit = async (id: number) => {
+    if (duplicatingId !== null) return
+    setDuplicatingId(id)
+    setError(null)
     try {
       const copy = await duplicatePanel(id)
+      if (!mounted.current) return
       navigate(`/panels/${copy.id}/edit`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err))
+      if (!mounted.current) return
+      setError(`Could not duplicate panel: ${err instanceof ApiError ? err.message : String(err)}`)
+    } finally {
+      if (mounted.current) setDuplicatingId(null)
     }
   }
 
   return (
-    <section>
+    <section aria-busy={duplicatingId !== null || undefined}>
       <div className="btn-row list-page-header">
         <h1>Panels</h1>
         <Link to="/panels/new" className="btn btn--primary">
           Stage new panel
         </Link>
       </div>
-      {error && <p className="banner banner--error">{error}</p>}
-      {!panels && !error && <p>Loading…</p>}
+      {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
+      {!panels && !error && <AsyncMessage kind="loading">Loading panels…</AsyncMessage>}
       {panels && panels.length === 0 && <p>No panels yet.</p>}
       {panels && panels.length > 0 && (
         <div className="card-grid">
@@ -67,9 +87,10 @@ export function PanelListPage() {
                   <button
                     type="button"
                     className="btn"
+                    disabled={duplicatingId !== null}
                     onClick={() => void handleDuplicateAndEdit(panel.id)}
                   >
-                    Duplicate &amp; edit
+                    {duplicatingId === panel.id ? 'Duplicating…' : 'Duplicate & edit'}
                   </button>
                 )}
               </div>

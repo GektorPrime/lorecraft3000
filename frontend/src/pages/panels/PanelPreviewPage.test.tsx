@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -100,6 +100,20 @@ const PENDING_ATTEMPT: GenerationSummary = {
   completed_at: null,
 }
 
+const SUCCEEDED_ATTEMPT: GenerationSummary = {
+  ...PENDING_ATTEMPT,
+  state: 'succeeded',
+  completed_at: '2026-08-31 15:00:03',
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve
+  })
+  return { promise, resolve }
+}
+
 const GENERATED: Generation = {
   id: 8,
   scene_id: 3,
@@ -121,9 +135,9 @@ const GENERATED: Generation = {
   candidates: [],
 }
 
-function renderPreview() {
+function renderPreview(path = '/panels/3/preview') {
   return render(
-    <MemoryRouter initialEntries={['/panels/3/preview']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/panels/:id/preview" element={<PanelPreviewPage />} />
       </Routes>
@@ -142,6 +156,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     refreshBudget.mockReset().mockResolvedValue(undefined)
   })
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -168,6 +183,19 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
     await waitFor(() => expect(client.duplicatePanel).toHaveBeenCalledWith(3))
     expect(mockNavigate).toHaveBeenCalledWith('/panels/99/edit')
+  })
+
+  it('keeps the panel preview and history visible when duplication fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([FAILED_ATTEMPT])
+    vi.mocked(client.duplicatePanel).mockRejectedValue(new Error('offline'))
+    renderPreview()
+
+    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
+
+    expect(await screen.findByText('Could not duplicate panel: Error: offline')).toHaveAttribute('role', 'alert')
+    expect(screen.getByText('Mara backs toward the door.')).toBeInTheDocument()
+    expect(screen.getByText('Attempt #5')).toBeInTheDocument()
   })
 
   it('still shows Edit panel (not duplicate) for an editable panel', async () => {
@@ -215,6 +243,9 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     renderPreview()
 
     expect(await screen.findByText('Attempt #5')).toBeInTheDocument()
+    const timestamp = document.querySelector('time')
+    expect(timestamp).toHaveAttribute('datetime', '2026-08-31T15:00:00.000Z')
+    expect(timestamp).toHaveAttribute('title')
     expect(screen.getByText('Media resolution is not supported')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View details' })).toHaveAttribute(
       'href',
@@ -274,6 +305,30 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
+  it('keeps panel, prompt, and history when generation and its reload fail', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getPanel)
+      .mockResolvedValueOnce(LOCKED_PANEL)
+      .mockRejectedValueOnce(new Error('reload offline'))
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([FAILED_ATTEMPT])
+    vi.mocked(client.generatePanel).mockRejectedValue(new Error('provider offline'))
+    renderPreview()
+
+    await user.click(await screen.findByRole('button', { name: /Generate one candidate/ }))
+
+    expect(await screen.findByText(/Could not start generation/)).toHaveAttribute('role', 'alert')
+    expect(screen.getByText(/Could not refresh panel: Error: reload offline/)).toHaveAttribute(
+      'role',
+      'alert',
+    )
+    expect(screen.getByText('Mara backs toward the door.')).toBeInTheDocument()
+    expect(document.querySelector('.prompt-preview')).toHaveTextContent(READY_PREVIEW.prompt, {
+      normalizeWhitespace: false,
+    })
+    expect(screen.getByText('Attempt #5')).toBeInTheDocument()
+  })
+
   it('disables paid generation while an attempt is pending', async () => {
     vi.mocked(client.getPanel).mockResolvedValue({
       ...LOCKED_PANEL,
@@ -287,5 +342,169 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     const button = await screen.findByRole('button', { name: 'Generation in progress' })
     expect(button).toBeDisabled()
     expect(screen.getByText(/refreshes automatically/)).toBeInTheDocument()
+    expect(screen.getByText(/refreshes automatically/)).toHaveAttribute('role', 'status')
+  })
+
+  it('accepts a poll slower than two seconds without starting an overlapping request', async () => {
+    vi.useFakeTimers()
+    const slowHistory = deferred<GenerationSummary[]>()
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listPanelGenerations)
+      .mockResolvedValueOnce([PENDING_ATTEMPT])
+      .mockImplementationOnce(() => slowHistory.promise)
+
+    await act(async () => {
+      renderPreview()
+    })
+    expect(screen.getByRole('button', { name: 'Generation in progress' })).toBeDisabled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000)
+    })
+    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      slowHistory.resolve([SUCCEEDED_ATTEMPT])
+      await slowHistory.promise
+    })
+
+    expect(screen.getByText('Generation attempt #7 succeeded.')).toHaveAttribute('role', 'status')
+    expect(screen.getByText('Attempt #7')).toBeInTheDocument()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000)
+    })
+    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+  })
+
+  it('announces a pending-to-failed transition once and stops polling', async () => {
+    vi.useFakeTimers()
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listPanelGenerations)
+      .mockResolvedValueOnce([PENDING_ATTEMPT])
+      .mockResolvedValueOnce([{
+        ...PENDING_ATTEMPT,
+        state: 'failed',
+        error_text: 'provider failed',
+        completed_at: '2026-08-31 15:00:03',
+      }])
+
+    await act(async () => {
+      renderPreview()
+    })
+    expect(screen.getByText(/refreshes automatically/)).toHaveAttribute('role', 'status')
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+
+    expect(screen.getByText('Generation attempt #7 failed.')).toHaveAttribute('role', 'alert')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000)
+    })
+    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not navigate when generation completes after unmount', async () => {
+    const generation = deferred<Generation>()
+    const user = userEvent.setup()
+    vi.mocked(client.getPanel).mockResolvedValue({ ...LOCKED_PANEL, is_editable: true })
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.generatePanel).mockImplementation(() => generation.promise)
+    const page = renderPreview()
+
+    await user.click(await screen.findByRole('button', { name: /Generate one candidate/ }))
+    page.unmount()
+    await act(async () => {
+      generation.resolve(GENERATED)
+      await generation.promise
+    })
+
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  it('does not navigate when duplication completes after unmount', async () => {
+    const duplicate = deferred<Panel>()
+    const user = userEvent.setup()
+    vi.mocked(client.duplicatePanel).mockImplementation(() => duplicate.promise)
+    const page = renderPreview()
+
+    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
+    page.unmount()
+    await act(async () => {
+      duplicate.resolve({ ...LOCKED_PANEL, id: 99, is_editable: true })
+      await duplicate.promise
+    })
+
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  it('shows panel and history when the initial preview request fails, then retries it', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.previewPanel)
+      .mockRejectedValueOnce(new Error('preview offline'))
+      .mockResolvedValueOnce(READY_PREVIEW)
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([FAILED_ATTEMPT])
+    renderPreview()
+
+    expect(await screen.findByText('Mara backs toward the door.')).toBeInTheDocument()
+    expect(screen.getByText('Attempt #5')).toBeInTheDocument()
+    expect(screen.getByText(/Could not load generation preview: Error: preview offline/)).toHaveAttribute(
+      'role',
+      'alert',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry preview' }))
+    expect(await screen.findByRole('heading', { name: 'Exact prompt sent to Gemini' })).toBeInTheDocument()
+  })
+
+  it('shows panel and preview when the initial history request fails with a section retry', async () => {
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listPanelGenerations).mockRejectedValue(new Error('history offline'))
+    renderPreview()
+
+    expect(await screen.findByText('Mara backs toward the door.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Exact prompt sent to Gemini' })).toBeInTheDocument()
+    expect(screen.getByText(/Could not load generation history: Error: history offline/)).toHaveAttribute(
+      'role',
+      'alert',
+    )
+    expect(screen.getByRole('button', { name: 'Retry generation history' })).toBeInTheDocument()
+  })
+
+  it('rejects malformed panel IDs without resource calls', async () => {
+    renderPreview('/panels/bad/preview')
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(client.getPanel).not.toHaveBeenCalled()
+    expect(client.previewPanel).not.toHaveBeenCalled()
+    expect(client.listPanelGenerations).not.toHaveBeenCalled()
+  })
+
+  it('renders not found when the initial panel request returns 404', async () => {
+    vi.mocked(client.getPanel).mockRejectedValue(
+      new client.ApiError('missing', 'NotFoundError', 404),
+    )
+    renderPreview()
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+  })
+
+  it('retries an initial failure and updates the loaded title', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getPanel)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(LOCKED_PANEL)
+    renderPreview()
+
+    await waitFor(() => expect(document.title).toBe('Loading Panel Preview | LoreCraft3000'))
+    await user.click(await screen.findByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText(/Mara backs toward the door/)).toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Panel #3 Preview | LoreCraft3000'))
   })
 })

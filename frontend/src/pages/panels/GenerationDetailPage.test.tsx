@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -45,9 +45,9 @@ const GENERATION: Generation = {
   ],
 }
 
-function renderPage() {
+function renderPage(path = '/generations/8') {
   return render(
-    <MemoryRouter initialEntries={['/generations/8']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/generations/:id" element={<GenerationDetailPage />} />
       </Routes>
@@ -82,11 +82,11 @@ describe('GenerationDetailPage candidate preview', () => {
 
     await user.click(trigger)
     await user.click(screen.getByRole('button', { name: 'Close preview' }))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     await user.click(trigger)
     await user.click(screen.getByRole('dialog'))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   it('closes when Escape is pressed', async () => {
@@ -94,8 +94,57 @@ describe('GenerationDetailPage candidate preview', () => {
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Preview candidate 0' }))
-    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('rejects malformed generation IDs without an API request', async () => {
+    renderPage('/generations/bad')
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(client.getGeneration).not.toHaveBeenCalled()
+  })
+
+  it('renders not found for a missing generation', async () => {
+    vi.mocked(client.getGeneration).mockRejectedValue(
+      new client.ApiError('missing', 'NotFoundError', 404),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+  })
+
+  it('retries an initial failure and updates the generation title', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getGeneration)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(GENERATION)
+    renderPage()
+
+    await waitFor(() => expect(document.title).toBe('Loading Generation | LoreCraft3000'))
+    await user.click(await screen.findByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('heading', { name: 'Generation #8' })).toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Generation #8 | LoreCraft3000'))
+  })
+
+  it('keeps generation content when review succeeds but refresh fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getGeneration)
+      .mockResolvedValueOnce(GENERATION)
+      .mockRejectedValueOnce(new Error('refresh offline'))
+    vi.mocked(client.reviewCandidate).mockResolvedValue({
+      ...GENERATION.candidates[0],
+      review_status: 'accepted',
+    })
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Accept' }))
+
+    expect(await screen.findByText(/Candidate accepted, but generation details/)).toHaveTextContent(
+      'Candidate accepted, but generation details could not be refreshed: Error: refresh offline',
+    )
+    expect(screen.getByText('A detailed comic panel')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Preview candidate 0' })).toBeInTheDocument()
   })
 })

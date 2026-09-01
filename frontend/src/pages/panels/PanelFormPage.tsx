@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ApiError,
@@ -12,6 +12,11 @@ import {
 import { useOptions } from '../../api/useOptions'
 import type { CastMemberInput, Character, PanelInput, Style } from '../../api/types'
 import { CastSelector } from '../../components/CastSelector'
+import { AsyncMessage } from '../../components/AsyncMessage'
+import { useUnsavedChanges } from '../../hooks/useUnsavedChanges'
+import { RouteIdGuard } from '../../routing/routeId'
+import { usePageTitle } from '../../routing/usePageTitle'
+import { NotFoundPage } from '../NotFoundPage'
 
 const EMPTY = (defaults: { model: string; image_size: string }): PanelInput => ({
   beat_text: '',
@@ -25,9 +30,32 @@ const EMPTY = (defaults: { model: string; image_size: string }): PanelInput => (
   image_size: defaults.image_size,
 })
 
+const snapshot = (values: PanelInput) =>
+  JSON.stringify({
+    beat_text: values.beat_text,
+    camera: values.camera,
+    framing: values.framing,
+    mood: values.mood,
+    aspect_ratio: values.aspect_ratio,
+    cast: values.cast.map(({ character_id, role, prominence }) => ({
+      character_id,
+      role,
+      prominence,
+    })),
+    style_id: values.style_id,
+    model: values.model,
+    image_size: values.image_size,
+  })
+
 export function PanelFormPage() {
   const { id } = useParams()
-  const panelId = id ? Number(id) : null
+  if (id === undefined) return <PanelForm key="new" panelId={null} />
+  return (
+    <RouteIdGuard>{(panelId) => <PanelForm key={panelId} panelId={panelId} />}</RouteIdGuard>
+  )
+}
+
+function PanelForm({ panelId }: { panelId: number | null }) {
   const navigate = useNavigate()
   const options = useOptions()
 
@@ -38,16 +66,30 @@ export function PanelFormPage() {
   const [styles, setStyles] = useState<Style[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [prerequisiteState, setPrerequisiteState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [prerequisiteError, setPrerequisiteError] = useState<string | null>(null)
   const [prerequisiteAttempt, setPrerequisiteAttempt] = useState(0)
   const [panelState, setPanelState] = useState<'loading' | 'ready' | 'error'>(
     panelId === null ? 'ready' : 'loading',
   )
-  const [loadedPanelId, setLoadedPanelId] = useState(panelId)
+  const [loadedPanelId, setLoadedPanelId] = useState<number | null>(panelId)
   const [panelError, setPanelError] = useState<string | null>(null)
   const [panelAttempt, setPanelAttempt] = useState(0)
   const [locked, setLocked] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+  const [baseline, setBaseline] = useState<string | null>(null)
+  const allowNavigation = useUnsavedChanges(baseline !== null && snapshot(values) !== baseline)
+  const mounted = useRef(true)
+  const mutationRequest = useRef(0)
+
+  usePageTitle(
+    panelId === null
+      ? 'New Panel'
+      : panelState === 'ready' && loadedPanelId === panelId
+        ? `Edit Panel #${panelId}`
+        : 'Edit Panel',
+  )
 
   useEffect(() => {
     let active = true
@@ -59,6 +101,14 @@ export function PanelFormPage() {
         setValues((v) =>
           v.style_id === 0 && styleList[0] ? { ...v, style_id: styleList[0].id } : v,
         )
+        if (panelId === null) {
+          const hydratedValues = EMPTY({
+            model: options.default_model,
+            image_size: options.default_image_size,
+          })
+          if (styleList[0]) hydratedValues.style_id = styleList[0].id
+          setBaseline(snapshot(hydratedValues))
+        }
         setPrerequisiteState('ready')
       })
       .catch((err) => {
@@ -69,7 +119,7 @@ export function PanelFormPage() {
     return () => {
       active = false
     }
-  }, [prerequisiteAttempt])
+  }, [options.default_image_size, options.default_model, panelId, prerequisiteAttempt])
 
   useEffect(() => {
     if (panelId === null) return
@@ -84,7 +134,7 @@ export function PanelFormPage() {
           return
         }
         setLocked(false)
-        setValues({
+        const hydratedValues: PanelInput = {
           beat_text: panel.beat_text,
           camera: panel.camera,
           framing: panel.framing,
@@ -98,55 +148,85 @@ export function PanelFormPage() {
           style_id: panel.style_id,
           model: panel.model,
           image_size: panel.image_size,
-        })
+        }
+        setBaseline(snapshot(hydratedValues))
+        setValues(hydratedValues)
         setPanelState('ready')
       })
       .catch((err) => {
         if (!active) return
         setLoadedPanelId(panelId)
-        setPanelError(err instanceof ApiError ? err.message : String(err))
-        setPanelState('error')
+        if (err instanceof ApiError && err.status === 404) setNotFound(true)
+        else {
+          setPanelError(err instanceof ApiError ? err.message : String(err))
+          setPanelState('error')
+        }
       })
     return () => {
       active = false
     }
   }, [panelAttempt, panelId])
 
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      mutationRequest.current += 1
+    }
+  }, [])
+
   const handleDuplicate = async () => {
     if (panelId === null) return
+    const request = ++mutationRequest.current
+    setDuplicating(true)
+    setError(null)
     try {
       const copy = await duplicatePanel(panelId)
+      if (!mounted.current || request !== mutationRequest.current) return
       navigate(`/panels/${copy.id}/edit`)
     } catch (err) {
+      if (!mounted.current || request !== mutationRequest.current) return
       setError(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      if (mounted.current && request === mutationRequest.current) setDuplicating(false)
     }
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    const request = ++mutationRequest.current
     setSubmitting(true)
     setError(null)
     try {
       const saved = panelId === null ? await createPanel(values) : await updatePanel(panelId, values)
+      if (!mounted.current || request !== mutationRequest.current) return
+      allowNavigation()
       navigate(`/panels/${saved.id}/preview`)
     } catch (err) {
+      if (!mounted.current || request !== mutationRequest.current) return
       setError(err instanceof ApiError ? err.message : String(err))
     } finally {
-      setSubmitting(false)
+      if (mounted.current && request === mutationRequest.current) setSubmitting(false)
     }
   }
 
   const heading = panelId === null ? 'Stage new panel' : 'Edit panel'
   const currentPanelState = panelId === null ? 'ready' : loadedPanelId === panelId ? panelState : 'loading'
 
+  if (notFound) return <NotFoundPage />
+
   if (prerequisiteState !== 'ready' || currentPanelState !== 'ready') {
     return (
       <section>
         <h1>{heading}</h1>
-        {prerequisiteState === 'loading' && <p>Loading panel prerequisites...</p>}
+        {prerequisiteState === 'loading' && (
+          <AsyncMessage kind="loading" aria-busy="true">Loading panel prerequisites...</AsyncMessage>
+        )}
         {prerequisiteState === 'error' && (
-          <div className="banner banner--error">
-            <p>Could not load panel prerequisites: {prerequisiteError}</p>
+          <div>
+            <AsyncMessage kind="error">
+              Could not load panel prerequisites: {prerequisiteError}
+            </AsyncMessage>
             <button
               type="button"
               className="btn"
@@ -161,10 +241,12 @@ export function PanelFormPage() {
             </button>
           </div>
         )}
-        {currentPanelState === 'loading' && <p>Loading panel details...</p>}
+        {currentPanelState === 'loading' && (
+          <AsyncMessage kind="loading" aria-busy="true">Loading panel details...</AsyncMessage>
+        )}
         {currentPanelState === 'error' && (
-          <div className="banner banner--error">
-            <p>Could not load panel details: {panelError}</p>
+          <div>
+            <AsyncMessage kind="error">Could not load panel details: {panelError}</AsyncMessage>
             <button
               type="button"
               className="btn"
@@ -188,7 +270,9 @@ export function PanelFormPage() {
       <section>
         <h1>Panel locked</h1>
         <p className="banner banner--info">{options.panel_immutability_explanation}</p>
-        <button type="button" className="btn btn--primary" onClick={() => void handleDuplicate()}>
+        {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
+        {duplicating && <AsyncMessage kind="loading">Duplicating panel…</AsyncMessage>}
+        <button type="button" className="btn btn--primary" disabled={duplicating} aria-busy={duplicating} onClick={() => void handleDuplicate()}>
           Duplicate &amp; edit
         </button>
       </section>
@@ -239,8 +323,9 @@ export function PanelFormPage() {
   return (
     <section>
       <h1>{heading}</h1>
-      {error && <p className="banner banner--error">{error}</p>}
-      <form onSubmit={handleSubmit}>
+      {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
+      {submitting && <AsyncMessage kind="loading">Saving panel…</AsyncMessage>}
+      <form onSubmit={handleSubmit} aria-busy={submitting}>
         <div className="field">
           <label htmlFor="beat_text">Action</label>
           <textarea
@@ -400,6 +485,16 @@ export function PanelFormPage() {
         <div className="btn-row">
           <button type="submit" className="btn btn--primary" disabled={submitting}>
             Save and preview
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={submitting}
+            onClick={() =>
+              navigate(panelId === null ? '/panels' : `/panels/${panelId}/preview`)
+            }
+          >
+            Cancel
           </button>
         </div>
       </form>
