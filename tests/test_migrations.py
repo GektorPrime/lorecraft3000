@@ -223,7 +223,10 @@ def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
     finally:
         conn.close()
 
-    assert run_migrations(db) == ["010_image_provenance"]
+    assert run_migrations(db) == [
+        "010_image_provenance",
+        "011_repair_generation_scene_revision",
+    ]
     conn = connect(db)
     try:
         assert "010_image_provenance" in applied_versions(conn)
@@ -409,6 +412,70 @@ def test_phase1_safety_columns_and_indexes_are_migrated(conn):
         "idx_generation_one_pending_per_scene",
         "idx_generation_scene_idempotency",
     } <= indexes
+
+
+def test_011_repairs_legacy_generation_missing_scene_revision(tmp_path):
+    """Some databases were migrated by an earlier lineage of 007 phase1 safety
+    that predates the generation.scene_revision column. 007 is still recorded
+    as applied, so the runner never re-adds it and every reservation INSERT
+    fails with ``table generation has no column named scene_revision``. 011
+    must detect the drift and heal the column.
+    """
+    from app.config import Settings
+    from app.services.costs import CostLedger
+
+    db = tmp_path / "legacy-scene-revision.db"
+    conn = connect(db)
+    try:
+        _ensure_migrations_table(conn)
+        for module_name in MIGRATIONS[:6]:
+            version = module_name.rsplit(".", 1)[-1]
+            importlib.import_module(module_name).upgrade(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
+            )
+        # Apply everything through 010, then drop the scene_revision column to
+        # reproduce the legacy schema drift: 007 stays recorded, the column
+        # vanishes (008-010 never reference the column, so they apply cleanly).
+        for module_name in MIGRATIONS[6:10]:
+            version = module_name.rsplit(".", 1)[-1]
+            importlib.import_module(module_name).upgrade(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)", (version,)
+            )
+        conn.execute("ALTER TABLE generation DROP COLUMN scene_revision")
+        style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+        scene_id = conn.execute(
+            "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+        ).lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+
+    # The drift is invisible to the pre-011 runner: everything is recorded.
+    assert run_migrations(db) == ["011_repair_generation_scene_revision"]
+    assert run_migrations(db) == []  # and healing is idempotent
+
+    conn = connect(db)
+    try:
+        columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(generation)")
+        }
+        assert "scene_revision" in columns
+        # The healed column unblocks reservation, which previously raised
+        # OperationalError on the INSERT.
+        ledger = CostLedger(conn, Settings.from_env())
+        reservation = ledger.reserve(
+            scene_id=scene_id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            prompt_hash="probe",
+            request_json={"aspect_ratio": "3:2"},
+        )
+        assert reservation.created
+        conn.rollback()
+    finally:
+        conn.close()
 
 
 def test_phase1_migration_recovers_old_duplicate_pending_rows(tmp_path):

@@ -24,6 +24,7 @@ MIGRATIONS: list[str] = [
     "app.migrations.008_phase1_reconciliation",
     "app.migrations.009_storage_indexes",
     "app.migrations.010_image_provenance",
+    "app.migrations.011_repair_generation_scene_revision",
 ]
 
 
