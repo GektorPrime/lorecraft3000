@@ -60,14 +60,12 @@ export interface Style {
   id: number
   name: string
   style_contract: string
-  ref_image_ids: number[]
   created_at: string
 }
 
 export interface StyleInput {
   name: string
   style_contract?: string
-  ref_image_ids?: number[]
 }
 
 export interface RefImage {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 
 import pytest
@@ -110,6 +111,13 @@ def _create_scene(route_app, characters, model="gemini-3.1-flash-image"):
     return response.headers["location"]
 
 
+def _preview_prompt_hash(route_app, preview_url: str) -> str:
+    page = route_app.client.get(preview_url)
+    match = re.search(r'name="expected_prompt_hash" value="([a-f0-9]+)"', page.text)
+    assert match is not None
+    return match.group(1)
+
+
 def test_new_panel_form_and_list_are_available(route_app):
     assert route_app.client.get("/scenes").status_code == 200
     form = route_app.client.get("/scenes/new")
@@ -128,6 +136,7 @@ def test_preview_is_no_spend_and_shows_exact_multi_character_allocation(route_ap
     assert "ELIAS" in page.text and "MARA" in page.text
     assert "Image 1 is a canonical reference for ELIAS" in page.text
     assert "Generate one candidate · $0.07" in page.text
+    assert 'name="expected_prompt_hash"' in page.text
     assert "SECRET" not in page.text
     conn = route_app.conn()
     try:
@@ -144,7 +153,9 @@ def test_generate_review_and_media_vertical_path(route_app):
     preview_url = _create_scene(route_app, [elias])
     scene_id = preview_url.split("/")[2]
     generated = route_app.client.post(
-        f"/scenes/{scene_id}/generate", follow_redirects=False
+        f"/scenes/{scene_id}/generate",
+        data={"expected_prompt_hash": _preview_prompt_hash(route_app, preview_url)},
+        follow_redirects=False,
     )
     assert generated.status_code == 303
     assert generated.headers["location"].startswith("/generations/")
@@ -236,7 +247,9 @@ def test_provider_failure_is_recorded_and_visible(route_app):
     scene_id = preview_url.split("/")[2]
     route_app.provider.error = TimeoutError("provider timeout")
     response = route_app.client.post(
-        f"/scenes/{scene_id}/generate", follow_redirects=False
+        f"/scenes/{scene_id}/generate",
+        data={"expected_prompt_hash": _preview_prompt_hash(route_app, preview_url)},
+        follow_redirects=False,
     )
     assert response.status_code == 303
     assert "notice=" in response.headers["location"]
@@ -304,7 +317,9 @@ def test_generation_detail_reports_missing_candidate_file(route_app):
     preview_url = _create_scene(route_app, [character])
     scene_id = preview_url.split("/")[2]
     generated = route_app.client.post(
-        f"/scenes/{scene_id}/generate", follow_redirects=False
+        f"/scenes/{scene_id}/generate",
+        data={"expected_prompt_hash": _preview_prompt_hash(route_app, preview_url)},
+        follow_redirects=False,
     )
     detail_url = generated.headers["location"]
     conn = route_app.conn()

@@ -7,7 +7,7 @@ import pytest
 from app.config import Settings
 from app.providers.base import ProviderResult
 from app.services.characters import CharacterService
-from app.services.generation import GenerationError, GenerationService
+from app.services.generation import GenerationError, GenerationService, PreviewChangedError
 from app.services.costs import CostLedger, IdempotencyConflictError
 from app.services.ref_sets import RefSetService
 from app.services.styles import StyleService
@@ -164,6 +164,30 @@ def test_idempotent_replay_does_not_call_provider_twice(conn, storage, tmp_path)
     assert replay.generation_id == first.generation_id
     assert replay.candidate_id == first.candidate_id
     assert len(provider.requests) == 1
+
+
+def test_changed_preview_hash_fails_before_reservation_or_provider(
+    conn, storage, tmp_path
+):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+    reviewed = service.preview(scene_id)
+
+    style = StyleService(conn).get_default()
+    StyleService(conn).update(
+        style.id,
+        name=style.name,
+        style_contract=f"{style.style_contract}\nChanged after preview.",
+    )
+
+    with pytest.raises(PreviewChangedError, match="changed after preview"):
+        service.generate(scene_id, expected_prompt_hash=reviewed.prompt_hash)
+    assert provider.requests == []
+    assert conn.execute("SELECT COUNT(*) FROM generation").fetchone()[0] == 0
 
 
 def test_storage_failure_records_known_actual_provider_cost(

@@ -22,6 +22,10 @@ class GenerationError(Exception):
     pass
 
 
+class PreviewChangedError(GenerationError):
+    """Raised when paid generation no longer matches the reviewed preview."""
+
+
 @dataclass(frozen=True)
 class GenerationOutcome:
     generation_id: int
@@ -216,12 +220,20 @@ class GenerationService:
         image_size: str | None = None,
         parent_generation_id: int | None = None,
         idempotency_key: str | None = None,
+        expected_prompt_hash: str | None = None,
     ) -> GenerationOutcome:
         if self.provider is None:
             raise GenerationError("generation provider is not configured")
         preview = self.preview(
             scene_id, model=model, image_size=image_size, check_budget=False
         )
+        if (
+            expected_prompt_hash is not None
+            and preview.prompt_hash != expected_prompt_hash
+        ):
+            raise PreviewChangedError(
+                "the assembled prompt changed after preview; review the updated prompt before generating"
+            )
         ledger = CostLedger(self.conn, self.settings)
         reservation = ledger.reserve(
             scene_id=scene_id,

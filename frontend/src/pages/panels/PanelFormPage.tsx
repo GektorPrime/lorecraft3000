@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ApiError,
   createPanel,
@@ -38,26 +38,52 @@ export function PanelFormPage() {
   const [styles, setStyles] = useState<Style[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [loaded, setLoaded] = useState(panelId === null)
+  const [prerequisiteState, setPrerequisiteState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [prerequisiteError, setPrerequisiteError] = useState<string | null>(null)
+  const [prerequisiteAttempt, setPrerequisiteAttempt] = useState(0)
+  const [panelState, setPanelState] = useState<'loading' | 'ready' | 'error'>(
+    panelId === null ? 'ready' : 'loading',
+  )
+  const [loadedPanelId, setLoadedPanelId] = useState(panelId)
+  const [panelError, setPanelError] = useState<string | null>(null)
+  const [panelAttempt, setPanelAttempt] = useState(0)
   const [locked, setLocked] = useState(false)
 
   useEffect(() => {
-    Promise.all([listCharacters(), listStyles()]).then(([chars, styleList]) => {
-      setCharacters(chars)
-      setStyles(styleList)
-      setValues((v) => (v.style_id === 0 && styleList[0] ? { ...v, style_id: styleList[0].id } : v))
-    })
-  }, [])
+    let active = true
+    Promise.all([listCharacters(), listStyles()])
+      .then(([chars, styleList]) => {
+        if (!active) return
+        setCharacters(chars)
+        setStyles(styleList)
+        setValues((v) =>
+          v.style_id === 0 && styleList[0] ? { ...v, style_id: styleList[0].id } : v,
+        )
+        setPrerequisiteState('ready')
+      })
+      .catch((err) => {
+        if (!active) return
+        setPrerequisiteError(err instanceof ApiError ? err.message : String(err))
+        setPrerequisiteState('error')
+      })
+    return () => {
+      active = false
+    }
+  }, [prerequisiteAttempt])
 
   useEffect(() => {
     if (panelId === null) return
+    let active = true
     getPanel(panelId)
       .then((panel) => {
+        if (!active) return
+        setLoadedPanelId(panelId)
         if (!panel.is_editable) {
           setLocked(true)
-          setLoaded(true)
+          setPanelState('ready')
           return
         }
+        setLocked(false)
         setValues({
           beat_text: panel.beat_text,
           camera: panel.camera,
@@ -73,10 +99,18 @@ export function PanelFormPage() {
           model: panel.model,
           image_size: panel.image_size,
         })
-        setLoaded(true)
+        setPanelState('ready')
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : String(err)))
-  }, [panelId])
+      .catch((err) => {
+        if (!active) return
+        setLoadedPanelId(panelId)
+        setPanelError(err instanceof ApiError ? err.message : String(err))
+        setPanelState('error')
+      })
+    return () => {
+      active = false
+    }
+  }, [panelAttempt, panelId])
 
   const handleDuplicate = async () => {
     if (panelId === null) return
@@ -102,7 +136,52 @@ export function PanelFormPage() {
     }
   }
 
-  if (!loaded) return <p>Loading…</p>
+  const heading = panelId === null ? 'Stage new panel' : 'Edit panel'
+  const currentPanelState = panelId === null ? 'ready' : loadedPanelId === panelId ? panelState : 'loading'
+
+  if (prerequisiteState !== 'ready' || currentPanelState !== 'ready') {
+    return (
+      <section>
+        <h1>{heading}</h1>
+        {prerequisiteState === 'loading' && <p>Loading panel prerequisites...</p>}
+        {prerequisiteState === 'error' && (
+          <div className="banner banner--error">
+            <p>Could not load panel prerequisites: {prerequisiteError}</p>
+            <button
+              type="button"
+              className="btn"
+              aria-label="Retry panel prerequisites"
+              onClick={() => {
+                setPrerequisiteState('loading')
+                setPrerequisiteError(null)
+                setPrerequisiteAttempt((attempt) => attempt + 1)
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {currentPanelState === 'loading' && <p>Loading panel details...</p>}
+        {currentPanelState === 'error' && (
+          <div className="banner banner--error">
+            <p>Could not load panel details: {panelError}</p>
+            <button
+              type="button"
+              className="btn"
+              aria-label="Retry panel details"
+              onClick={() => {
+                setPanelState('loading')
+                setPanelError(null)
+                setPanelAttempt((attempt) => attempt + 1)
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+      </section>
+    )
+  }
 
   if (locked) {
     return (
@@ -116,11 +195,50 @@ export function PanelFormPage() {
     )
   }
 
+  if (styles.length === 0) {
+    return (
+      <section>
+        <h1>{heading}</h1>
+        <p>A style is required before you can stage a panel.</p>
+        <Link to="/styles/new" className="btn btn--primary">
+          Create a style
+        </Link>
+      </section>
+    )
+  }
+
+  if (characters.length === 0) {
+    return (
+      <section>
+        <h1>{heading}</h1>
+        <p>A character is required before you can stage a panel.</p>
+        <Link to="/characters/new" className="btn btn--primary">
+          Create a character
+        </Link>
+      </section>
+    )
+  }
+
+  if (
+    !characters.some((character) => character.has_canonical_ref_set) &&
+    (panelId === null || values.cast.length === 0)
+  ) {
+    return (
+      <section>
+        <h1>{heading}</h1>
+        <p>A character needs a canonical reference set before you can stage a panel.</p>
+        <Link to="/characters" className="btn btn--primary">
+          Manage characters
+        </Link>
+      </section>
+    )
+  }
+
   const setCast = (cast: CastMemberInput[]) => setValues((v) => ({ ...v, cast }))
 
   return (
     <section>
-      <h1>{panelId === null ? 'Stage new panel' : 'Edit panel'}</h1>
+      <h1>{heading}</h1>
       {error && <p className="banner banner--error">{error}</p>}
       <form onSubmit={handleSubmit}>
         <div className="field">

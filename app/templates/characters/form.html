@@ -18,15 +18,15 @@
 
   <label for="lore_md">Lore (markdown)</label>
   <textarea id="lore_md" name="lore_md" rows="6">{{ values.lore_md }}</textarea>
-  <p class="hint">Local-only background. <strong>Never sent to the model.</strong></p>
+  <p class="hint">Local-only background. <strong>Never sent to Gemini.</strong></p>
 
   <label for="visual_contract">Visual contract</label>
   <textarea id="visual_contract" name="visual_contract" rows="4">{{ values.visual_contract }}</textarea>
-  <p class="hint">Model-facing. Discriminative traits only, hard-capped at 60 words.</p>
+  <p class="hint">Gemini-facing. Discriminative traits only, hard-capped at 60 words.</p>
 
   <label for="negative_traits">Negative traits</label>
   <textarea id="negative_traits" name="negative_traits" rows="3">{{ values.negative_traits }}</textarea>
-  <p class="hint">Provider-facing — things the model must avoid for this character.</p>
+  <p class="hint">Gemini-facing — things Gemini must avoid for this character.</p>
 
   <label for="default_style_id">Default style</label>
   <select id="default_style_id" name="default_style_id">

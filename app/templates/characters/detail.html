@@ -30,7 +30,7 @@
   <dt>Lore</dt>
   <dd>
     {% if character.lore_md %}{{ character.lore_md }}{% else %}<span class="muted">(empty)</span>{% endif %}
-    <p class="hint">Local-only background — never sent to the model.</p>
+    <p class="hint">Local-only background — never sent to Gemini.</p>
   </dd>
 </dl>
 
@@ -58,7 +58,8 @@
       <td>
         <a href="/ref-sets/{{ rs.id }}">View</a>
         {% if rs.status == 'draft' %}
-        <form class="inline" method="post" action="/ref-sets/{{ rs.id }}/promote">
+        <form class="inline" method="post" action="/ref-sets/{{ rs.id }}/promote"
+              onsubmit="return confirm('Promote this draft to canonical? The draft will become immutable, and the current canonical, if any, will be retired.');">
           <button type="submit" class="link-button">Promote to canonical</button>
         </form>
         {% endif %}

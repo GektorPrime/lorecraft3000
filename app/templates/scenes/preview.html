@@ -28,6 +28,7 @@
   <h2>Exact prompt</h2>
   <pre class="prompt-preview">{{ preview.prompt }}</pre>
   <form method="post" action="/scenes/{{ scene.id }}/generate">
+    <input type="hidden" name="expected_prompt_hash" value="{{ preview.prompt_hash }}">
     <button class="generate-button" type="submit">Generate one candidate · ${{ '%.2f' | format(preview.estimated_cost_cents / 100) }}</button>
   </form>
 {% endif %}

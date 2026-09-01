@@ -13,7 +13,7 @@ Design notes (agents.md non-negotiables):
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -33,22 +33,14 @@ class Style:
     id: int
     name: str
     style_contract: str
-    ref_image_ids: list[int]
     created_at: str
 
     @classmethod
     def from_row(cls, row) -> "Style":
-        """Build a Style from a sqlite3.Row, parsing ref_image_ids JSON."""
-        raw = row["ref_image_ids"] or "[]"
-        try:
-            ids = json.loads(raw)
-        except json.JSONDecodeError:
-            ids = []
         return cls(
             id=row["id"],
             name=row["name"],
             style_contract=row["style_contract"],
-            ref_image_ids=[int(i) for i in ids],
             created_at=row["created_at"],
         )
 

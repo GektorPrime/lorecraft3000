@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from app.deps import get_conn, get_provider, get_storage, settings, templates
@@ -148,6 +148,7 @@ def preview_scene(
 @router.post("/scenes/{scene_id}/generate")
 def generate_scene(
     scene_id: int,
+    expected_prompt_hash: str = Form(...),
     conn=Depends(get_conn),
     storage: ImageStorage = Depends(get_storage),
     provider: ImageProvider = Depends(get_provider),
@@ -155,7 +156,10 @@ def generate_scene(
     try:
         scene = SceneService(conn, settings).get(scene_id)
         outcome = GenerationService(conn, storage, settings, provider).generate(
-            scene_id, model=scene.model, image_size=scene.image_size
+            scene_id,
+            model=scene.model,
+            image_size=scene.image_size,
+            expected_prompt_hash=expected_prompt_hash,
         )
     except (SceneError, GenerationError, CostError, ImageStorageError) as exc:
         return RedirectResponse(

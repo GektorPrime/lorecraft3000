@@ -132,10 +132,14 @@ export const duplicatePanel = (id: number) =>
 export const previewPanel = (id: number) => request<PanelPreview>(`/panels/${id}/preview`)
 export const listPanelGenerations = (id: number) =>
   request<GenerationSummary[]>(`/panels/${id}/generations`)
-export const generatePanel = (id: number) =>
+export const generatePanel = (id: number, expectedPromptHash: string) =>
   request<Generation>(`/panels/${id}/generate`, {
     method: 'POST',
-    headers: { 'Idempotency-Key': crypto.randomUUID() },
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: JSON.stringify({ expected_prompt_hash: expectedPromptHash }),
   })
 
 // ---------------------------------------------------------------------------

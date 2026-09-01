@@ -1,4 +1,5 @@
 import { HashRouter, Route, Routes } from 'react-router-dom'
+import { BudgetProvider } from './api/BudgetProvider'
 import { OptionsProvider } from './api/OptionsProvider'
 import { Header } from './components/Header'
 import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
@@ -24,24 +25,26 @@ function App() {
   return (
     <HashRouter>
       <OptionsProvider>
-        <Header />
-        <main className="app-main">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/characters" element={<CharacterListPage />} />
-            <Route path="/characters/new" element={<CharacterFormPage />} />
-            <Route path="/characters/:id" element={<CharacterDetailPage />} />
-            <Route path="/characters/:id/edit" element={<CharacterFormPage />} />
-            <Route path="/styles" element={<StyleListPage />} />
-            <Route path="/styles/new" element={<StyleFormPage />} />
-            <Route path="/styles/:id/edit" element={<StyleFormPage />} />
-            <Route path="/panels" element={<PanelListPage />} />
-            <Route path="/panels/new" element={<PanelFormPage />} />
-            <Route path="/panels/:id/edit" element={<PanelFormPage />} />
-            <Route path="/panels/:id/preview" element={<PanelPreviewPage />} />
-            <Route path="/generations/:id" element={<GenerationDetailPage />} />
-          </Routes>
-        </main>
+        <BudgetProvider>
+          <Header />
+          <main className="app-main">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/characters" element={<CharacterListPage />} />
+              <Route path="/characters/new" element={<CharacterFormPage />} />
+              <Route path="/characters/:id" element={<CharacterDetailPage />} />
+              <Route path="/characters/:id/edit" element={<CharacterFormPage />} />
+              <Route path="/styles" element={<StyleListPage />} />
+              <Route path="/styles/new" element={<StyleFormPage />} />
+              <Route path="/styles/:id/edit" element={<StyleFormPage />} />
+              <Route path="/panels" element={<PanelListPage />} />
+              <Route path="/panels/new" element={<PanelFormPage />} />
+              <Route path="/panels/:id/edit" element={<PanelFormPage />} />
+              <Route path="/panels/:id/preview" element={<PanelPreviewPage />} />
+              <Route path="/generations/:id" element={<GenerationDetailPage />} />
+            </Routes>
+          </main>
+        </BudgetProvider>
       </OptionsProvider>
     </HashRouter>
   )

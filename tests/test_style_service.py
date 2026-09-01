@@ -1,8 +1,4 @@
-"""Tests for the style bible service.
-
-Proves: CRUD, name uniqueness, ref_image_ids round-trip, and that the seeded
-Victorian oil-painting default style is present in every migrated database.
-"""
+"""Tests for style CRUD and the seeded Victorian default style."""
 
 from __future__ import annotations
 
@@ -35,7 +31,6 @@ def test_default_victorian_style_seeded_by_migrations(db_path):
         conn.close()
     assert style.name == DEFAULT_STYLE_NAME
     assert style.style_contract == DEFAULT_STYLE_CONTRACT
-    assert style.ref_image_ids == []
 
 
 def test_default_style_contract_is_non_empty(conn):
@@ -51,12 +46,10 @@ def test_create_style_round_trip(conn):
     s = _service(conn).create(
         name="Ink Wash",
         style_contract="Loose ink wash, high contrast.",
-        ref_image_ids=[1, 2, 3],
     )
     assert s.id > 0
     assert s.name == "Ink Wash"
     assert s.style_contract == "Loose ink wash, high contrast."
-    assert s.ref_image_ids == [1, 2, 3]
 
     fetched = _service(conn).get(s.id)
     assert fetched == s
@@ -65,7 +58,6 @@ def test_create_style_round_trip(conn):
 def test_create_style_defaults(conn):
     s = _service(conn).create(name="Minimal")
     assert s.style_contract == ""
-    assert s.ref_image_ids == []
 
 
 def test_list_styles_includes_default(conn):
@@ -75,13 +67,29 @@ def test_list_styles_includes_default(conn):
 
 def test_update_style(conn):
     service = _service(conn)
-    s = service.create(name="Old Name", style_contract="old", ref_image_ids=[1])
-    updated = service.update(
-        s.id, name="New Name", style_contract="new", ref_image_ids=[4, 5]
-    )
+    s = service.create(name="Old Name", style_contract="old")
+    updated = service.update(s.id, name="New Name", style_contract="new")
     assert updated.name == "New Name"
     assert updated.style_contract == "new"
-    assert updated.ref_image_ids == [4, 5]
+
+
+def test_legacy_ref_image_ids_are_ignored_and_preserved(conn):
+    cur = conn.execute(
+        "INSERT INTO style (name, style_contract, ref_image_ids) VALUES (?, ?, ?)",
+        ("Legacy Style", "old", "[12, 15]"),
+    )
+    conn.commit()
+
+    service = _service(conn)
+    style = service.get(cur.lastrowid)
+    assert style.name == "Legacy Style"
+    assert "ref_image_ids" not in style.__dict__
+
+    service.update(style.id, name=style.name, style_contract="updated")
+    row = conn.execute(
+        "SELECT ref_image_ids FROM style WHERE id = ?", (style.id,)
+    ).fetchone()
+    assert row["ref_image_ids"] == "[12, 15]"
 
 
 def test_get_missing_style_raises(conn):

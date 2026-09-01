@@ -90,7 +90,6 @@ class CharacterOut(BaseModel):
 class StyleCreate(BaseModel):
     name: str
     style_contract: str = ""
-    ref_image_ids: list[int] = Field(default_factory=list)
 
 
 class StyleUpdate(StyleCreate):
@@ -101,7 +100,6 @@ class StyleOut(BaseModel):
     id: int
     name: str
     style_contract: str
-    ref_image_ids: list[int]
     created_at: str
 
 
@@ -221,6 +219,10 @@ class PanelPreviewOut(BaseModel):
     remaining_after_cents: int
     can_generate: bool
     blocked_reason: str | None = None
+
+
+class GenerationCreate(BaseModel):
+    expected_prompt_hash: str
 
 
 class CandidateOut(BaseModel):

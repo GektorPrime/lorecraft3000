@@ -132,6 +132,7 @@ export function CastSelector({ characters, value, onChange, labelledBy }: CastSe
                 key={character.id}
                 type="button"
                 className="btn"
+                disabled={!character.has_canonical_ref_set}
                 onClick={() => add(character.id)}
               >
                 <Avatar
@@ -141,6 +142,7 @@ export function CastSelector({ characters, value, onChange, labelledBy }: CastSe
                   size={24}
                 />
                 {character.name}
+                {!character.has_canonical_ref_set && ' - Needs a canonical reference set'}
               </button>
             ))}
           </div>

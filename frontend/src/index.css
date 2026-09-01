@@ -191,6 +191,18 @@ textarea {
   border-color: var(--accent);
 }
 
+.prompt-preview {
+  max-width: 100%;
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--text-h);
+  color: var(--surface);
+}
+
 .candidate-preview-trigger {
   display: block;
   width: 100%;

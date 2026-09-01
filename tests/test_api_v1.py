@@ -126,6 +126,15 @@ def _create_panel(api, character_ids, model="gemini-3.1-flash-image"):
     return resp.json()
 
 
+def _generate_panel(api, panel_id, *, headers=None):
+    preview = api.client.get(f"/api/v1/panels/{panel_id}/preview").json()
+    return api.client.post(
+        f"/api/v1/panels/{panel_id}/generate",
+        json={"expected_prompt_hash": preview["prompt_hash"]},
+        headers=headers,
+    )
+
+
 # ---------------------------------------------------------------------------
 # options / budget
 # ---------------------------------------------------------------------------
@@ -226,10 +235,12 @@ def test_style_crud_round_trip(api):
         "/api/v1/styles", json={"name": "Ink Wash", "style_contract": "Loose ink wash."}
     )
     assert created.status_code == 201
+    assert "ref_image_ids" not in created.json()
     style_id = created.json()["id"]
 
     fetched = api.client.get(f"/api/v1/styles/{style_id}").json()
     assert fetched["name"] == "Ink Wash"
+    assert "ref_image_ids" not in fetched
 
     updated = api.client.put(
         f"/api/v1/styles/{style_id}",
@@ -493,7 +504,7 @@ def test_panel_editable_until_generation_succeeds_then_backend_rejects_update(ap
     assert updated.json()["beat_text"] == "Updated beat."
 
     # Generate once.
-    generated = api.client.post(f"/api/v1/panels/{panel['id']}/generate")
+    generated = _generate_panel(api, panel["id"])
     assert generated.status_code == 201, generated.text
     assert generated.json()["state"] == "succeeded"
 
@@ -519,12 +530,8 @@ def test_generation_idempotency_key_returns_existing_attempt(api):
     panel = _create_panel(api, [character["id"]])
     headers = {"Idempotency-Key": "browser-request-1"}
 
-    first = api.client.post(
-        f"/api/v1/panels/{panel['id']}/generate", headers=headers
-    )
-    replay = api.client.post(
-        f"/api/v1/panels/{panel['id']}/generate", headers=headers
-    )
+    first = _generate_panel(api, panel["id"], headers=headers)
+    replay = _generate_panel(api, panel["id"], headers=headers)
 
     assert first.status_code == 201
     assert replay.status_code == 200
@@ -539,7 +546,7 @@ def test_actual_cost_overrun_is_returned_as_a_warning(api):
     from app.deps import settings
 
     api.provider.billed_cost_cents = settings.daily_spend_cap_cents + 1
-    response = api.client.post(f"/api/v1/panels/{panel['id']}/generate")
+    response = _generate_panel(api, panel["id"])
 
     assert response.status_code == 201
     body = response.json()
@@ -553,7 +560,7 @@ def test_failed_generation_remains_editable_and_is_preserved_in_history(api):
     panel = _create_panel(api, [character["id"]])
     api.provider.error = RuntimeError("provider unavailable")
 
-    failed = api.client.post(f"/api/v1/panels/{panel['id']}/generate")
+    failed = _generate_panel(api, panel["id"])
     assert failed.status_code == 422
 
     refreshed = api.client.get(f"/api/v1/panels/{panel['id']}").json()
@@ -593,7 +600,7 @@ def test_panel_duplicate_prefills_all_fields_with_new_id_and_preserves_original(
     character = _create_character(api)
     _promote_canonical(api, character["id"])
     panel = _create_panel(api, [character["id"]])
-    api.client.post(f"/api/v1/panels/{panel['id']}/generate")
+    _generate_panel(api, panel["id"])
 
     duplicated = api.client.post(f"/api/v1/panels/{panel['id']}/duplicate")
     assert duplicated.status_code == 201
@@ -633,6 +640,32 @@ def test_panel_preview_is_no_spend_and_reports_allocation(api):
     assert budget["spent_today_cents"] == 0
 
 
+def test_panel_generate_rejects_prompt_changed_after_preview(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
+    style = api.client.get(f"/api/v1/styles/{panel['style_id']}").json()
+    updated = api.client.put(
+        f"/api/v1/styles/{panel['style_id']}",
+        json={
+            "name": style["name"],
+            "style_contract": f"{style['style_contract']} Changed after preview.",
+        },
+    )
+    assert updated.status_code == 200
+
+    response = api.client.post(
+        f"/api/v1/panels/{panel['id']}/generate",
+        json={"expected_prompt_hash": preview["prompt_hash"]},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["type"] == "PreviewChangedError"
+    assert api.provider.requests == []
+    assert api.client.get(f"/api/v1/panels/{panel['id']}/generations").json() == []
+
+
 def test_panel_preview_blocked_without_canonical_ref_set(api):
     character = _create_character(api)  # no canonical ref-set
     resp = api.client.post(
@@ -663,7 +696,7 @@ def test_panel_generate_and_review_and_content(api):
     _promote_canonical(api, character["id"])
     panel = _create_panel(api, [character["id"]])
 
-    generated = api.client.post(f"/api/v1/panels/{panel['id']}/generate")
+    generated = _generate_panel(api, panel["id"])
     assert generated.status_code == 201
     generation = generated.json()
     assert generation["state"] == "succeeded"
@@ -693,7 +726,7 @@ def test_invalid_review_verdict_is_422(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
     panel = _create_panel(api, [character["id"]])
-    generation = api.client.post(f"/api/v1/panels/{panel['id']}/generate").json()
+    generation = _generate_panel(api, panel["id"]).json()
     candidate_id = generation["candidates"][0]["id"]
     resp = api.client.post(
         f"/api/v1/candidates/{candidate_id}/review", json={"verdict": "maybe"}
