@@ -15,7 +15,7 @@ export function StyleListPage() {
 
   return (
     <section>
-      <div className="btn-row" style={{ justifyContent: 'space-between', marginTop: 0 }}>
+      <div className="btn-row list-page-header">
         <h1>Styles</h1>
         <Link to="/styles/new" className="btn btn--primary">
           New style

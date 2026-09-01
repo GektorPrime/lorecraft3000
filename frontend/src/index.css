@@ -344,6 +344,17 @@ textarea {
   margin-top: 1rem;
 }
 
+.list-page-header {
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.list-page-header h1 {
+  margin-bottom: 0;
+}
+
 /* ---------------------------------------------------------------------- */
 /* misc                                                                      */
 /* ---------------------------------------------------------------------- */
