@@ -94,6 +94,15 @@ class Settings:
     provider_timeout_seconds: int = 120
     pending_stale_seconds: int = 600
 
+    # SQLite concurrency and durability tuning. WAL lets one writer and many
+    # readers proceed without blocking each other; the busy timeout makes a
+    # second writer wait briefly instead of failing immediately with
+    # "database is locked"; synchronous=NORMAL is the safe, standard pairing
+    # with WAL.
+    sqlite_journal_mode: str = "wal"
+    sqlite_busy_timeout_ms: int = 5000
+    sqlite_synchronous: str = "normal"
+
     @property
     def daily_spend_cap_cents(self) -> int:
         """Daily spend cap expressed as integer minor units (cents)."""
@@ -117,8 +126,33 @@ class Settings:
         pending_stale_seconds = int(
             os.environ.get("LORECRAFT_PENDING_STALE_SECONDS", "600")
         )
+        journal_mode = os.environ.get(
+            "LORECRAFT_SQLITE_JOURNAL_MODE", "wal"
+        ).strip().lower()
+        busy_timeout_ms = int(
+            os.environ.get("LORECRAFT_SQLITE_BUSY_TIMEOUT_MS", "5000")
+        )
+        synchronous = os.environ.get(
+            "LORECRAFT_SQLITE_SYNCHRONOUS", "normal"
+        ).strip().lower()
         if provider_timeout_seconds <= 0:
             raise ValueError("LORECRAFT_PROVIDER_TIMEOUT_SECONDS must be positive")
+        allowed_journal_modes = {
+            "delete", "truncate", "persist", "memory", "wal", "off"
+        }
+        if journal_mode not in allowed_journal_modes:
+            raise ValueError(
+                "LORECRAFT_SQLITE_JOURNAL_MODE must be one of "
+                + ", ".join(sorted(allowed_journal_modes))
+            )
+        allowed_synchronous = {"off", "normal", "full", "extra"}
+        if synchronous not in allowed_synchronous:
+            raise ValueError(
+                "LORECRAFT_SQLITE_SYNCHRONOUS must be one of "
+                + ", ".join(sorted(allowed_synchronous))
+            )
+        if busy_timeout_ms < 0:
+            raise ValueError("LORECRAFT_SQLITE_BUSY_TIMEOUT_MS must not be negative")
         # Gemini capacity retries can make up to four calls with 11 seconds of
         # total backoff. Recovery must not expire an attempt still in that loop.
         minimum_stale_seconds = provider_timeout_seconds * 4 + 11
@@ -135,4 +169,7 @@ class Settings:
             default_image_size=default_image_size,
             provider_timeout_seconds=provider_timeout_seconds,
             pending_stale_seconds=pending_stale_seconds,
+            sqlite_journal_mode=journal_mode,
+            sqlite_busy_timeout_ms=busy_timeout_ms,
+            sqlite_synchronous=synchronous,
         )

@@ -56,8 +56,18 @@ async def lifespan(app: FastAPI):
     """Initialize the database (idempotent) and ensure store root exists."""
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     settings.store_root.mkdir(parents=True, exist_ok=True)
-    run_migrations(settings.db_path)
-    conn = connect(settings.db_path)
+    run_migrations(
+        settings.db_path,
+        journal_mode=settings.sqlite_journal_mode,
+        busy_timeout_ms=settings.sqlite_busy_timeout_ms,
+        synchronous=settings.sqlite_synchronous,
+    )
+    conn = connect(
+        settings.db_path,
+        journal_mode=settings.sqlite_journal_mode,
+        busy_timeout_ms=settings.sqlite_busy_timeout_ms,
+        synchronous=settings.sqlite_synchronous,
+    )
     try:
         CostLedger(conn, settings).recover_stale_pending()
     finally:

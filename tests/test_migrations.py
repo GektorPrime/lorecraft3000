@@ -282,6 +282,7 @@ def test_phase1_migration_recovers_old_duplicate_pending_rows(tmp_path):
     assert run_migrations(db) == [
         "007_phase1_safety",
         "008_phase1_reconciliation",
+        "009_storage_indexes",
     ]
     conn = connect(db)
     try:
@@ -340,6 +341,7 @@ def test_phase1_migration_rolls_back_completely_and_can_retry(tmp_path):
     assert run_migrations(db) == [
         "007_phase1_safety",
         "008_phase1_reconciliation",
+        "009_storage_indexes",
     ]
 
 
@@ -387,7 +389,10 @@ def test_phase1_reconciliation_returns_legacy_empty_canon_to_draft(tmp_path):
     finally:
         conn.close()
 
-    assert run_migrations(db) == ["008_phase1_reconciliation"]
+    assert run_migrations(db) == [
+        "008_phase1_reconciliation",
+        "009_storage_indexes",
+    ]
     conn = connect(db)
     try:
         row = conn.execute("SELECT status FROM ref_set WHERE id = 1").fetchone()

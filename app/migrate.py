@@ -22,6 +22,7 @@ MIGRATIONS: list[str] = [
     "app.migrations.006_reconcile_high_demand_failures",
     "app.migrations.007_phase1_safety",
     "app.migrations.008_phase1_reconciliation",
+    "app.migrations.009_storage_indexes",
 ]
 
 
@@ -42,9 +43,20 @@ def applied_versions(conn: sqlite3.Connection) -> set[str]:
     return {r["version"] for r in rows}
 
 
-def run_migrations(db_path: Path | str) -> list[str]:
+def run_migrations(
+    db_path: Path | str,
+    *,
+    journal_mode: str = "wal",
+    busy_timeout_ms: int = 5000,
+    synchronous: str = "normal",
+) -> list[str]:
     """Apply all pending migrations. Returns the list of versions applied."""
-    conn = connect(db_path)
+    conn = connect(
+        db_path,
+        journal_mode=journal_mode,
+        busy_timeout_ms=busy_timeout_ms,
+        synchronous=synchronous,
+    )
     try:
         _ensure_migrations_table(conn)
         done = applied_versions(conn)
