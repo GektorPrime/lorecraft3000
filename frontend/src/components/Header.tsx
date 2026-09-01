@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useBudget } from '../api/useBudget'
+import { AsyncMessage } from './AsyncMessage'
 
 /**
  * The single app header, rendered once by the top-level layout in App.tsx
@@ -28,9 +29,9 @@ export function Header() {
           Budget: ${spent} / ${cap}
         </span>
         {refreshError && (
-          <span className="field__hint" title={refreshError}>
+          <AsyncMessage kind="error" className="field__hint app-header__budget-warning" title={refreshError}>
             Budget may be out of date
-          </span>
+          </AsyncMessage>
         )}
       </div>
     </header>

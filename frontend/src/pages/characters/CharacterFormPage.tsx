@@ -1,7 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ApiError, createCharacter, getCharacter, listStyles, updateCharacter } from '../../api/client'
 import type { CharacterInput, Style } from '../../api/types'
+import { AsyncMessage } from '../../components/AsyncMessage'
+import { useUnsavedChanges } from '../../hooks/useUnsavedChanges'
+import { RouteIdGuard } from '../../routing/routeId'
+import { usePageTitle } from '../../routing/usePageTitle'
+import { NotFoundPage } from '../NotFoundPage'
 
 const EMPTY: CharacterInput = {
   name: '',
@@ -12,43 +17,110 @@ const EMPTY: CharacterInput = {
   default_style_id: null,
 }
 
+const snapshot = (values: CharacterInput) =>
+  JSON.stringify({
+    name: values.name,
+    slug: values.slug ?? '',
+    lore_md: values.lore_md,
+    visual_contract: values.visual_contract,
+    negative_traits: values.negative_traits,
+    default_style_id: values.default_style_id ?? null,
+  })
+
 /** Create/edit form. On a failed submit the user's values are preserved
  * (they live in React state, not reset from a server response) and only the
  * error banner changes — issue #15's "preserve values on errors" rule. */
 export function CharacterFormPage() {
   const { id } = useParams()
-  const characterId = id ? Number(id) : null
+  if (id === undefined) return <CharacterForm key="new" characterId={null} />
+  return (
+    <RouteIdGuard>
+      {(characterId) => <CharacterForm key={characterId} characterId={characterId} />}
+    </RouteIdGuard>
+  )
+}
+
+function CharacterForm({ characterId }: { characterId: number | null }) {
   const navigate = useNavigate()
 
   const [values, setValues] = useState<CharacterInput>(EMPTY)
   const [styles, setStyles] = useState<Style[]>([])
+  const [stylesError, setStylesError] = useState<string | null>(null)
+  const [stylesLoading, setStylesLoading] = useState(true)
+  const [stylesAttempt, setStylesAttempt] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [loaded, setLoaded] = useState(characterId === null)
+  const [notFound, setNotFound] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [baseline, setBaseline] = useState<string | null>(
+    characterId === null ? snapshot(EMPTY) : null,
+  )
+  const allowNavigation = useUnsavedChanges(baseline !== null && snapshot(values) !== baseline)
+  const mounted = useRef(true)
+  const submitRequest = useRef(0)
+
+  usePageTitle(
+    characterId === null ? 'New Character' : loaded ? `Edit ${values.name}` : 'Edit Character',
+  )
 
   useEffect(() => {
-    listStyles().then(setStyles).catch(() => setStyles([]))
+    let active = true
+    listStyles()
+      .then((styleList) => {
+        if (!active) return
+        setStyles(styleList)
+        setStylesLoading(false)
+      })
+      .catch((err) => {
+        if (!active) return
+        setStylesError(err instanceof ApiError ? err.message : String(err))
+        setStylesLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [stylesAttempt])
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      submitRequest.current += 1
+    }
   }, [])
 
   useEffect(() => {
     if (characterId === null) return
+    let active = true
     getCharacter(characterId)
       .then((character) => {
-        setValues({
+        if (!active) return
+        const hydratedValues: CharacterInput = {
           name: character.name,
           slug: character.slug,
           lore_md: character.lore_md,
           visual_contract: character.visual_contract,
           negative_traits: character.negative_traits,
           default_style_id: character.default_style_id,
-        })
+        }
+        setBaseline(snapshot(hydratedValues))
+        setValues(hydratedValues)
         setLoaded(true)
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : String(err)))
-  }, [characterId])
+      .catch((err) => {
+        if (!active) return
+        if (err instanceof ApiError && err.status === 404) setNotFound(true)
+        else setError(err instanceof ApiError ? err.message : String(err))
+      })
+    return () => {
+      active = false
+    }
+  }, [characterId, loadAttempt])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    const request = ++submitRequest.current
     setSubmitting(true)
     setError(null)
     try {
@@ -56,23 +128,63 @@ export function CharacterFormPage() {
         characterId === null
           ? await createCharacter(values)
           : await updateCharacter(characterId, values)
+      if (!mounted.current || request !== submitRequest.current) return
+      allowNavigation()
       navigate(`/characters/${saved.id}`)
     } catch (err) {
+      if (!mounted.current || request !== submitRequest.current) return
       setError(err instanceof ApiError ? err.message : String(err))
     } finally {
-      setSubmitting(false)
+      if (mounted.current && request === submitRequest.current) setSubmitting(false)
     }
   }
 
-  if (!loaded) return <p>Loading…</p>
+  if (notFound) return <NotFoundPage />
+  if (!loaded) {
+    return error ? (
+      <div>
+        <AsyncMessage kind="error">Could not load character: {error}</AsyncMessage>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            setError(null)
+            setLoadAttempt((value) => value + 1)
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    ) : <AsyncMessage kind="loading" aria-busy="true">Loading character…</AsyncMessage>
+  }
 
   const wordCount = values.visual_contract?.trim() ? values.visual_contract.trim().split(/\s+/).length : 0
 
   return (
     <section>
       <h1>{characterId === null ? 'New character' : 'Edit character'}</h1>
-      {error && <p className="banner banner--error">{error}</p>}
-      <form onSubmit={handleSubmit}>
+      {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
+      {stylesLoading && (
+        <AsyncMessage kind="loading" aria-busy="true">Loading styles…</AsyncMessage>
+      )}
+      {stylesError && (
+        <div>
+          <AsyncMessage kind="error">Could not load styles: {stylesError}</AsyncMessage>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setStylesLoading(true)
+              setStylesError(null)
+              setStylesAttempt((value) => value + 1)
+            }}
+          >
+            Retry styles
+          </button>
+        </div>
+      )}
+      {submitting && <AsyncMessage kind="loading">Saving character…</AsyncMessage>}
+      <form onSubmit={handleSubmit} aria-busy={submitting}>
         <div className="field">
           <label htmlFor="name">Name</label>
           <input
@@ -152,6 +264,14 @@ export function CharacterFormPage() {
         <div className="btn-row">
           <button type="submit" className="btn btn--primary" disabled={submitting}>
             Save
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={submitting}
+            onClick={() => navigate(characterId === null ? '/characters' : `/characters/${characterId}`)}
+          >
+            Cancel
           </button>
         </div>
       </form>

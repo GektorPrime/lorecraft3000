@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { Avatar } from './Avatar'
 
@@ -15,5 +15,19 @@ describe('Avatar', () => {
     const fallback = screen.getByRole('img', { name: 'Elias' })
     expect(fallback.tagName).not.toBe('IMG')
     expect(fallback).toHaveTextContent('EL')
+  })
+
+  it('falls back after an image fails and retries when the url changes', () => {
+    const { rerender } = render(
+      <Avatar url="/broken.jpg" initials="EL" name="Elias" />,
+    )
+    fireEvent.error(screen.getByRole('img', { name: 'Elias' }))
+    expect(screen.getByRole('img', { name: 'Elias' })).toHaveTextContent('EL')
+
+    rerender(<Avatar url="/replacement.jpg" initials="EL" name="Elias" />)
+    expect(screen.getByRole('img', { name: 'Elias' })).toHaveAttribute(
+      'src',
+      '/replacement.jpg',
+    )
   })
 })

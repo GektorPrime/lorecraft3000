@@ -1,3 +1,5 @@
+import { ImageWithFallback } from './ImageWithFallback'
+
 interface AvatarProps {
   url: string | null
   initials: string
@@ -13,12 +15,13 @@ interface AvatarProps {
  */
 export function Avatar({ url, initials, name, size = 40 }: AvatarProps) {
   const style = { width: size, height: size, fontSize: size * 0.4 }
-  if (url) {
-    return <img className="avatar" src={url} alt={name} style={style} />
-  }
   return (
-    <span className="avatar" style={style} aria-label={name} role="img">
-      {initials}
-    </span>
+    <ImageWithFallback
+      className="avatar"
+      src={url}
+      alt={name}
+      fallback={initials}
+      style={style}
+    />
   )
 }

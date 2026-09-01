@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, listCharacters } from '../../api/client'
 import type { Character } from '../../api/types'
 import { Avatar } from '../../components/Avatar'
+import { AsyncMessage } from '../../components/AsyncMessage'
 
 export function CharacterListPage() {
   const [characters, setCharacters] = useState<Character[] | null>(null)
@@ -22,8 +23,8 @@ export function CharacterListPage() {
           New character
         </Link>
       </div>
-      {error && <p className="banner banner--error">{error}</p>}
-      {!characters && !error && <p>Loading…</p>}
+      {error && <AsyncMessage kind="error">Could not load characters: {error}</AsyncMessage>}
+      {!characters && !error && <AsyncMessage kind="loading">Loading characters…</AsyncMessage>}
       {characters && characters.length === 0 && <p>No characters yet.</p>}
       {characters && characters.length > 0 && (
         <div className="card-grid">

@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../../api/client'
 import type { Character, OptionsSummary, Panel, Style } from '../../api/types'
@@ -10,9 +10,12 @@ vi.mock('../../api/client', async () => {
   const actual = await vi.importActual<typeof import('../../api/client')>('../../api/client')
   return {
     ...actual,
+    createPanel: vi.fn(),
+    duplicatePanel: vi.fn(),
     getPanel: vi.fn(),
     listCharacters: vi.fn(),
     listStyles: vi.fn(),
+    updatePanel: vi.fn(),
   }
 })
 
@@ -93,20 +96,29 @@ describe('PanelFormPage — field descriptions', () => {
     vi.mocked(client.getPanel).mockReset().mockResolvedValue(EDITABLE_PANEL)
     vi.mocked(client.listCharacters).mockReset().mockResolvedValue([READY_CHARACTER])
     vi.mocked(client.listStyles).mockReset().mockResolvedValue(STYLES)
+    vi.mocked(client.createPanel).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
+    vi.mocked(client.duplicatePanel).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
+    vi.mocked(client.updatePanel).mockReset().mockResolvedValue(EDITABLE_PANEL)
   })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   function renderForm(path = '/panels/new') {
-    return render(
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/panels/new" element={<PanelFormPage />} />
-          <Route path="/panels/:id/edit" element={<PanelFormPage />} />
-        </Routes>
-      </MemoryRouter>,
+    const router = createMemoryRouter(
+      [
+        { path: '/panels/new', element: <PanelFormPage /> },
+        { path: '/panels/:id/edit', element: <PanelFormPage /> },
+        { path: '/panels/:id/preview', element: <h1>Panel preview</h1> },
+        { path: '/panels', element: <h1>Panels</h1> },
+        { path: '/styles/new', element: <h1>New style</h1> },
+        { path: '/characters/new', element: <h1>New character</h1> },
+        { path: '/characters', element: <h1>Characters</h1> },
+      ],
+      { initialEntries: [path] },
     )
+    render(<RouterProvider router={router} />)
+    return router
   }
 
   it('describes camera as viewer position/angle, distinct from framing as crop', async () => {
@@ -263,6 +275,38 @@ describe('PanelFormPage — field descriptions', () => {
     expect(client.listStyles).toHaveBeenCalledTimes(1)
   })
 
+  it('rejects a malformed edit ID without loading panel resources', async () => {
+    renderForm('/panels/bad/edit')
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(client.getPanel).not.toHaveBeenCalled()
+    expect(client.listCharacters).not.toHaveBeenCalled()
+    expect(client.listStyles).not.toHaveBeenCalled()
+  })
+
+  it('renders not found when an edit panel is missing', async () => {
+    vi.mocked(client.getPanel).mockRejectedValue(
+      new client.ApiError('missing', 'NotFoundError', 404),
+    )
+    renderForm('/panels/12/edit')
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+  })
+
+  it('uses a static edit title while loading', async () => {
+    vi.mocked(client.getPanel).mockReturnValue(new Promise(() => {}))
+    renderForm('/panels/12/edit')
+
+    await waitFor(() => expect(document.title).toBe('Edit Panel | LoreCraft3000'))
+  })
+
+  it('updates the edit title after the panel loads', async () => {
+    renderForm('/panels/12/edit')
+
+    await screen.findByDisplayValue('Mara opens the door')
+    await waitFor(() => expect(document.title).toBe('Edit Panel #12 | LoreCraft3000'))
+  })
+
   it('preserves an existing noncanonical cast member while editing a mixed list', async () => {
     vi.mocked(client.listCharacters).mockResolvedValue([READY_CHARACTER, UNREADY_CHARACTER])
     renderForm('/panels/12/edit')
@@ -281,5 +325,91 @@ describe('PanelFormPage — field descriptions', () => {
       'at the door',
     )
     expect(screen.queryByText(/before you can stage a panel/)).not.toBeInTheDocument()
+  })
+
+  it('captures prerequisite defaults as a clean create baseline and Cancels to panels', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    const router = renderForm()
+
+    expect(await screen.findByLabelText('Style')).toHaveValue('7')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(router.state.location.pathname).toBe('/panels')
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('captures edit hydration as clean and Cancels to preview', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    const router = renderForm('/panels/12/edit')
+
+    await screen.findByDisplayValue('Mara opens the door')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(router.state.location.pathname).toBe('/panels/12/preview')
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('protects material panel edits when Cancel is declined', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    const router = renderForm()
+    const action = await screen.findByLabelText('Action')
+
+    await user.type(action, 'Elias enters')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(router.state.location.pathname).toBe('/panels/new')
+    expect(action).toHaveValue('Elias enters')
+  })
+
+  it('keeps a failed save dirty and bypasses protection after a successful save', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    vi.mocked(client.createPanel)
+      .mockRejectedValueOnce(new Error('save failed'))
+      .mockResolvedValueOnce({ ...EDITABLE_PANEL, id: 20 })
+    const router = renderForm()
+
+    await user.type(await screen.findByLabelText('Action'), 'Elias enters')
+    await user.type(screen.getByLabelText('Camera'), 'eye level')
+    await user.type(screen.getByLabelText('Shot framing'), 'wide shot')
+    const beforeUnload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(beforeUnload)
+    expect(beforeUnload.defaultPrevented).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: 'Save and preview' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('save failed')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(router.state.location.pathname).toBe('/panels/new')
+    expect(confirm).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Save and preview' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/panels/20/preview'))
+    expect(confirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets duplication finish without navigating after the locked page is left', async () => {
+    let resolveDuplicate!: (panel: Panel) => void
+    vi.mocked(client.getPanel).mockResolvedValue({ ...EDITABLE_PANEL, is_editable: false })
+    vi.mocked(client.duplicatePanel).mockReturnValue(
+      new Promise((resolve) => {
+        resolveDuplicate = resolve
+      }),
+    )
+    const user = userEvent.setup()
+    const router = renderForm('/panels/12/edit')
+
+    await user.click(await screen.findByRole('button', { name: 'Duplicate & edit' }))
+    expect(screen.getByRole('button', { name: 'Duplicate & edit' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    )
+    await router.navigate('/panels')
+    expect(await screen.findByRole('heading', { name: 'Panels' })).toBeInTheDocument()
+
+    await act(async () => resolveDuplicate({ ...EDITABLE_PANEL, id: 20 }))
+    expect(router.state.location.pathname).toBe('/panels')
   })
 })

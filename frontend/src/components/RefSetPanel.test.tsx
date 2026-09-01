@@ -13,6 +13,9 @@ vi.mock('../api/client', async () => {
     getRefSet: vi.fn(),
     promoteRefSet: vi.fn(),
     removeRefImage: vi.fn(),
+    uploadRefImage: vi.fn(),
+    copyRefSet: vi.fn(),
+    reRoleRefImage: vi.fn(),
   }
 })
 
@@ -64,6 +67,9 @@ describe('RefSetPanel destructive confirmations', () => {
     vi.mocked(client.getRefSet).mockReset()
     vi.mocked(client.promoteRefSet).mockReset().mockResolvedValue(draft)
     vi.mocked(client.removeRefImage).mockReset().mockResolvedValue(undefined)
+    vi.mocked(client.uploadRefImage).mockReset()
+    vi.mocked(client.copyRefSet).mockReset()
+    vi.mocked(client.reRoleRefImage).mockReset()
   })
 
   afterEach(() => {
@@ -133,5 +139,22 @@ describe('RefSetPanel destructive confirmations', () => {
     renderPanel({ ...draft, images: [] })
 
     expect(await screen.findByRole('button', { name: 'Promote to canonical' })).toBeDisabled()
+  })
+
+  it('keeps the loaded images and selected file when upload fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.uploadRefImage).mockRejectedValue(new Error('upload offline'))
+    renderPanel()
+    const input = await screen.findByLabelText('Reference image file')
+    const file = new File(['image'], 'elias.png', { type: 'image/png' })
+
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: 'Upload' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not upload reference image: Error: upload offline',
+    )
+    expect(screen.getByRole('button', { name: 'Preview face_front reference' })).toBeInTheDocument()
+    expect(input).toHaveValue('C:\\fakepath\\elias.png')
   })
 })

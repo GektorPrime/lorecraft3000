@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, listStyles } from '../../api/client'
 import type { Style } from '../../api/types'
+import { AsyncMessage } from '../../components/AsyncMessage'
 
 export function StyleListPage() {
   const [styles, setStyles] = useState<Style[] | null>(null)
@@ -21,8 +22,8 @@ export function StyleListPage() {
           New style
         </Link>
       </div>
-      {error && <p className="banner banner--error">{error}</p>}
-      {!styles && !error && <p>Loading…</p>}
+      {error && <AsyncMessage kind="error">Could not load styles: {error}</AsyncMessage>}
+      {!styles && !error && <AsyncMessage kind="loading">Loading styles…</AsyncMessage>}
       {styles && (
         <div className="card-grid">
           {styles.map((style) => (

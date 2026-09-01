@@ -79,6 +79,13 @@ textarea {
   flex-wrap: wrap;
 }
 
+.app-header__budget-warning {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .app-header__title {
   font-weight: 700;
   font-size: 1.15rem;
@@ -203,7 +210,7 @@ textarea {
   color: var(--surface);
 }
 
-.candidate-preview-trigger {
+.image-dialog__trigger {
   display: block;
   width: 100%;
   padding: 0;
@@ -212,32 +219,34 @@ textarea {
   cursor: zoom-in;
 }
 
-.candidate-preview-trigger img {
+.image-dialog__trigger-image {
   display: block;
   width: 100%;
 }
 
-.candidate-preview-trigger:focus-visible {
+.image-dialog__trigger:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
 
-.candidate-preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.image-dialog {
+  max-width: none;
+  max-height: none;
+  border: 0;
   padding: 2rem;
+  overflow: visible;
+  background: transparent;
+}
+
+.image-dialog::backdrop {
   background: rgba(10, 8, 14, 0.82);
 }
 
-.candidate-preview {
+.image-dialog__content {
   position: relative;
 }
 
-.candidate-preview__image {
+.image-dialog__image {
   display: block;
   width: auto;
   height: auto;
@@ -247,7 +256,7 @@ textarea {
   box-shadow: rgba(0, 0, 0, 0.35) 0 12px 40px;
 }
 
-.candidate-preview__close {
+.image-dialog__close {
   position: absolute;
   top: 0.65rem;
   right: 0.65rem;
@@ -262,9 +271,25 @@ textarea {
   line-height: 1;
 }
 
-.candidate-preview__close:hover,
-.candidate-preview__close:focus-visible {
+.image-dialog__close:hover,
+.image-dialog__close:focus-visible {
   background: rgba(10, 8, 14, 0.95);
+}
+
+.image-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background: #eeebf1;
+  color: var(--muted);
+  text-align: center;
+}
+
+.image-dialog__image.image-fallback {
+  width: min(80vw, 36rem);
+  height: min(70vh, 24rem);
+  border-radius: 8px;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -505,7 +530,8 @@ textarea {
 }
 
 .cast-list__item {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(4.5rem, 0.5fr) auto;
   align-items: center;
   gap: 0.6rem;
   border: 1px solid var(--border);
@@ -514,8 +540,46 @@ textarea {
   background: var(--surface);
 }
 
-.cast-list__item strong {
-  flex: 1;
+.cast-list__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.cast-list__identity strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cast-list__staging,
+.cast-list__prominence {
+  width: 100%;
+  min-width: 0;
+}
+
+.cast-list__actions {
+  display: flex;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.cast-list__actions .btn {
+  padding-inline: 0.7rem;
+}
+
+.cast-selector__available {
+  margin-top: 0.75rem;
+}
+
+.cast-selector__available-actions {
+  margin-top: 0;
+}
+
+.cast-selector__available-actions .btn {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .ref-image-grid {
@@ -531,7 +595,7 @@ textarea {
   background: var(--surface);
 }
 
-.ref-image-card img {
+.ref-image-card .image-dialog__trigger-image {
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
@@ -544,29 +608,12 @@ textarea {
   font-size: 0.85rem;
 }
 
-.preview-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 8, 14, 0.75);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  z-index: 50;
-}
-
-.preview-overlay img {
-  max-width: min(90vw, 720px);
-  max-height: 85vh;
-  border-radius: 8px;
-}
-
 @media (max-width: 640px) {
-  .candidate-preview-overlay {
+  .image-dialog {
     padding: 1rem;
   }
 
-  .candidate-preview__image {
+  .image-dialog__image {
     max-width: 94vw;
     max-height: 90vh;
   }
@@ -586,5 +633,18 @@ textarea {
 
   .attempt-row__actions {
     justify-content: flex-start;
+  }
+
+  .cast-list__item {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .cast-list__actions {
+    flex-wrap: wrap;
+  }
+
+  .cast-list__actions .btn {
+    max-width: 100%;
   }
 }

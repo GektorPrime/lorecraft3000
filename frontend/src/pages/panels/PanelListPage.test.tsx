@@ -70,4 +70,41 @@ describe('PanelListPage — Duplicate & edit', () => {
     // panel's edit page (issue #15 follow-up).
     expect(mockNavigate).toHaveBeenCalledWith('/panels/42/edit')
   })
+
+  it('keeps the panel list visible when duplication fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.duplicatePanel).mockRejectedValue(new Error('offline'))
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not duplicate panel: Error: offline')
+    expect(screen.getByText('Elias draws his sword.')).toBeInTheDocument()
+  })
+
+  it('does not redirect when duplication finishes after leaving the page', async () => {
+    const user = userEvent.setup()
+    let finishDuplicate!: (panel: Panel) => void
+    vi.mocked(client.duplicatePanel).mockReturnValue(
+      new Promise((resolve) => {
+        finishDuplicate = resolve
+      }),
+    )
+    const view = render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
+    view.unmount()
+    finishDuplicate({ ...LOCKED_PANEL, id: 42, is_editable: true })
+    await Promise.resolve()
+
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
 })

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ApiError,
   duplicatePanel,
@@ -10,6 +10,11 @@ import {
 } from '../../api/client'
 import type { GenerationSummary, Panel, PanelPreview } from '../../api/types'
 import { useBudget } from '../../api/useBudget'
+import { RouteIdGuard } from '../../routing/routeId'
+import { usePageTitle } from '../../routing/usePageTitle'
+import { NotFoundPage } from '../NotFoundPage'
+import { DateTime } from '../../components/DateTime'
+import { AsyncMessage } from '../../components/AsyncMessage'
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
@@ -30,70 +35,166 @@ function friendlyGenerationError(error: string): string {
 }
 
 export function PanelPreviewPage() {
-  const { id } = useParams()
-  const panelId = Number(id)
+  return (
+    <RouteIdGuard>{(panelId) => <PanelPreview key={panelId} panelId={panelId} />}</RouteIdGuard>
+  )
+}
+
+function PanelPreview({ panelId }: { panelId: number }) {
   const navigate = useNavigate()
   const { refreshBudget } = useBudget()
 
   const [panel, setPanel] = useState<Panel | null>(null)
   const [preview, setPreview] = useState<PanelPreview | null>(null)
   const [attempts, setAttempts] = useState<GenerationSummary[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [panelError, setPanelError] = useState<string | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [attemptsError, setAttemptsError] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
+  const [completionMessage, setCompletionMessage] = useState<{
+    kind: 'success' | 'error'
+    text: string
+  } | null>(null)
   const [generating, setGenerating] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+  const requestVersion = useRef(0)
+  const hasLoadedPanel = useRef(false)
+  const attemptsRef = useRef<GenerationSummary[] | null>(null)
+  const reloadInFlight = useRef<Promise<void> | null>(null)
+  const mounted = useRef(true)
 
-  const reload = async () => {
+  usePageTitle(panel ? `Panel #${panel.id} Preview` : 'Loading Panel Preview')
+
+  const reload = useCallback(async () => {
+    if (reloadInFlight.current) return reloadInFlight.current
+
+    let release!: () => void
+    const inFlight = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    reloadInFlight.current = inFlight
+
     try {
-      const [nextPanel, nextPreview, history] = await Promise.all([
-        getPanel(panelId),
-        previewPanel(panelId),
-        listPanelGenerations(panelId),
-      ])
-      setPanel(nextPanel)
-      setPreview(nextPreview)
-      setAttempts(history)
-      await refreshBudget()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err))
+      const version = ++requestVersion.current
+      const panelRequest = getPanel(panelId).then(
+        (nextPanel) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          setPanel(nextPanel)
+          hasLoadedPanel.current = true
+          setPanelError(null)
+        },
+        (err: unknown) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          if (err instanceof ApiError && err.status === 404 && !hasLoadedPanel.current) {
+            setNotFound(true)
+          }
+          setPanelError(err instanceof ApiError ? err.message : String(err))
+        },
+      )
+      const previewRequest = previewPanel(panelId).then(
+        (nextPreview) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          setPreview(nextPreview)
+          setPreviewError(null)
+        },
+        (err: unknown) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          setPreviewError(err instanceof ApiError ? err.message : String(err))
+        },
+      )
+      const attemptsRequest = listPanelGenerations(panelId).then(
+        (history) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          const completed = attemptsRef.current?.find((previous) =>
+            previous.state === 'pending' && history.some(
+              (next) => next.id === previous.id && next.state !== 'pending',
+            ),
+          )
+          const nextCompleted = completed && history.find((next) => next.id === completed.id)
+          if (nextCompleted) {
+            setCompletionMessage({
+              kind: nextCompleted.state === 'failed' ? 'error' : 'success',
+              text: `Generation attempt #${nextCompleted.id} ${nextCompleted.state}.`,
+            })
+          }
+          attemptsRef.current = history
+          setAttempts(history)
+          setAttemptsError(null)
+        },
+        (err: unknown) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          setAttemptsError(err instanceof ApiError ? err.message : String(err))
+        },
+      )
+
+      await Promise.all([panelRequest, previewRequest, attemptsRequest])
+      if (mounted.current && version === requestVersion.current) await refreshBudget()
+    } finally {
+      if (reloadInFlight.current === inFlight) reloadInFlight.current = null
+      release()
     }
-  }
+  }, [panelId, refreshBudget])
 
   useEffect(() => {
+    mounted.current = true
+    // reload updates state only after its resource promises settle.
+    // oxlint-disable-next-line react/set-state-in-effect
     void reload()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelId])
+    return () => {
+      mounted.current = false
+    }
+  }, [reload])
 
   const hasPendingAttempt = attempts?.some((attempt) => attempt.state === 'pending') ?? false
 
   useEffect(() => {
     if (!hasPendingAttempt) return
-    const timer = window.setInterval(() => void reload(), 2000)
-    return () => window.clearInterval(timer)
-    // reload intentionally follows the current panel id without becoming a
-    // public callback dependency; the interval is rebuilt when pending ends.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPendingAttempt, panelId])
+    let cancelled = false
+    let timer: number | undefined
+    const poll = async () => {
+      await reload()
+      if (!cancelled) timer = window.setTimeout(() => void poll(), 2000)
+    }
+    timer = window.setTimeout(() => void poll(), 2000)
+    return () => {
+      cancelled = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [hasPendingAttempt, reload])
 
   useEffect(() => {
     if (!generating) return
-    void refreshBudget()
-    const timer = window.setInterval(() => void refreshBudget(), 2000)
-    return () => window.clearInterval(timer)
+    let cancelled = false
+    let timer: number | undefined
+    const pollBudget = async () => {
+      await refreshBudget()
+      if (!cancelled) timer = window.setTimeout(() => void pollBudget(), 2000)
+    }
+    timer = window.setTimeout(() => void pollBudget(), 2000)
+    return () => {
+      cancelled = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
   }, [generating, refreshBudget])
 
   const handleGenerate = async () => {
+    if (generating) return
     setGenerating(true)
-    setError(null)
+    setActionMessage(null)
     try {
       if (!preview) return
       const generation = await generatePanel(panelId, preview.prompt_hash)
       await refreshBudget()
+      if (!mounted.current) return
       navigate(`/generations/${generation.id}`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err))
+      if (!mounted.current) return
+      const message = err instanceof ApiError ? err.message : String(err)
+      setActionMessage(`Could not start generation. ${friendlyGenerationError(message)}`)
       await reload()
     } finally {
-      setGenerating(false)
+      if (mounted.current) setGenerating(false)
     }
   }
 
@@ -101,29 +202,62 @@ export function PanelPreviewPage() {
   // editable because their exact request is preserved on the attempt itself.
   // A locked panel can be duplicated into a fresh editable copy.
   const handleDuplicateAndEdit = async () => {
+    if (duplicating) return
     setDuplicating(true)
-    setError(null)
+    setActionMessage(null)
     try {
       const copy = await duplicatePanel(panelId)
+      if (!mounted.current) return
       navigate(`/panels/${copy.id}/edit`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err))
+      if (!mounted.current) return
+      setActionMessage(`Could not duplicate panel: ${err instanceof ApiError ? err.message : String(err)}`)
     } finally {
-      setDuplicating(false)
+      if (mounted.current) setDuplicating(false)
     }
   }
 
-  if (!panel || !preview || !attempts) {
-    return error ? <p className="banner banner--error">{error}</p> : <p>Loading…</p>
+  if (notFound) return <NotFoundPage />
+  if (!panel) {
+    return panelError ? (
+      <div>
+        <AsyncMessage kind="error">Could not load panel: {panelError}</AsyncMessage>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            setPanelError(null)
+            void reload()
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    ) : <AsyncMessage kind="loading">Loading panel…</AsyncMessage>
   }
 
   return (
-    <section>
+    <section aria-busy={generating || duplicating || undefined}>
       <h1>Preview panel</h1>
       <p>{panel.beat_text}</p>
-      {error && <p className="banner banner--error">{friendlyGenerationError(error)}</p>}
+      {panelError && <AsyncMessage kind="error">Could not refresh panel: {panelError}</AsyncMessage>}
+      {actionMessage && <AsyncMessage kind="error">{actionMessage}</AsyncMessage>}
+      {completionMessage && <AsyncMessage kind={completionMessage.kind}>{completionMessage.text}</AsyncMessage>}
+      {hasPendingAttempt && (
+        <AsyncMessage kind="loading">
+          A generation is in progress. This page refreshes automatically; do not start another
+          paid request.
+        </AsyncMessage>
+      )}
 
-      {preview.can_generate ? (
+      {!preview && previewError && (
+        <div>
+          <AsyncMessage kind="error">Could not load generation preview: {previewError}</AsyncMessage>
+          <button type="button" className="btn" onClick={() => void reload()}>Retry preview</button>
+        </div>
+      )}
+      {!preview && !previewError && <AsyncMessage kind="loading">Loading generation preview…</AsyncMessage>}
+      {preview?.can_generate ? (
         <>
           <h2>Reference-slot allocation</h2>
           <ul>
@@ -153,27 +287,22 @@ export function PanelPreviewPage() {
             {formatCents(preview.remaining_after_cents)}
           </p>
 
-          {hasPendingAttempt && (
-            <p className="banner banner--info">
-              A generation is in progress. This page refreshes automatically; do not start another
-              paid request.
-            </p>
-          )}
-
           <button
             type="button"
             className="btn btn--primary"
             disabled={generating || hasPendingAttempt}
             onClick={() => void handleGenerate()}
           >
-            {hasPendingAttempt
+            {generating
+              ? 'Starting generation…'
+              : hasPendingAttempt
               ? 'Generation in progress'
               : `Generate one candidate · ${formatCents(preview.estimated_cost_cents)}`}
           </button>
         </>
-      ) : (
-        <p className="banner banner--error">Generation blocked: {preview.blocked_reason}</p>
-      )}
+      ) : preview ? (
+        <AsyncMessage kind="error">Generation blocked: {preview.blocked_reason}</AsyncMessage>
+      ) : null}
 
       <div className="btn-row">
         {panel.is_editable ? (
@@ -187,7 +316,7 @@ export function PanelPreviewPage() {
             disabled={duplicating}
             onClick={() => void handleDuplicateAndEdit()}
           >
-            Duplicate &amp; edit
+            {duplicating ? 'Duplicating…' : 'Duplicate & edit'}
           </button>
         )}
         <Link to="/panels" className="btn">
@@ -196,9 +325,16 @@ export function PanelPreviewPage() {
       </div>
 
       <h2>Generation attempts</h2>
-      {attempts.length === 0 ? (
+      {attemptsError && (
+        <div>
+          <AsyncMessage kind="error">Could not load generation history: {attemptsError}</AsyncMessage>
+          <button type="button" className="btn" onClick={() => void reload()}>Retry generation history</button>
+        </div>
+      )}
+      {!attempts && !attemptsError && <AsyncMessage kind="loading">Loading generation history…</AsyncMessage>}
+      {attempts?.length === 0 ? (
         <p className="field__hint">No generation attempts yet.</p>
-      ) : (
+      ) : attempts ? (
         <div className="attempt-list">
           {attempts.map((attempt) => (
             <article className="attempt-row" key={attempt.id}>
@@ -207,7 +343,7 @@ export function PanelPreviewPage() {
                 <strong>Attempt #{attempt.id}</strong>
                 <span className="field__hint">
                   {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}
-                  {attempt.created_at}
+                  <DateTime value={attempt.created_at} />
                 </span>
               </div>
               {attempt.error_text && (
@@ -220,7 +356,7 @@ export function PanelPreviewPage() {
                 </div>
               )}
               <div className="btn-row attempt-row__actions">
-                {preview.can_generate &&
+                {preview?.can_generate &&
                   attempt.state === 'failed' &&
                   attempt.id === attempts[0].id && (
                   <button
@@ -240,7 +376,7 @@ export function PanelPreviewPage() {
             </article>
           ))}
         </div>
-      )}
+      ) : null}
     </section>
   )
 }

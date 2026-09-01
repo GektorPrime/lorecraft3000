@@ -73,8 +73,7 @@ describe('CastSelector', () => {
     expect(items[0]).toHaveTextContent('Elias')
     expect(items[1]).toHaveTextContent('Mara')
 
-    const downButtons = screen.getAllByRole('button', { name: '↓' })
-    await user.click(downButtons[0])
+    await user.click(screen.getByRole('button', { name: 'Move Elias down' }))
 
     const reordered = screen.getAllByRole('listitem')
     expect(reordered[0]).toHaveTextContent('Mara')
@@ -86,8 +85,52 @@ describe('CastSelector', () => {
     render(<Harness />)
     await user.click(screen.getByRole('button', { name: /Elias/ }))
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
-    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await user.click(screen.getByRole('button', { name: 'Remove Elias from cast' }))
     expect(screen.queryAllByRole('listitem')).toHaveLength(0)
+  })
+
+  it('gives each cast action a character-specific name and preserves reorder boundaries', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: /Elias/ }))
+    await user.click(screen.getByRole('button', { name: /Mara/ }))
+
+    expect(screen.getByRole('button', { name: 'Move Elias up' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move Elias down' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Remove Elias from cast' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move Mara up' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move Mara down' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Remove Mara from cast' })).toBeEnabled()
+  })
+
+  it('keeps cast actions keyboard operable', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: /Elias/ }))
+    await user.click(screen.getByRole('button', { name: /Mara/ }))
+
+    screen.getByRole('button', { name: 'Move Elias down' }).focus()
+    await user.keyboard('{Enter}')
+
+    const reordered = screen.getAllByRole('listitem')
+    expect(reordered[0]).toHaveTextContent('Mara')
+    expect(reordered[1]).toHaveTextContent('Elias')
+  })
+
+  it('exposes stable layout classes for each cast row region', () => {
+    render(
+      <CastSelector
+        characters={CHARACTERS}
+        value={[{ character_id: CHARACTERS[0].id, role: '', prominence: 1 }]}
+        onChange={() => {}}
+      />,
+    )
+
+    const item = screen.getByRole('listitem')
+    expect(item.querySelector('.cast-list__identity')).toBeInTheDocument()
+    expect(item.querySelector('.cast-list__staging')).toBeInTheDocument()
+    expect(item.querySelector('.cast-list__prominence')).toBeInTheDocument()
+    expect(item.querySelector('.cast-list__actions')).toBeInTheDocument()
   })
 
   it('shows visible cast-order and staging explanations, not only placeholder text', () => {
