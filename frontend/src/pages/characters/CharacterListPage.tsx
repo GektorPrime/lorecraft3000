@@ -16,7 +16,7 @@ export function CharacterListPage() {
 
   return (
     <section>
-      <div className="btn-row" style={{ justifyContent: 'space-between', marginTop: 0 }}>
+      <div className="btn-row list-page-header">
         <h1>Characters</h1>
         <Link to="/characters/new" className="btn btn--primary">
           New character

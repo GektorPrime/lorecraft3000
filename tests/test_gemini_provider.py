@@ -70,15 +70,78 @@ def test_consumer_api_400_is_marked_non_billable():
     assert excinfo.value.charge_expected is False
 
 
-def test_high_demand_500_is_marked_non_billable():
-    class BusyInteractions:
-        def create(self, **kwargs):
-            raise RuntimeError(
-                "Error code: 500 - gemini-3-pro-image is currently experiencing "
-                "high demand. Please try again later."
-            )
+_HIGH_DEMAND = (
+    "Error code: 500 - gemini-3-pro-image is currently experiencing "
+    "high demand. Please try again later."
+)
 
-    provider = GeminiProvider(SimpleNamespace(interactions=BusyInteractions()))
+
+def test_high_demand_500_exhausts_retries_and_is_non_billable():
+    class BusyInteractions:
+        def __init__(self):
+            self.calls = 0
+
+        def create(self, **kwargs):
+            self.calls += 1
+            raise RuntimeError(_HIGH_DEMAND)
+
+    interactions = BusyInteractions()
+    sleeps: list[float] = []
+    provider = GeminiProvider(
+        SimpleNamespace(interactions=interactions), sleep=sleeps.append
+    )
     with pytest.raises(GeminiProviderError) as excinfo:
         provider.generate(_request("gemini-3-pro-image"))
     assert excinfo.value.charge_expected is False
+    # Retried up to the cap, then surfaced the failure.
+    assert interactions.calls == 4
+    # Backoff slept between attempts but not after the final failure.
+    assert sleeps == [1.0, 3.0, 7.0]
+
+
+def test_high_demand_500_retries_then_succeeds():
+    class FlakyInteractions:
+        def __init__(self):
+            self.calls = 0
+
+        def create(self, **kwargs):
+            self.calls += 1
+            if self.calls < 3:
+                raise RuntimeError(_HIGH_DEMAND)
+            return SimpleNamespace(
+                id="interaction-1",
+                output_image=SimpleNamespace(
+                    data=base64.b64encode(b"output").decode()
+                ),
+            )
+
+    interactions = FlakyInteractions()
+    sleeps: list[float] = []
+    provider = GeminiProvider(
+        SimpleNamespace(interactions=interactions), sleep=sleeps.append
+    )
+    result = provider.generate(_request("gemini-3-pro-image"))
+    assert result.image_bytes == b"output"
+    assert interactions.calls == 3
+    assert sleeps == [1.0, 3.0]
+
+
+def test_consumer_api_400_is_not_retried():
+    class RejectedInteractions:
+        def __init__(self):
+            self.calls = 0
+
+        def create(self, **kwargs):
+            self.calls += 1
+            raise RuntimeError("Error code: 400 - invalid_request")
+
+    interactions = RejectedInteractions()
+    sleeps: list[float] = []
+    provider = GeminiProvider(
+        SimpleNamespace(interactions=interactions), sleep=sleeps.append
+    )
+    with pytest.raises(GeminiProviderError):
+        provider.generate(_request("gemini-3-pro-image"))
+    # 4xx fails fast: no retries, no backoff sleeps.
+    assert interactions.calls == 1
+    assert sleeps == []

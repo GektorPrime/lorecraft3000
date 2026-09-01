@@ -31,7 +31,7 @@ export function PanelListPage() {
 
   return (
     <section>
-      <div className="btn-row" style={{ justifyContent: 'space-between', marginTop: 0 }}>
+      <div className="btn-row list-page-header">
         <h1>Panels</h1>
         <Link to="/panels/new" className="btn btn--primary">
           Stage new panel
