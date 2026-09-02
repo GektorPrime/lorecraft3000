@@ -101,16 +101,14 @@ export function PanelListPage() {
               }}
             >
               <div className="resource-card__body">
-                <div className="resource-card__header">
-                  <h2 className="resource-card__title">Panel #{panel.id}</h2>
-                  <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
-                    {panel.is_editable ? 'Editable' : 'Locked'}
-                  </span>
-                </div>
+                <h2 className="resource-card__title">Panel #{panel.id}</h2>
                 <p className="resource-card__summary text-clamp" title={panel.beat_text}>
                   {panel.beat_text}
                 </p>
                 <p className="resource-card__meta">
+                  <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
+                    {panel.is_editable ? 'Editable' : 'Locked'}
+                  </span>
                   <span>Cast: {panel.cast.map((m) => m.name).join(', ') || 'none'}</span>
                   <span>
                     {panel.generation_count} generation attempt
@@ -119,16 +117,6 @@ export function PanelListPage() {
                 </p>
               </div>
               <div className="resource-card__actions">
-                {panel.is_editable && (
-                  <Link
-                    to={`/panels/${panel.id}/edit`}
-                    className="btn"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Icon name="edit" size={15} />
-                    Edit
-                  </Link>
-                )}
                 <button
                   type="button"
                   className="btn btn--danger"

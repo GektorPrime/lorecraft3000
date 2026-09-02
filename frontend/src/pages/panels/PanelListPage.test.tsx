@@ -107,8 +107,29 @@ describe('PanelListPage — preview via tile click', () => {
       </MemoryRouter>,
     )
     await screen.findByText('A quiet dawn over the harbor.')
-    await user.click(screen.getByRole('link', { name: /Edit/ }))
+    await user.click(screen.getByRole('button', { name: /Delete/ }))
     expect(mockNavigate).not.toHaveBeenCalledWith('/panels/3/preview')
+  })
+
+  it('does not expose Edit on editable panel cards', async () => {
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('A quiet dawn over the harbor.')
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
+  })
+
+  it('places the status badge first in the metadata row', async () => {
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('A quiet dawn over the harbor.')
+    const metadata = screen.getByText(/Cast:/).closest('.resource-card__meta')
+    expect(metadata?.firstElementChild).toHaveTextContent('Editable')
   })
 })
 
