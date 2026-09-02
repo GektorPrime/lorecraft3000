@@ -68,4 +68,35 @@ describe('ImageDialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(trigger).toHaveFocus()
   })
+
+  it('uses arrow keys for optional preview navigation', async () => {
+    const onPrevious = vi.fn()
+    const onNext = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <ImageDialog
+        src="/thumbnail.jpg"
+        previewSrc="/preview.jpg"
+        thumbnailAlt="Portrait thumbnail"
+        previewAlt="Portrait full size"
+        triggerLabel="Preview portrait"
+        dialogLabel="Portrait preview"
+        onPrevious={onPrevious}
+        onNext={onNext}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Preview portrait' }))
+    const dialog = screen.getByRole('dialog', { name: 'Portrait preview' })
+    expect(screen.getByRole('img', { name: 'Portrait full size' })).toHaveAttribute(
+      'src',
+      '/preview.jpg',
+    )
+
+    fireEvent.keyDown(dialog, { key: 'ArrowLeft' })
+    fireEvent.keyDown(dialog, { key: 'ArrowRight' })
+
+    expect(onPrevious).toHaveBeenCalledOnce()
+    expect(onNext).toHaveBeenCalledOnce()
+  })
 })

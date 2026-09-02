@@ -3,18 +3,26 @@ import { ImageWithFallback } from './ImageWithFallback'
 
 interface ImageDialogProps {
   src: string
+  previewSrc?: string
   thumbnailAlt: string
   previewAlt: string
   triggerLabel: string
   dialogLabel: string
+  onPrevious?: () => void
+  onNext?: () => void
+  onOpenChange?: (open: boolean) => void
 }
 
 export function ImageDialog({
   src,
+  previewSrc = src,
   thumbnailAlt,
   previewAlt,
   triggerLabel,
   dialogLabel,
+  onPrevious,
+  onNext,
+  onOpenChange,
 }: ImageDialogProps) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -40,7 +48,10 @@ export function ImageDialog({
         type="button"
         className="image-dialog__trigger"
         aria-label={triggerLabel}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          onOpenChange?.(true)
+          setOpen(true)
+        }}
       >
         <ImageWithFallback
           className="image-dialog__trigger-image"
@@ -53,12 +64,22 @@ export function ImageDialog({
         className="image-dialog"
         aria-label={dialogLabel}
         aria-modal="true"
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowLeft' && onPrevious) {
+            event.preventDefault()
+            onPrevious()
+          } else if (event.key === 'ArrowRight' && onNext) {
+            event.preventDefault()
+            onNext()
+          }
+        }}
         onCancel={(event) => {
           event.preventDefault()
           setOpen(false)
         }}
         onClose={() => {
           setOpen(false)
+          onOpenChange?.(false)
           triggerRef.current?.focus()
         }}
         onClick={(event) => {
@@ -75,7 +96,7 @@ export function ImageDialog({
           >
             &times;
           </button>
-          <ImageWithFallback className="image-dialog__image" src={src} alt={previewAlt} />
+          <ImageWithFallback className="image-dialog__image" src={previewSrc} alt={previewAlt} />
         </div>
       </dialog>
     </>

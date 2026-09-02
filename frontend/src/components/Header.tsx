@@ -22,6 +22,7 @@ export function Header() {
         <nav className="app-header__nav" aria-label="Primary">
           <NavLink to="/characters">Characters</NavLink>
           <NavLink to="/styles">Styles</NavLink>
+          <NavLink to="/gallery">Gallery</NavLink>
           <NavLink to="/panels" end>Panels</NavLink>
           <NavLink to="/panels/new">Stage new panel</NavLink>
         </nav>

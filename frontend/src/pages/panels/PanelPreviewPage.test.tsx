@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -388,6 +388,55 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(carousel).toHaveTextContent('Attempt #10')
     const alt = screen.getByAltText('Generated image from attempt 10')
     expect(alt).toBeInTheDocument()
+  })
+
+  it('cycles carousel images with arrow keys while the dialog stays open', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      generation_count: 2,
+    })
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+      {
+        ...SUCCEEDED_ATTEMPT,
+        id: 10,
+        candidates: [
+          { ...CANDIDATE, id: 901, generation_id: 10, content_url: '/candidate-10.png' },
+        ],
+      },
+      {
+        ...SUCCEEDED_ATTEMPT,
+        id: 9,
+        candidates: [
+          { ...CANDIDATE, id: 902, generation_id: 9, content_url: '/candidate-9.png' },
+        ],
+      },
+    ])
+
+    renderPreview()
+    const carousel = await screen.findByLabelText('Generated candidate across attempts')
+    await user.click(
+      within(carousel).getByRole('button', { name: 'Preview image from attempt 10' }),
+    )
+    let dialog = screen.getByRole('dialog')
+    expect(screen.getByRole('img', { name: /attempt 10, full-size preview/ })).toHaveAttribute(
+      'src',
+      '/candidate-10.png',
+    )
+
+    fireEvent.keyDown(dialog, { key: 'ArrowRight' })
+    dialog = screen.getByRole('dialog')
+    expect(screen.getByRole('img', { name: /attempt 9, full-size preview/ })).toHaveAttribute(
+      'src',
+      '/candidate-9.png',
+    )
+
+    fireEvent.keyDown(dialog, { key: 'ArrowLeft' })
+    expect(screen.getByRole('img', { name: /attempt 10, full-size preview/ })).toHaveAttribute(
+      'src',
+      '/candidate-10.png',
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('reloads and explains when the reviewed prompt changed', async () => {

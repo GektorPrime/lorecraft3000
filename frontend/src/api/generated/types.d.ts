@@ -133,6 +133,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Gallery */
+        get: operations["list_gallery_api_v1_gallery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/generations/{generation_id}": {
         parameters: {
             query?: never;
@@ -572,6 +589,21 @@ export interface components {
              * @default
              */
             visual_contract: string;
+        };
+        /** GalleryItem */
+        GalleryItem: {
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            /** Beat Text */
+            beat_text: string;
+            /** Candidate Id */
+            candidate_id: number;
+            /** Content Url */
+            content_url: string;
+            /** Created At */
+            created_at: string;
+            /** Panel Id */
+            panel_id: number;
         };
         /** Generation */
         Generation: {
@@ -1153,6 +1185,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_gallery_api_v1_gallery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItem"][];
                 };
             };
         };

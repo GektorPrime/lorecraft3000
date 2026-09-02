@@ -58,3 +58,22 @@ class CandidateService:
         if row is None:
             raise CandidateNotFoundError(f"candidate {candidate_id} not found")
         return row["sha256"]
+
+    def list_accepted(self) -> list[sqlite3.Row]:
+        """Every accepted candidate across all panels, newest first, joined
+        with its panel (scene) so callers can render a gallery grid."""
+        return self.conn.execute(
+            """
+            SELECT c.id               AS candidate_id,
+                   c.generation_id    AS generation_id,
+                   c.created_at       AS created_at,
+                   s.id               AS panel_id,
+                   s.beat_text        AS beat_text,
+                   s.aspect_ratio     AS aspect_ratio
+            FROM candidate c
+            JOIN generation g ON g.id = c.generation_id
+            JOIN scene s     ON s.id = g.scene_id
+            WHERE c.review_status = 'accepted'
+            ORDER BY c.created_at DESC, c.id DESC
+            """
+        ).fetchall()

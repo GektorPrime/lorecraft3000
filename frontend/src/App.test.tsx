@@ -57,6 +57,12 @@ describe('App routing', () => {
     expect(window.location.hash).toBe('#/styles')
     expect(await screen.findByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Styles' })).toBeInTheDocument()
+
+    const nav = screen.getByRole('navigation', { name: 'Primary' })
+    const labels = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
+    expect(labels).toContain('Gallery')
+    expect(labels.indexOf('Styles')).toBeLessThan(labels.indexOf('Gallery'))
+    expect(labels.indexOf('Gallery')).toBeLessThan(labels.indexOf('Panels'))
   })
 
   it('does not mark Panels active when on Stage new panel', async () => {

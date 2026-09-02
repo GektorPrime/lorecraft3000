@@ -290,6 +290,44 @@
         "title": "CharacterInput",
         "type": "object"
       },
+      "GalleryItem": {
+        "properties": {
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "beat_text": {
+            "title": "Beat Text",
+            "type": "string"
+          },
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "integer"
+          },
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "panel_id": {
+            "title": "Panel Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "content_url",
+          "panel_id",
+          "beat_text",
+          "aspect_ratio",
+          "created_at"
+        ],
+        "title": "GalleryItem",
+        "type": "object"
+      },
       "Generation": {
         "properties": {
           "actual_cost_usd_cents": {
@@ -1481,6 +1519,32 @@
         "tags": [
           "api-v1",
           "api-v1-ref-sets"
+        ]
+      }
+    },
+    "/api/v1/gallery": {
+      "get": {
+        "operationId": "list_gallery_api_v1_gallery_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GalleryItem"
+                  },
+                  "title": "Response List Gallery Api V1 Gallery Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Gallery",
+        "tags": [
+          "api-v1",
+          "api-v1-generations"
         ]
       }
     },

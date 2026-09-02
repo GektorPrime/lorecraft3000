@@ -259,3 +259,12 @@ class GenerationSummary(BaseModel):
     completed_at: str | None
     created_at: str
     candidates: list[Candidate]
+
+
+class GalleryItem(BaseModel):
+    candidate_id: int
+    content_url: str
+    panel_id: int
+    beat_text: str
+    aspect_ratio: str
+    created_at: str

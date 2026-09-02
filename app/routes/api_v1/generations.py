@@ -11,11 +11,27 @@ from app.routes.api_v1._common import (
     _raise_for,
     _serve_stored_image,
 )
-from app.schemas import Candidate, CandidateReviewIn, Generation
+from app.schemas import Candidate, CandidateReviewIn, GalleryItem, Generation
 from app.services.candidates import CandidateService
 from app.services.generation import GenerationService
 
 router = APIRouter(prefix="/api/v1", tags=["api-v1-generations"])
+
+
+@router.get("/gallery", response_model=list[GalleryItem])
+def list_gallery(conn=Depends(get_conn)) -> list[GalleryItem]:
+    service = CandidateService(conn)
+    return [
+        GalleryItem(
+            candidate_id=row["candidate_id"],
+            content_url=f"/api/v1/candidates/{row['candidate_id']}/content",
+            panel_id=row["panel_id"],
+            beat_text=row["beat_text"],
+            aspect_ratio=row["aspect_ratio"],
+            created_at=row["created_at"],
+        )
+        for row in service.list_accepted()
+    ]
 
 
 @router.get("/generations/{generation_id}", response_model=Generation)

@@ -15,6 +15,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
+import { GalleryPage } from './pages/gallery/GalleryPage'
 import { PanelFormPage } from './pages/panels/PanelFormPage'
 import { PanelListPage } from './pages/panels/PanelListPage'
 import { PanelPreviewPage } from './pages/panels/PanelPreviewPage'
@@ -120,6 +121,11 @@ const appRoutes: RouteObject[] = [
             loader: requireRouteId,
             element: <StyleFormPage />,
             handle: { title: 'Edit Style' } satisfies RouteHandle,
+          },
+          {
+            path: 'gallery',
+            element: <GalleryPage />,
+            handle: { title: 'Gallery' } satisfies RouteHandle,
           },
           {
             path: 'panels',
