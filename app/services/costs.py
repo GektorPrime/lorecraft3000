@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.config import Settings
 
@@ -63,17 +65,47 @@ class CostLedger:
             )
         return cents
 
-    def spent_today(self) -> int:
-        row = self.conn.execute(
+    @staticmethod
+    def _tz(tz_name: str | None) -> object:
+        """Resolve an IANA timezone name, defaulting to UTC.
+
+        Conversions to a user's local calendar day always happen in the browser
+        timezone supplied via the request header. When none is available (server
+        calls such as budget gating during generation, or tests), UTC is used so
+        behaviour never depends on the server's own system timezone.
+        """
+        if tz_name:
+            try:
+                return ZoneInfo(tz_name)
+            except ZoneInfoNotFoundError:
+                return timezone.utc
+        return timezone.utc
+
+    @staticmethod
+    def _local_date(utc_timestamp: str, tz_name: str | None = None) -> str:
+        """Convert a UTC timestamp to YYYY-MM-DD in the given timezone (UTC default)."""
+        dt = datetime.strptime(utc_timestamp, "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=timezone.utc
+        )
+        return dt.astimezone(CostLedger._tz(tz_name)).strftime("%Y-%m-%d")
+
+    def spent_today(self, tz_name: str | None = None) -> int:
+        today = self._local_date(
+            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), tz_name
+        )
+        rows = self.conn.execute(
             """
-            SELECT COALESCE(SUM(
-                       COALESCE(actual_cost_usd_cents, reserved_cost_usd_cents)
-                   ), 0) AS spent
+            SELECT COALESCE(actual_cost_usd_cents, reserved_cost_usd_cents) AS cost,
+                   created_at
               FROM generation
-             WHERE date(created_at) = date('now')
+             WHERE cost IS NOT NULL AND cost != 0
             """
-        ).fetchone()
-        return int(row["spent"])
+        ).fetchall()
+        return sum(
+            int(row["cost"])
+            for row in rows
+            if self._local_date(row["created_at"], tz_name) == today
+        )
 
     def reserve(
         self,

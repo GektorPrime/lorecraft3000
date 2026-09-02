@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 
 from app.deps import get_conn, settings
 from app.models import ModelRegistry
@@ -10,6 +10,7 @@ from app.routes.api_v1._common import (
     PANEL_IMMUTABILITY_EXPLANATION,
     REF_IMAGE_WEIGHT_EXPLANATION,
     REF_SET_IMMUTABILITY_EXPLANATION,
+    TIMEZONE_HEADER,
 )
 from app.schemas import Budget, OptionsSummary
 from app.services.costs import CostLedger
@@ -19,10 +20,13 @@ router = APIRouter(prefix="/api/v1", tags=["api-v1-options"])
 
 
 @router.get("/options/summary", response_model=OptionsSummary)
-def options_summary(conn=Depends(get_conn)) -> OptionsSummary:
+def options_summary(
+    conn=Depends(get_conn),
+    timezone_name: str | None = Header(default=None, alias=TIMEZONE_HEADER),
+) -> OptionsSummary:
     registry = ModelRegistry(settings)
     ledger = CostLedger(conn, settings)
-    spent = ledger.spent_today()
+    spent = ledger.spent_today(timezone_name)
     return OptionsSummary(
         models=list(registry.models),
         image_sizes=list(registry.image_sizes),
@@ -40,9 +44,12 @@ def options_summary(conn=Depends(get_conn)) -> OptionsSummary:
 
 
 @router.get("/budget", response_model=Budget)
-def budget(conn=Depends(get_conn)) -> Budget:
+def budget(
+    conn=Depends(get_conn),
+    timezone_name: str | None = Header(default=None, alias=TIMEZONE_HEADER),
+) -> Budget:
     ledger = CostLedger(conn, settings)
-    spent = ledger.spent_today()
+    spent = ledger.spent_today(timezone_name)
     return Budget(
         daily_spend_cap_cents=settings.daily_spend_cap_cents,
         spent_today_cents=spent,

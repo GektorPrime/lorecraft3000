@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -321,3 +322,55 @@ def test_reservation_rejects_a_panel_changed_after_preview(conn, tmp_path):
             request_json={},
             scene_revision=0,
         )
+
+
+def _insert_reserved(conn, scene_id, cost, created_at):
+    conn.execute(
+        """
+        INSERT INTO generation
+            (scene_id, model, params_json, prompt_hash, request_json,
+             cost_usd_cents, reserved_cost_usd_cents, state, price_table_version,
+             scene_revision, created_at)
+        VALUES (?, ?, '{}', ?, '{}', ?, ?, 'succeeded', 'test', 0, ?)
+        """,
+        (scene_id, "gemini-3.1-flash-image", "x" * 64, cost, cost, created_at),
+    )
+    conn.commit()
+
+
+def test_budget_conversion_uses_supplied_timezone(conn, tmp_path):
+    """spent_today(tz_name) converts UTC timestamps to the caller's calendar day,
+    so the user-local daily boundary is correct regardless of the server timezone."""
+    settings = Settings(
+        daily_spend_cap_usd=1.0,
+        db_path=tmp_path / "db.sqlite",
+        store_root=tmp_path / "store",
+    )
+    ledger = CostLedger(conn, settings)
+
+    # Fixed UTC-4 zone (Etc/GMT+4). At 01:00 UTC the local clock reads 21:00 on
+    # the previous calendar day.
+    assert ledger._local_date("2026-09-01 01:00:00", "Etc/GMT+4") == "2026-08-31"
+    assert ledger._local_date("2026-09-01 04:00:00", "Etc/GMT+4") == "2026-09-01"
+    # Without a timezone, the same UTC timestamp maps to its own UTC date.
+    assert ledger._local_date("2026-09-01 01:00:00") == "2026-09-01"
+    # An invalid timezone falls back to UTC rather than raising.
+    assert ledger._local_date("2026-09-01 01:00:00", "Not/AZone") == "2026-09-01"
+
+
+def test_spent_today_defaults_to_utc_not_server_local(conn, tmp_path):
+    """Without a timezone, spent_today() uses the UTC boundary so behaviour is
+    identical no matter the server's system timezone (important when hosted)."""
+    settings = Settings(
+        daily_spend_cap_usd=1.0,
+        db_path=tmp_path / "db.sqlite",
+        store_root=tmp_path / "store",
+    )
+    ledger = CostLedger(conn, settings)
+
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    scene_id = _scene(conn)
+    _insert_reserved(conn, scene_id, 42, now_utc)
+
+    # Counts as today regardless of the host's local timezone.
+    assert ledger.spent_today() == 42

@@ -28,6 +28,14 @@ describe('api client', () => {
     )
   })
 
+  it('sends the browser timezone so budget boundaries use local time', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse([]))
+    await listCharacters()
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0]
+    const headers = new Headers(init?.headers)
+    expect(headers.get('X-Timezone')).toBeTruthy()
+  })
+
   it('returns parsed JSON on success', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(
       jsonResponse({ id: 1, name: 'Elias', avatar_url: null, avatar_initials: 'EL' }),

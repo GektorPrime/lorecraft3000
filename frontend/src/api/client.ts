@@ -29,6 +29,14 @@ import type {
 
 const BASE = '/api/v1'
 
+export function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
+
 export class ApiError extends Error {
   type: string
   status: number
@@ -42,9 +50,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const { headers: initHeaders, ...rest } = init ?? {}
+  const headers = { ...(initHeaders ?? {}) } as Record<string, string>
+  if (!(rest.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json'
+  }
+  headers['X-Timezone'] = browserTimezone()
   const response = await fetch(`${BASE}${path}`, {
-    headers: init?.body instanceof FormData ? undefined : { 'Content-Type': 'application/json' },
-    ...init,
+    headers,
+    ...rest,
   })
   if (response.status === 204) {
     return undefined as T

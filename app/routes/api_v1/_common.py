@@ -14,6 +14,11 @@ from fastapi.responses import Response
 
 from app.deps import settings
 from app.services.avatars import AvatarService
+
+# Browser timezone (IANA name) used to compute the user-local daily budget
+# boundary. Supplied by the React client; absent/invalid values fall back to
+# UTC so the server never depends on its own system timezone.
+TIMEZONE_HEADER = "X-Timezone"
 from app.services.candidates import CandidateError, CandidateNotFoundError
 from app.services.characters import (
     CharacterError,

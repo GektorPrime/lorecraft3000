@@ -88,6 +88,7 @@ class GenerationService:
         model: str | None = None,
         image_size: str | None = None,
         check_budget: bool = True,
+        tz_name: str | None = None,
     ) -> GenerationPreview:
         """Run the exact no-spend preflight used by generate()."""
         selected_model = model or self.settings.default_model
@@ -190,7 +191,11 @@ class GenerationService:
         }
         ledger = CostLedger(self.conn, self.settings)
         estimate = ledger.estimate(selected_model, selected_size)
+        # The hard budget gate is enforced on the UTC boundary (machine
+        # independent). The figure surfaced to the UI uses the caller's browser
+        # timezone so the dashboard matches what the user sees.
         spent = ledger.spent_today()
+        spent_display = ledger.spent_today(tz_name)
         remaining = self.settings.daily_spend_cap_cents - spent - estimate
         if check_budget and remaining < 0:
             from app.services.costs import BudgetExceededError
@@ -210,7 +215,7 @@ class GenerationService:
             attachments=tuple(attachment_capture),
             warnings=assembled.warnings,
             estimated_cost_cents=estimate,
-            spent_today_cents=spent,
+            spent_today_cents=spent_display,
             remaining_after_cents=remaining,
             provider_request=request,
             request_capture=request_capture,

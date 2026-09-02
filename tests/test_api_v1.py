@@ -163,6 +163,51 @@ def test_budget_reflects_spend(api):
     assert body["remaining_today_cents"] == body["daily_spend_cap_cents"]
 
 
+def test_budget_accepts_timezone_header_and_falls_back_to_utc(api):
+    """/budget accepts X-Timezone (case-insensitive) and treats an invalid zone
+    the same as UTC, so the value never depends on the server's own timezone."""
+    from datetime import datetime, timezone
+
+    from app.services.costs import CostLedger
+
+    conn = connect(api.db_path)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        conn.execute(
+            """
+            INSERT INTO generation
+                (scene_id, model, params_json, prompt_hash, request_json,
+                 cost_usd_cents, reserved_cost_usd_cents, state,
+                 price_table_version, scene_revision, created_at)
+            VALUES (NULL, 'gemini-3.1-flash-image', '{}', 'hash', '{}',
+                    33, 33, 'succeeded', 'test', 0, ?)
+            """,
+            (ts,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # No header and an explicit UTC header must agree: the server+UTC boundary.
+    no_header = api.client.get("/api/v1/budget").json()["spent_today_cents"]
+    utc_header = api.client.get(
+        "/api/v1/budget", headers={"X-Timezone": "UTC"}
+    ).json()["spent_today_cents"]
+    assert utc_header == no_header
+
+    # An invalid zone also falls back to UTC (never raises, depends only on UTC).
+    invalid = api.client.get(
+        "/api/v1/budget", headers={"x-timezone": "Not/AZone"}
+    ).json()
+    assert invalid["spent_today_cents"] == no_header
+
+    # The UTC attribution is exactly the documented conversion.
+    expected = (
+        33 if CostLedger._local_date(ts, "UTC") == ts[:10] else 0
+    )
+    assert no_header == expected
+
+
 # ---------------------------------------------------------------------------
 # characters
 # ---------------------------------------------------------------------------

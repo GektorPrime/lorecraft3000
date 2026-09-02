@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, Response
 from app.deps import get_conn, get_provider, get_storage, settings
 from app.providers.base import ImageProvider
 from app.routes.api_v1._common import (
+    TIMEZONE_HEADER,
     _attachment_out,
     _candidate_out,
     _generation_out,
@@ -89,7 +90,12 @@ def duplicate_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_s
 
 
 @router.get("/panels/{panel_id}/preview", response_model=PanelPreview)
-def preview_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
+def preview_panel(
+    panel_id: int,
+    conn=Depends(get_conn),
+    storage=Depends(get_storage),
+    timezone_name: str | None = Header(default=None, alias=TIMEZONE_HEADER),
+):
     scenes = SceneService(conn, settings)
     try:
         scene = scenes.get(panel_id)
@@ -97,7 +103,10 @@ def preview_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_sto
         _raise_for(exc)
     try:
         preview = GenerationService(conn, storage, settings, None).preview(
-            panel_id, model=scene.model, image_size=scene.image_size
+            panel_id,
+            model=scene.model,
+            image_size=scene.image_size,
+            tz_name=timezone_name,
         )
     except (GenerationError, CostError, ImageStorageError) as exc:
         return PanelPreview(
@@ -109,7 +118,7 @@ def preview_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_sto
             attachments=[],
             warnings=[],
             estimated_cost_cents=0,
-            spent_today_cents=CostLedger(conn, settings).spent_today(),
+            spent_today_cents=CostLedger(conn, settings).spent_today(timezone_name),
             remaining_after_cents=0,
             can_generate=False,
             blocked_reason=str(exc),

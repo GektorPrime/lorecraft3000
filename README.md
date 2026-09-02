@@ -27,7 +27,8 @@ cp .env.example .env
 ```
 
 Set `GEMINI_API_KEY` in `.env`. The default daily limit can be changed with
-`LORECRAFT_DAILY_SPEND_CAP_USD`.
+`LORECRAFT_DAILY_SPEND_CAP_USD`. Spend is counted from midnight in the browser's
+local timezone; the database stores timestamps in UTC.
 
 ## Run in development
 
