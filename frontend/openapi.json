@@ -1161,6 +1161,24 @@
     "/api/v1/budget": {
       "get": {
         "operationId": "budget_api_v1_budget_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Timezone"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1171,6 +1189,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Budget",
@@ -1594,6 +1622,24 @@
     "/api/v1/options/summary": {
       "get": {
         "operationId": "options_summary_api_v1_options_summary_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Timezone"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1604,6 +1650,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Options Summary",
@@ -1943,6 +1999,22 @@
             "schema": {
               "title": "Panel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Timezone"
             }
           }
         ],
