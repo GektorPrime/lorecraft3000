@@ -27,6 +27,12 @@ import { PageHeader } from '../../components/PageHeader'
 import { SectionHeader } from '../../components/SectionHeader'
 import { CandidateCarousel } from './CandidateCarousel'
 
+const REVIEW_STATUS_LABEL: Record<string, string> = {
+  pending: 'Waiting',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
+}
+
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
@@ -436,6 +442,12 @@ function PanelPreview({ panelId }: { panelId: number }) {
               <article className="attempt-row" key={attempt.id}>
                 <div className="attempt-row__summary">
                   <span className={`badge badge--attempt-${attempt.state}`}>{attempt.state}</span>
+                  {attempt.candidates[0] && (
+                    <span className={`badge badge--attempt-${attempt.candidates[0].review_status}`}>
+                      {REVIEW_STATUS_LABEL[attempt.candidates[0].review_status]
+                        ?? attempt.candidates[0].review_status}
+                    </span>
+                  )}
                   <strong>Attempt #{attempt.id}</strong>
                   <span className="field__hint">
                     {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}

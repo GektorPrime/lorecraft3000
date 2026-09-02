@@ -10,8 +10,8 @@ interface CandidateCarouselProps {
   onReview: (candidateId: number, verdict: 'accepted' | 'rejected') => void
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'Pending review',
+const REVIEW_STATUS_LABEL: Record<string, string> = {
+  pending: 'Waiting',
   accepted: 'Accepted',
   rejected: 'Rejected',
 }
@@ -53,7 +53,7 @@ export function CandidateCarousel({
       </div>
       <div className="carousel__meta">
         <span className={`badge badge--attempt-${candidate.review_status}`}>
-          {STATUS_LABEL[candidate.review_status] ?? candidate.review_status}
+          {REVIEW_STATUS_LABEL[candidate.review_status] ?? candidate.review_status}
         </span>
         <span className="field__hint">Attempt #{attempt.id}</span>
       </div>
