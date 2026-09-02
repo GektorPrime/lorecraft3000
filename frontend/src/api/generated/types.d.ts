@@ -419,9 +419,33 @@ export interface paths {
         };
         /**
          * Health
-         * @description Health check.
+         * @description Readiness: verify database, migrations, and storage are ready.
+         *
+         *     Returns 200 with a per-check breakdown when the app can serve requests, and
+         *     503 with the failing checks named otherwise. The report is read-only and
+         *     never runs the full storage consistency scan.
          */
         get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Live
+         * @description Liveness: the process is up and answering. No subsystem checks.
+         */
+        get: operations["health_live_health_live_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1776,6 +1800,26 @@ export interface operations {
         };
     };
     health_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    health_live_health_live_get: {
         parameters: {
             query?: never;
             header?: never;

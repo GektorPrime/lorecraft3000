@@ -112,3 +112,26 @@ npm run test --workspace frontend
 
 Uses [Vitest](https://vitest.dev/) with `@testing-library/react` (jsdom
 environment, see `frontend/vite.config.ts` and `frontend/src/test/setup.ts`).
+
+## Operating a running instance
+
+See [docs/OPERATIONS.md](docs/OPERATIONS.md) for the operator runbook: backup
+and restore, recovery after shutdown during generation, migration recovery,
+storage consistency, and the health/readiness endpoints.
+
+Two rules matter most:
+
+- The SQLite database (`data/`) and the image store (`store/`) are one logical
+  unit. Always back up, restore, and move them **together** and from the same
+  moment. Restoring one without the other produces dangling references and is
+  unsupported.
+- Readiness is exposed at `GET /health` (503 until the database, migrations,
+  and storage are all ready); liveness is at `GET /health/live`.
+
+## Health endpoints
+
+- `GET /health/live` — liveness; `200` whenever the process is up.
+- `GET /health` — readiness; verifies database connectivity, that all
+  migrations are applied, and that the image store is writable. Returns `200`
+  with a per-check breakdown when ready, or `503` with the failing checks
+  named. It is read-only and never runs the full consistency scan.
