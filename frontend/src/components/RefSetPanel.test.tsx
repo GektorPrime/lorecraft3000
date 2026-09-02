@@ -77,40 +77,41 @@ describe('RefSetPanel destructive confirmations', () => {
   })
 
   it('does not remove an image when confirmation is cancelled', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     renderPanel()
 
-    await user.click(await screen.findByRole('button', { name: 'Remove' }))
+    const trigger = await screen.findByRole('button', { name: 'Remove' })
+    await user.click(trigger)
+    expect(screen.getByRole('dialog', { name: 'Remove reference image?' })).toHaveTextContent(
+      'permanently removed',
+    )
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    expect(confirm).toHaveBeenCalledOnce()
-    expect(confirm).toHaveBeenCalledWith('Remove this image from the draft?')
     expect(client.removeRefImage).not.toHaveBeenCalled()
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 
   it('removes an image exactly once after confirmation', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     renderPanel()
 
     await user.click(await screen.findByRole('button', { name: 'Remove' }))
+    await user.click(screen.getByRole('button', { name: 'Remove image' }))
 
     await waitFor(() => expect(client.removeRefImage).toHaveBeenCalledOnce())
-    expect(confirm).toHaveBeenCalledOnce()
     expect(client.removeRefImage).toHaveBeenCalledWith(7, 11)
   })
 
   it('does not promote when confirmation is cancelled', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     renderPanel()
 
     await user.click(await screen.findByRole('button', { name: 'Promote to canonical' }))
-
-    expect(confirm).toHaveBeenCalledOnce()
-    expect(confirm).toHaveBeenCalledWith(
-      'Promote this draft to canonical? The draft will become immutable, and the current canonical, if any, will be retired.',
+    expect(screen.getByRole('dialog', { name: 'Promote reference set?' })).toHaveTextContent(
+      'current canonical set',
     )
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
     expect(client.promoteRefSet).not.toHaveBeenCalled()
   })
 
@@ -121,14 +122,13 @@ describe('RefSetPanel destructive confirmations', () => {
         finishPromotion = resolve
       }),
     )
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     renderPanel()
     const button = await screen.findByRole('button', { name: 'Promote to canonical' })
 
     await user.click(button)
+    await user.click(screen.getByRole('button', { name: 'Promote' }))
 
-    expect(confirm).toHaveBeenCalledOnce()
     expect(client.promoteRefSet).toHaveBeenCalledOnce()
     expect(button).toBeDisabled()
     finishPromotion(draft)

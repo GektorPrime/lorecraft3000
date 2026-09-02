@@ -5,6 +5,9 @@ import type { GalleryItem } from '../../api/types'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { DateTime } from '../../components/DateTime'
 import { ImageDialog } from '../../components/ImageDialog'
+import { PageHeader } from '../../components/PageHeader'
+import { EmptyState } from '../../components/EmptyState'
+import { Icon } from '../../components/Icon'
 
 /**
  * Gallery of every accepted generated image across all panels, newest first.
@@ -38,11 +41,17 @@ export function GalleryPage() {
 
   return (
     <section aria-busy={items === null && error === null || undefined}>
-      <h1>Gallery</h1>
-      <p className="field__hint">All accepted generated images, newest first. </p>
+      <PageHeader title="Gallery" description="All accepted generated images, newest first." />
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {!items && !error && <AsyncMessage kind="loading">Loading gallery…</AsyncMessage>}
-      {items && items.length === 0 && <p>No accepted images yet.</p>}
+      {items && items.length === 0 && (
+        <EmptyState
+          icon="gallery"
+          title="No accepted images yet."
+          description="Accept a generated candidate from a panel preview and it will appear here."
+          action={<Link to="/panels">Review panels</Link>}
+        />
+      )}
       {items && items.length > 0 && (
         <div className="gallery-grid">
           {items.map((item, index) => {
@@ -61,14 +70,15 @@ export function GalleryPage() {
                   onOpenChange={(open) => setPreviewIndex(open ? index : null)}
                 />
                 <div className="gallery-card__body">
-                  <p className="text-clamp" style={{ margin: '0 0 0.3rem' }}>{item.beat_text}</p>
-                  <p className="field__hint" style={{ margin: 0 }}>
+                  <p className="gallery-card__summary text-clamp" title={item.beat_text}>{item.beat_text}</p>
+                  <p className="gallery-card__meta">
                     Panel #{item.panel_id} · {item.aspect_ratio} ·{' '}
                     <DateTime value={item.created_at} />
                   </p>
                 </div>
                 <div className="gallery-card__actions">
                   <Link to={`/panels/${item.panel_id}/preview`} className="btn">
+                    <Icon name="chevronRight" size={15} />
                     Open panel
                   </Link>
                 </div>

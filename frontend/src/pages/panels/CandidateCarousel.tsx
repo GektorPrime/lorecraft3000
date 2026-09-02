@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { GenerationSummary } from '../../api/types'
 import { ImageDialog } from '../../components/ImageDialog'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { Icon } from '../../components/Icon'
 
 interface CandidateCarouselProps {
   attempts: GenerationSummary[]
@@ -56,42 +57,48 @@ export function CandidateCarousel({
         </span>
         <span className="field__hint">Attempt #{attempt.id}</span>
       </div>
-      <div className="btn-row carousel__controls">
-        <button
-          type="button"
-          className="btn"
-          disabled={count <= 1}
-          onClick={showPrevious}
-          aria-label="Previous attempt"
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={count <= 1}
-          onClick={showNext}
-          aria-label="Next attempt"
-        >
-          Next
-        </button>
-        <span className="carousel__spacer" />
-        <button
-          type="button"
-          className="btn"
-          disabled={isReviewing}
-          onClick={() => onReview(candidate.id, 'accepted')}
-        >
-          Accept
-        </button>
-        <button
-          type="button"
-          className="btn btn--danger"
-          disabled={isReviewing}
-          onClick={() => onReview(candidate.id, 'rejected')}
-        >
-          Reject
-        </button>
+      <div className="action-bar carousel__controls">
+        <div className="action-bar__group action-bar__group--start">
+          <button
+            type="button"
+            className="btn"
+            disabled={count <= 1}
+            onClick={showPrevious}
+            aria-label="Previous attempt"
+          >
+            <Icon name="chevronLeft" size={16} />
+            Previous
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={count <= 1}
+            onClick={showNext}
+            aria-label="Next attempt"
+          >
+            Next
+            <Icon name="chevronRight" size={16} />
+          </button>
+        </div>
+        <div className="action-bar__group action-bar__group--end">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={isReviewing}
+            onClick={() => onReview(candidate.id, 'accepted')}
+          >
+            <Icon name="check" size={16} />
+            Accept
+          </button>
+          <button
+            type="button"
+            className="btn btn--danger"
+            disabled={isReviewing}
+            onClick={() => onReview(candidate.id, 'rejected')}
+          >
+            Reject
+          </button>
+        </div>
       </div>
       {reviewingThis && <AsyncMessage kind="loading">Reviewing image…</AsyncMessage>}
     </div>

@@ -13,6 +13,10 @@ import { useOptions } from '../../api/useOptions'
 import type { CastMemberInput, Character, PanelInput, Style } from '../../api/types'
 import { CastSelector } from '../../components/CastSelector'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { EmptyState } from '../../components/EmptyState'
+import { Notice } from '../../components/Notice'
+import { PageHeader } from '../../components/PageHeader'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges'
 import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
@@ -79,7 +83,9 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   const [locked, setLocked] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [baseline, setBaseline] = useState<string | null>(null)
-  const allowNavigation = useUnsavedChanges(baseline !== null && snapshot(values) !== baseline)
+  const { allowNavigation, confirmationProps } = useUnsavedChanges(
+    baseline !== null && snapshot(values) !== baseline,
+  )
   const mounted = useRef(true)
   const mutationRequest = useRef(0)
 
@@ -217,8 +223,8 @@ function PanelForm({ panelId }: { panelId: number | null }) {
 
   if (prerequisiteState !== 'ready' || currentPanelState !== 'ready') {
     return (
-      <section>
-        <h1>{heading}</h1>
+      <section className="form-page form-page--wide">
+        <PageHeader title={heading} description="Scene direction, framing, output settings and cast." />
         {prerequisiteState === 'loading' && (
           <AsyncMessage kind="loading" aria-busy="true">Loading panel prerequisites...</AsyncMessage>
         )}
@@ -267,38 +273,46 @@ function PanelForm({ panelId }: { panelId: number | null }) {
 
   if (locked) {
     return (
-      <section>
-        <h1>Panel locked</h1>
-        <p className="banner banner--info">{options.panel_immutability_explanation}</p>
-        {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
-        {duplicating && <AsyncMessage kind="loading">Duplicating panel…</AsyncMessage>}
-        <button type="button" className="btn btn--primary" disabled={duplicating} aria-busy={duplicating} onClick={() => void handleDuplicate()}>
-          Duplicate &amp; edit
-        </button>
+      <section className="form-page">
+        <PageHeader title="Panel locked" />
+        <div className="content-stack">
+          <Notice>{options.panel_immutability_explanation}</Notice>
+          {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
+          {duplicating && <AsyncMessage kind="loading">Duplicating panel…</AsyncMessage>}
+          <div>
+            <button type="button" className="btn btn--primary" disabled={duplicating} aria-busy={duplicating} onClick={() => void handleDuplicate()}>
+              Duplicate &amp; edit
+            </button>
+          </div>
+        </div>
       </section>
     )
   }
 
   if (styles.length === 0) {
     return (
-      <section>
-        <h1>{heading}</h1>
-        <p>A style is required before you can stage a panel.</p>
-        <Link to="/styles/new" className="btn btn--primary">
-          Create a style
-        </Link>
+      <section className="form-page">
+        <PageHeader title={heading} />
+        <EmptyState
+          icon="styles"
+          title="A style is required"
+          description="Define a visual contract before staging a panel."
+          action={<Link to="/styles/new" className="btn btn--primary">Create a style</Link>}
+        />
       </section>
     )
   }
 
   if (characters.length === 0) {
     return (
-      <section>
-        <h1>{heading}</h1>
-        <p>A character is required before you can stage a panel.</p>
-        <Link to="/characters/new" className="btn btn--primary">
-          Create a character
-        </Link>
+      <section className="form-page">
+        <PageHeader title={heading} />
+        <EmptyState
+          icon="characters"
+          title="A character is required"
+          description="Add a character before staging a panel."
+          action={<Link to="/characters/new" className="btn btn--primary">Create a character</Link>}
+        />
       </section>
     )
   }
@@ -308,12 +322,14 @@ function PanelForm({ panelId }: { panelId: number | null }) {
     (panelId === null || values.cast.length === 0)
   ) {
     return (
-      <section>
-        <h1>{heading}</h1>
-        <p>A character needs a canonical reference set before you can stage a panel.</p>
-        <Link to="/characters" className="btn btn--primary">
-          Manage characters
-        </Link>
+      <section className="form-page">
+        <PageHeader title={heading} />
+        <EmptyState
+          icon="gallery"
+          title="A canonical reference set is required"
+          description="A character needs a canonical reference set before you can stage a panel."
+          action={<Link to="/characters" className="btn btn--primary">Manage characters</Link>}
+        />
       </section>
     )
   }
@@ -321,15 +337,18 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   const setCast = (cast: CastMemberInput[]) => setValues((v) => ({ ...v, cast }))
 
   return (
-    <section>
-      <h1>{heading}</h1>
+    <section className="form-page form-page--wide">
+      <PageHeader title={heading} description="Scene direction, framing, output settings and cast." />
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {submitting && <AsyncMessage kind="loading">Saving panel…</AsyncMessage>}
-      <form onSubmit={handleSubmit} aria-busy={submitting}>
+      <form className="form-card" onSubmit={handleSubmit} aria-busy={submitting}>
+        <fieldset className="form-section">
+          <legend>Scene</legend>
         <div className="field">
           <label htmlFor="beat_text">Action</label>
           <textarea
             id="beat_text"
+            className="field__textarea--standard"
             required
             aria-describedby="beat_text-hint"
             value={values.beat_text}
@@ -340,8 +359,9 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             draws his sword as Mara backs toward the door."
           </span>
         </div>
+        </fieldset>
 
-        <fieldset style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '0.75rem 1rem' }}>
+        <fieldset className="form-section">
           <legend>Framing</legend>
           <div className="field">
             <label htmlFor="camera">Camera</label>
@@ -377,6 +397,9 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           </div>
         </fieldset>
 
+        <fieldset className="form-section">
+          <legend>Style and output</legend>
+          <div className="form-grid">
         <div className="field">
           <label htmlFor="mood">Mood</label>
           <input
@@ -472,6 +495,11 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           </span>
         </div>
 
+          </div>
+        </fieldset>
+
+        <fieldset className="form-section">
+          <legend>Cast</legend>
         <div className="field">
           <label id="cast-label">Cast</label>
           <CastSelector
@@ -481,8 +509,9 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             labelledBy="cast-label"
           />
         </div>
+        </fieldset>
 
-        <div className="btn-row">
+        <div className="form-actions">
           <button type="submit" className="btn btn--primary" disabled={submitting}>
             Save and preview
           </button>
@@ -498,6 +527,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           </button>
         </div>
       </form>
+      <ConfirmDialog {...confirmationProps} />
     </section>
   )
 }

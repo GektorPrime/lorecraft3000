@@ -5,6 +5,10 @@ import type { Character, RefSetSummary } from '../../api/types'
 import { Avatar } from '../../components/Avatar'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { RefSetPanel } from '../../components/RefSetPanel'
+import { EmptyState } from '../../components/EmptyState'
+import { Icon } from '../../components/Icon'
+import { PageHeader } from '../../components/PageHeader'
+import { SectionHeader } from '../../components/SectionHeader'
 import { NotFoundPage } from '../NotFoundPage'
 import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
@@ -139,49 +143,64 @@ function CharacterDetail({ characterId }: { characterId: number }) {
   if (!character) return <AsyncMessage kind="loading">Loading character…</AsyncMessage>
 
   return (
-    <section aria-busy={creatingDraft || undefined}>
-      <div className="btn-row" style={{ marginTop: 0, alignItems: 'center' }}>
-        <Avatar url={character.avatar_url} initials={character.avatar_initials} name={character.name} size={72} />
-        <div>
-          <h1 style={{ margin: 0 }}>{character.name}</h1>
-          <p className="field__hint" style={{ margin: 0 }}>
-            {character.slug}
-          </p>
-        </div>
-        <Link
-          to={`/characters/${character.id}/edit`}
-          className="btn btn--primary"
-          style={{ marginLeft: 'auto' }}
-        >
-          Edit
-        </Link>
-      </div>
+    <section className="character-detail" aria-busy={creatingDraft || undefined}>
+      <PageHeader
+        media={(
+          <Avatar
+            url={character.avatar_url}
+            initials={character.avatar_initials}
+            name={character.name}
+            size={72}
+          />
+        )}
+        title={character.name}
+        description={character.slug}
+        actions={(
+          <Link to={`/characters/${character.id}/edit`} className="btn btn--primary">
+            <Icon name="edit" size={16} />
+            Edit
+          </Link>
+        )}
+      />
 
-      {character.visual_contract && (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <h3>Visual contract</h3>
-          <p>{character.visual_contract}</p>
-        </div>
-      )}
-      {character.negative_traits && (
-        <div className="card" style={{ marginTop: '0.75rem' }}>
-          <h3>Negative traits</h3>
-          <p>{character.negative_traits}</p>
-        </div>
-      )}
-      {character.lore_md && (
-        <div className="card" style={{ marginTop: '0.75rem' }}>
-          <h3>Lore (local only)</h3>
-          <p>{character.lore_md}</p>
+      {(character.visual_contract || character.negative_traits || character.lore_md) && (
+        <div className="character-detail__cards">
+          {character.visual_contract && (
+            <section className="card character-detail__card">
+              <h2>Visual contract</h2>
+              <p>{character.visual_contract}</p>
+            </section>
+          )}
+          {character.negative_traits && (
+            <section className="card character-detail__card">
+              <h2>Negative traits</h2>
+              <p>{character.negative_traits}</p>
+            </section>
+          )}
+          {character.lore_md && (
+            <section className="card character-detail__card">
+              <h2>Lore (local only)</h2>
+              <p>{character.lore_md}</p>
+            </section>
+          )}
         </div>
       )}
 
-      <div className="btn-row" style={{ justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0 }}>Reference-set versions</h2>
-        <button type="button" className="btn btn--primary" disabled={creatingDraft} onClick={() => void handleNewDraft()}>
-          {creatingDraft ? 'Creating draft…' : 'New draft'}
-        </button>
-      </div>
+      <SectionHeader
+        title="Reference-set versions"
+        description="Canonical identity and immutable version history."
+        actions={(
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={creatingDraft}
+            onClick={() => void handleNewDraft()}
+          >
+            <Icon name="plus" size={16} />
+            {creatingDraft ? 'Creating draft…' : 'New draft'}
+          </button>
+        )}
+      />
 
       {characterError && <AsyncMessage kind="error">Could not refresh character: {characterError}</AsyncMessage>}
       {actionMessage && <AsyncMessage kind={actionMessage.kind}>{actionMessage.text}</AsyncMessage>}
@@ -193,15 +212,26 @@ function CharacterDetail({ characterId }: { characterId: number }) {
         </div>
       )}
       {!refSets && !refSetsError && <AsyncMessage kind="loading">Loading reference sets…</AsyncMessage>}
-      {refSets?.length === 0 && <p className="field__hint">No reference sets yet.</p>}
-      {refSets?.map((summary) => {
-        const isOpen = openIds.has(summary.id)
-        return (
-          <div key={summary.id}>
+      {refSets?.length === 0 && (
+        <EmptyState
+          icon="gallery"
+          title="No reference sets yet."
+          description="Create a draft and upload identity references for this character."
+          compact
+        />
+      )}
+      {refSets && refSets.length > 0 && (
+        <div className="ref-set-list">
+          {refSets.map((summary) => {
+            const isOpen = openIds.has(summary.id)
+            return (
+              <div className="ref-set-item" key={summary.id}>
             <div className="refset-row">
               <div className="refset-row__meta">
                 <span>v{summary.version}</span>
-                <span className={`badge badge--${summary.status}`}>{summary.status}</span>
+                <span className={`badge badge--${summary.status}`}>
+                  {summary.status.charAt(0).toUpperCase() + summary.status.slice(1)}
+                </span>
                 <span className="field__hint">
                   {summary.image_count} image{summary.image_count === 1 ? '' : 's'}
                 </span>
@@ -223,9 +253,11 @@ function CharacterDetail({ characterId }: { characterId: number }) {
               </button>
             </div>
             {isOpen && <RefSetPanel refSetId={summary.id} onChanged={handleRefSetChanged} />}
-          </div>
-        )
-      })}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }

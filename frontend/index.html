@@ -4,7 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>LoreCraft3000</title>
+    <script>
+      // Applies a pinned theme before first paint, so pinning light on a dark
+      // OS (or vice versa) does not flash the wrong palette. A `system`
+      // preference is stored as *no* attribute and is handled entirely by the
+      // prefers-color-scheme block in src/styles/tokens.css.
+      //
+      // Mirrors readStoredPreference() + applyPreferenceToDocument() in
+      // src/theme/theme.ts — keep the storage key in sync with THEME_STORAGE_KEY.
+      try {
+        var stored = localStorage.getItem('lorecraft-theme')
+        if (stored === 'light' || stored === 'dark') {
+          document.documentElement.setAttribute('data-theme', stored)
+        }
+      } catch (error) {
+        // Storage unavailable; fall back to the OS preference.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Icon } from './Icon'
 import { ImageWithFallback } from './ImageWithFallback'
 
 interface ImageDialogProps {
@@ -94,7 +95,8 @@ export function ImageDialog({
             aria-label="Close preview"
             onClick={() => setOpen(false)}
           >
-            &times;
+            {/* Decorative: the button already carries the accessible name. */}
+            <Icon name="close" size={20} />
           </button>
           <ImageWithFallback className="image-dialog__image" src={previewSrc} alt={previewAlt} />
         </div>

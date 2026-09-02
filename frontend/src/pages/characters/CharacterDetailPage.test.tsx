@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -121,7 +121,12 @@ describe('CharacterDetailPage routing', () => {
     vi.mocked(client.createRefSetDraft).mockRejectedValue(new Error('offline'))
     renderPage('/characters/1')
 
-    await user.click(await screen.findByRole('button', { name: 'New draft' }))
+    const versions = await screen.findByRole('heading', { name: 'Reference-set versions' })
+    const sectionHeader = versions.closest('.section-header')
+    expect(sectionHeader).not.toBeNull()
+    const newDraft = within(sectionHeader as HTMLElement).getByRole('button', { name: 'New draft' })
+
+    await user.click(newDraft)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not create reference-set draft: Error: offline',

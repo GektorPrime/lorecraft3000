@@ -12,6 +12,11 @@ import { useOptions } from '../api/useOptions'
 import type { RefSet } from '../api/types'
 import { RefImageCard } from './RefImageCard'
 import { AsyncMessage } from './AsyncMessage'
+import { EmptyState } from './EmptyState'
+import { Icon } from './Icon'
+import { Notice } from './Notice'
+import { SectionHeader } from './SectionHeader'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface RefSetPanelProps {
   refSetId: number
@@ -23,6 +28,8 @@ const STATUS_LABEL: Record<RefSet['status'], string> = {
   canonical: 'Canonical',
   retired: 'Retired',
 }
+
+type PendingConfirmation = { kind: 'promote' } | { kind: 'remove'; imageId: number }
 
 /** Manages one reference-set version: images, promotion, and copy (issue #15). */
 export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
@@ -36,6 +43,7 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
   const [role, setRole] = useState(options.ref_image_roles[0] ?? 'face_front')
   const [file, setFile] = useState<File | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [confirmation, setConfirmation] = useState<PendingConfirmation | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mounted = useRef(true)
   const requestVersion = useRef(0)
@@ -136,34 +144,52 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
   }
 
   const handlePromote = () => {
-    if (
-      !window.confirm(
-        'Promote this draft to canonical? The draft will become immutable, and the current canonical, if any, will be retired.',
-      )
-    ) {
-      return
-    }
-    void runAction('promote reference set', 'Reference set promoted to canonical.', () => promoteRefSet(refSetId))
+    setConfirmation({ kind: 'promote' })
   }
 
   const handleRemove = (imageId: number) => {
-    if (!window.confirm('Remove this image from the draft?')) return
-    void runAction('remove reference image', 'Reference image removed.', () => removeRefImage(refSetId, imageId))
+    setConfirmation({ kind: 'remove', imageId })
+  }
+
+  const confirmPendingAction = () => {
+    const pending = confirmation
+    setConfirmation(null)
+    if (!pending) return
+    if (pending.kind === 'promote') {
+      void runAction(
+        'promote reference set',
+        'Reference set promoted to canonical.',
+        () => promoteRefSet(refSetId),
+      )
+    } else {
+      void runAction(
+        'remove reference image',
+        'Reference image removed.',
+        () => removeRefImage(refSetId, pending.imageId),
+      )
+    }
   }
 
   return (
-    <div className="card" style={{ marginTop: '0.75rem' }} aria-busy={busyAction !== null || undefined}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0 }}>
-          v{refSet.version} <span className={`badge badge--${refSet.status}`}>{STATUS_LABEL[refSet.status]}</span>
-        </h3>
-        <div className="btn-row" style={{ marginTop: 0 }}>
+    <div className="card ref-set-panel" aria-busy={busyAction !== null || undefined}>
+      <SectionHeader
+        className="ref-set-panel__header"
+        level={3}
+        title={(
+          <>
+            v{refSet.version}{' '}
+            <span className={`badge badge--${refSet.status}`}>{STATUS_LABEL[refSet.status]}</span>
+          </>
+        )}
+        actions={(
+          <>
           <button
             type="button"
             className="btn"
             disabled={busyAction !== null}
             onClick={() => void runAction('copy reference set', 'Reference set copied to a new draft.', () => copyRefSet(refSetId))}
           >
+            <Icon name="copy" size={16} />
             Copy to new draft
           </button>
           {isDraft && (
@@ -173,14 +199,16 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
               disabled={busyAction !== null || refSet.images.length === 0}
               onClick={handlePromote}
             >
+              <Icon name="check" size={16} />
               Promote to canonical
             </button>
           )}
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {!isDraft && (
-        <p className="field__hint">{options.ref_set_immutability_explanation}</p>
+        <Notice>{options.ref_set_immutability_explanation}</Notice>
       )}
 
       {busyAction && <AsyncMessage kind="loading">Working: {busyAction}…</AsyncMessage>}
@@ -188,7 +216,12 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
       {actionMessage && <AsyncMessage kind={actionMessage.kind}>{actionMessage.text}</AsyncMessage>}
 
       {refSet.images.length === 0 ? (
-        <p className="field__hint">No images yet.</p>
+        <EmptyState
+          icon="gallery"
+          title="No images yet."
+          description="Upload identity references before promoting this draft."
+          compact
+        />
       ) : (
         <div className="ref-image-grid">
           {refSet.images.map((image) => (
@@ -209,32 +242,53 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
       )}
 
       {isDraft && (
-        <form onSubmit={handleUpload} className="btn-row" style={{ alignItems: 'center' }}>
-          <select
-            value={role}
-            disabled={busyAction !== null}
-            onChange={(e) => setRole(e.target.value)}
-            aria-label="New image role"
-          >
-            {options.ref_image_roles.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-          <input
-            type="file"
-            ref={fileInputRef}
-            disabled={busyAction !== null}
-            accept="image/png,image/jpeg,image/webp"
-            aria-label="Reference image file"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
+        <form onSubmit={handleUpload} className="inline-form ref-set-panel__upload">
+          <div className="inline-form__field">
+            <label htmlFor={`new-image-role-${refSetId}`}>Role</label>
+            <select
+              id={`new-image-role-${refSetId}`}
+              value={role}
+              disabled={busyAction !== null}
+              onChange={(e) => setRole(e.target.value)}
+              aria-label="New image role"
+            >
+              {options.ref_image_roles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="inline-form__field inline-form__field--file">
+            <label htmlFor={`reference-image-file-${refSetId}`}>Reference image</label>
+            <input
+              id={`reference-image-file-${refSetId}`}
+              type="file"
+              ref={fileInputRef}
+              disabled={busyAction !== null}
+              accept="image/png,image/jpeg,image/webp"
+              aria-label="Reference image file"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
           <button type="submit" className="btn" disabled={busyAction !== null || !file}>
+            <Icon name="plus" size={16} />
             Upload
           </button>
         </form>
       )}
+      <ConfirmDialog
+        open={confirmation !== null}
+        title={confirmation?.kind === 'promote' ? 'Promote reference set?' : 'Remove reference image?'}
+        description={
+          confirmation?.kind === 'promote'
+            ? 'This draft will become immutable. The current canonical set, if any, will be retired.'
+            : 'The image will be permanently removed from this draft.'
+        }
+        confirmLabel={confirmation?.kind === 'promote' ? 'Promote' : 'Remove image'}
+        onConfirm={confirmPendingAction}
+        onCancel={() => setConfirmation(null)}
+      />
     </div>
   )
 }

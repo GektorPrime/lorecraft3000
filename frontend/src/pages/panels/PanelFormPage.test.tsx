@@ -125,6 +125,10 @@ describe('PanelFormPage — field descriptions', () => {
     renderForm()
     await screen.findByLabelText('Action')
 
+    const form = document.querySelector('form')
+    expect(form).toHaveClass('form-card')
+    expect(form?.closest('section')).toHaveClass('form-page', 'form-page--wide')
+
     const cameraHint = document.getElementById('camera-hint')
     const framingHint = document.getElementById('framing-hint')
     expect(cameraHint).toHaveTextContent(/viewer's position and angle/i)
@@ -328,7 +332,6 @@ describe('PanelFormPage — field descriptions', () => {
   })
 
   it('captures prerequisite defaults as a clean create baseline and Cancels to panels', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const router = renderForm()
 
@@ -336,11 +339,10 @@ describe('PanelFormPage — field descriptions', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(router.state.location.pathname).toBe('/panels')
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('captures edit hydration as clean and Cancels to preview', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const router = renderForm('/panels/12/edit')
 
@@ -348,24 +350,23 @@ describe('PanelFormPage — field descriptions', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(router.state.location.pathname).toBe('/panels/12/preview')
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('protects material panel edits when Cancel is declined', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const router = renderForm()
     const action = await screen.findByLabelText('Action')
 
     await user.type(action, 'Elias enters')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
 
     expect(router.state.location.pathname).toBe('/panels/new')
     expect(action).toHaveValue('Elias enters')
   })
 
   it('keeps a failed save dirty and bypasses protection after a successful save', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     vi.mocked(client.createPanel)
       .mockRejectedValueOnce(new Error('save failed'))
@@ -382,12 +383,11 @@ describe('PanelFormPage — field descriptions', () => {
     await user.click(screen.getByRole('button', { name: 'Save and preview' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('save failed')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.pathname).toBe('/panels/new')
-    expect(confirm).toHaveBeenCalledTimes(1)
 
     await user.click(screen.getByRole('button', { name: 'Save and preview' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/panels/20/preview'))
-    expect(confirm).toHaveBeenCalledTimes(1)
   })
 
   it('lets duplication finish without navigating after the locked page is left', async () => {

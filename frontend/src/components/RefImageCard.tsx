@@ -1,5 +1,6 @@
 import type { RefImage } from '../api/types'
 import { ImageDialog } from './ImageDialog'
+import { Icon } from './Icon'
 
 interface RefImageCardProps {
   image: RefImage
@@ -38,7 +39,7 @@ export function RefImageCard({
         dialogLabel={`${image.role} reference, larger preview`}
       />
       <div className="ref-image-card__body">
-        <div className="field" style={{ marginBottom: '0.4rem' }}>
+        <div className="field ref-image-card__field">
           <label htmlFor={`role-${image.id}`}>Role</label>
           {editable ? (
             <select
@@ -57,18 +58,21 @@ export function RefImageCard({
             <strong>{image.role}</strong>
           )}
         </div>
-        <p className="field__hint" title={weightExplanation}>
+        <p className="ref-image-card__meta" title={weightExplanation}>
           Weight: {image.weight.toFixed(2)} (fixed)
         </p>
         {editable && (
-          <button
-            type="button"
-            className="btn btn--danger"
-            disabled={disabled}
-            onClick={() => onRemove?.(image.id)}
-          >
-            Remove
-          </button>
+          <div className="ref-image-card__actions">
+            <button
+              type="button"
+              className="btn btn--danger"
+              disabled={disabled}
+              onClick={() => onRemove?.(image.id)}
+            >
+              <Icon name="trash" size={15} />
+              Remove
+            </button>
+          </div>
         )}
       </div>
     </div>

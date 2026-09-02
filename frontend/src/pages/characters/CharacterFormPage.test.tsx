@@ -85,23 +85,25 @@ describe('CharacterFormPage edit routing', () => {
   })
 
   it('treats create defaults and hydrated edit data as clean with the planned destinations', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const createRouter = renderPage('/characters/new')
 
+    const createForm = document.querySelector('form')
+    expect(createForm).toHaveClass('form-card')
+    expect(createForm?.closest('section')).toHaveClass('form-page')
+
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(createRouter.state.location.pathname).toBe('/characters')
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     const editRouter = renderPage('/characters/4/edit')
     await screen.findByDisplayValue('Mara')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(editRouter.state.location.pathname).toBe('/characters/4')
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('preserves dirty values when Cancel is declined and leaves after confirmation', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     const user = userEvent.setup()
     const router = renderPage('/characters/new')
     const name = screen.getByLabelText('Name')
@@ -109,16 +111,17 @@ describe('CharacterFormPage edit routing', () => {
     await user.type(name, 'Elias')
     const cancel = screen.getByRole('button', { name: 'Cancel' })
     await user.click(cancel)
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.pathname).toBe('/characters/new')
     expect(name).toHaveValue('Elias')
-    expect(cancel).toHaveFocus()
+    await waitFor(() => expect(cancel).toHaveFocus())
 
     await user.click(cancel)
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/characters'))
   })
 
   it('keeps failed submissions dirty and bypasses protection only after a successful save', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     vi.mocked(client.createCharacter)
       .mockRejectedValueOnce(new Error('save failed'))
@@ -134,12 +137,11 @@ describe('CharacterFormPage edit routing', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('Elias')
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.pathname).toBe('/characters/new')
-    expect(confirm).toHaveBeenCalledTimes(1)
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/characters/9'))
-    expect(confirm).toHaveBeenCalledTimes(1)
   })
 
   it('shows a retryable style-list failure without discarding form values', async () => {
@@ -165,7 +167,6 @@ describe('CharacterFormPage edit routing', () => {
         resolveSave = resolve
       }),
     )
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     const router = renderPage('/characters/new')
 
@@ -173,6 +174,7 @@ describe('CharacterFormPage edit routing', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(document.querySelector('form')).toHaveAttribute('aria-busy', 'true')
     await router.navigate('/characters')
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/characters'))
 
     await act(async () => resolveSave({ ...CHARACTER, id: 9 }))

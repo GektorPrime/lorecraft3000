@@ -64,10 +64,18 @@ describe('BudgetProvider', () => {
     })
     renderHeader()
     expect(screen.getByText('Budget: $0.07 / $3.00')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'Daily spend against cap' })).toHaveAttribute(
+      'aria-valuenow',
+      '7',
+    )
 
     await user.click(screen.getByRole('button', { name: 'Refresh budget' }))
 
     await screen.findByText('Budget: $0.27 / $3.00')
+    expect(screen.getByRole('progressbar', { name: 'Daily spend against cap' })).toHaveAttribute(
+      'aria-valuenow',
+      '27',
+    )
   })
 
   it('refreshes when the window regains focus', async () => {

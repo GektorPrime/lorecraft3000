@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ApiError, createStyle, getStyle, updateStyle } from '../../api/client'
 import type { StyleInput } from '../../api/types'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { PageHeader } from '../../components/PageHeader'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges'
 import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
@@ -33,7 +35,9 @@ function StyleForm({ styleId }: { styleId: number | null }) {
   const [baseline, setBaseline] = useState<string | null>(
     styleId === null ? snapshot(EMPTY) : null,
   )
-  const allowNavigation = useUnsavedChanges(baseline !== null && snapshot(values) !== baseline)
+  const { allowNavigation, confirmationProps } = useUnsavedChanges(
+    baseline !== null && snapshot(values) !== baseline,
+  )
   const mounted = useRef(true)
   const submitRequest = useRef(0)
 
@@ -107,11 +111,16 @@ function StyleForm({ styleId }: { styleId: number | null }) {
   }
 
   return (
-    <section>
-      <h1>{styleId === null ? 'New style' : 'Edit style'}</h1>
+    <section className="form-page">
+      <PageHeader
+        title={styleId === null ? 'New style' : 'Edit style'}
+        description="A reusable visual contract applied verbatim during generation."
+      />
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {submitting && <AsyncMessage kind="loading">Saving style…</AsyncMessage>}
-      <form onSubmit={handleSubmit} aria-busy={submitting}>
+      <form className="form-card" onSubmit={handleSubmit} aria-busy={submitting}>
+        <fieldset className="form-section">
+          <legend>Style details</legend>
         <div className="field">
           <label htmlFor="name">Name</label>
           <input
@@ -137,7 +146,8 @@ function StyleForm({ styleId }: { styleId: number | null }) {
             painting. Rich chiaroscuro lighting; visible brushwork."
           </span>
         </div>
-        <div className="btn-row">
+        </fieldset>
+        <div className="form-actions">
           <button type="submit" className="btn btn--primary" disabled={submitting}>
             Save
           </button>
@@ -151,6 +161,7 @@ function StyleForm({ styleId }: { styleId: number | null }) {
           </button>
         </div>
       </form>
+      <ConfirmDialog {...confirmationProps} />
     </section>
   )
 }

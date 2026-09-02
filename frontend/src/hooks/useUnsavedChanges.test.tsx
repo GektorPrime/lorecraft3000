@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Link, RouterProvider, createMemoryRouter, useNavigate } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { useUnsavedChanges } from './useUnsavedChanges'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 function TestForm() {
   const [value, setValue] = useState('')
   const navigate = useNavigate()
-  const allowNavigation = useUnsavedChanges(value !== '')
+  const { allowNavigation, confirmationProps } = useUnsavedChanges(value !== '')
 
   return (
     <>
@@ -24,6 +25,7 @@ function TestForm() {
       >
         Save
       </button>
+      <ConfirmDialog {...confirmationProps} />
     </>
   )
 }
@@ -42,21 +44,17 @@ function renderForm(initialEntries = ['/form'], initialIndex = initialEntries.le
 }
 
 describe('useUnsavedChanges', () => {
-  afterEach(() => vi.restoreAllMocks())
-
   it('allows clean navigation without confirmation', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const router = renderForm()
 
     await user.click(screen.getByRole('link', { name: 'Other page' }))
 
     expect(router.state.location.pathname).toBe('/other')
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('resets declined navigation and proceeds after confirmation', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     const user = userEvent.setup()
     const router = renderForm()
     const input = screen.getByLabelText('Value')
@@ -65,24 +63,25 @@ describe('useUnsavedChanges', () => {
     const link = screen.getByRole('link', { name: 'Other page' })
     await user.click(link)
 
+    expect(await screen.findByRole('dialog', { name: 'Discard unsaved changes?' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.pathname).toBe('/form')
     expect(input).toHaveValue('draft')
-    expect(link).toHaveFocus()
+    await waitFor(() => expect(link).toHaveFocus())
 
     await user.click(link)
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/other'))
-    expect(confirm).toHaveBeenCalledTimes(2)
   })
 
   it('blocks and resets POP navigation when changes are declined', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const router = renderForm(['/previous', '/form'])
 
     await user.type(screen.getByLabelText('Value'), 'draft')
     await router.navigate(-1)
 
-    await waitFor(() => expect(window.confirm).toHaveBeenCalled())
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.pathname).toBe('/form')
     expect(screen.getByLabelText('Value')).toHaveValue('draft')
   })
@@ -107,7 +106,6 @@ describe('useUnsavedChanges', () => {
   })
 
   it('bypasses both protections after a successful save', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const router = renderForm()
 
@@ -115,6 +113,6 @@ describe('useUnsavedChanges', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(router.state.location.pathname).toBe('/other')
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

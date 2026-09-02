@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useBlocker } from 'react-router-dom'
+import type { ConfirmDialogProps } from '../components/ConfirmDialog'
 
-const DISCARD_MESSAGE = 'Discard your unsaved changes?'
+const DISCARD_TITLE = 'Discard unsaved changes?'
+const DISCARD_DESCRIPTION = 'Your changes have not been saved. This action cannot be undone.'
 
 export function useUnsavedChanges(isDirty: boolean) {
   const bypassRef = useRef(false)
@@ -12,12 +14,6 @@ export function useUnsavedChanges(isDirty: boolean) {
       [isDirty],
     ),
   )
-
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return
-    if (window.confirm(DISCARD_MESSAGE)) blocker.proceed()
-    else blocker.reset()
-  }, [blocker])
 
   useEffect(() => {
     if (!isDirty) return
@@ -31,7 +27,23 @@ export function useUnsavedChanges(isDirty: boolean) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [isDirty])
 
-  return useCallback(() => {
+  const allowNavigation = useCallback(() => {
     bypassRef.current = true
   }, [])
+
+  const confirmationProps: ConfirmDialogProps = {
+    open: blocker.state === 'blocked',
+    title: DISCARD_TITLE,
+    description: DISCARD_DESCRIPTION,
+    confirmLabel: 'Discard changes',
+    cancelLabel: 'Keep editing',
+    onConfirm: () => {
+      if (blocker.state === 'blocked') blocker.proceed()
+    },
+    onCancel: () => {
+      if (blocker.state === 'blocked') blocker.reset()
+    },
+  }
+
+  return { allowNavigation, confirmationProps }
 }

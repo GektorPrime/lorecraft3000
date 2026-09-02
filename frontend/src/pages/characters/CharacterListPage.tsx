@@ -4,6 +4,9 @@ import { ApiError, listCharacters } from '../../api/client'
 import type { Character } from '../../api/types'
 import { Avatar } from '../../components/Avatar'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { EmptyState } from '../../components/EmptyState'
+import { Icon } from '../../components/Icon'
+import { PageHeader } from '../../components/PageHeader'
 
 export function CharacterListPage() {
   const [characters, setCharacters] = useState<Character[] | null>(null)
@@ -17,31 +20,52 @@ export function CharacterListPage() {
 
   return (
     <section>
-      <div className="btn-row list-page-header">
-        <h1>Characters</h1>
-        <Link to="/characters/new" className="btn btn--primary">
-          New character
-        </Link>
-      </div>
+      <PageHeader
+        title="Characters"
+        actions={(
+          <Link to="/characters/new" className="btn btn--primary">
+            <Icon name="plus" size={16} />
+            New character
+          </Link>
+        )}
+      />
       {error && <AsyncMessage kind="error">Could not load characters: {error}</AsyncMessage>}
       {!characters && !error && <AsyncMessage kind="loading">Loading characters…</AsyncMessage>}
-      {characters && characters.length === 0 && <p>No characters yet.</p>}
+      {characters && characters.length === 0 && (
+        <EmptyState
+          icon="characters"
+          title="No characters yet"
+          description="Create a character, then build a canonical reference set for consistent generations."
+          action={(
+            <Link to="/characters/new" className="btn btn--primary">
+              <Icon name="plus" size={16} />
+              New character
+            </Link>
+          )}
+        />
+      )}
       {characters && characters.length > 0 && (
-        <div className="card-grid">
+        <div className="resource-grid">
           {characters.map((character) => (
-            <Link key={character.id} to={`/characters/${character.id}`} className="card card--link">
-              <div className="btn-row" style={{ marginTop: 0, alignItems: 'center' }}>
+            <Link
+              key={character.id}
+              to={`/characters/${character.id}`}
+              className="resource-card resource-card--link character-card"
+            >
+              <div className="resource-card__identity">
                 <Avatar
                   url={character.avatar_url}
                   initials={character.avatar_initials}
                   name={character.name}
                   size={48}
                 />
-                <div>
-                  <strong>{character.name}</strong>
-                  <p className="field__hint" style={{ margin: 0 }}>
-                    {character.has_canonical_ref_set ? 'Canonical ref-set ready' : 'No canonical ref-set yet'}
-                  </p>
+                <div className="resource-card__body">
+                  <h2 className="resource-card__title">{character.name}</h2>
+                  <span
+                    className={`badge ${character.has_canonical_ref_set ? 'badge--canonical' : 'badge--draft'}`}
+                  >
+                    {character.has_canonical_ref_set ? 'Canonical ready' : 'Needs canonical set'}
+                  </span>
                 </div>
               </div>
             </Link>

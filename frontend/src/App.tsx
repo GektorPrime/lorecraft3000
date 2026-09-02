@@ -9,7 +9,7 @@ import {
 } from 'react-router-dom'
 import { BudgetProvider } from './api/BudgetProvider'
 import { OptionsProvider } from './api/OptionsProvider'
-import { Header } from './components/Header'
+import { AppShell } from './components/AppShell'
 import { Home } from './pages/Home'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
@@ -52,10 +52,24 @@ function ConfiguredAppLayout() {
     <>
       <OptionsProvider>
         <BudgetProvider>
-          <Header />
-          <main className="app-main">
-            <Outlet />
-          </main>
+          {/* Hash routing means an in-page anchor would be swallowed by the
+              router, so the skip link moves focus directly instead of
+              navigating. <main> is tabIndex={-1} purely to receive it. */}
+          <a
+            className="skip-link"
+            href="#main-content"
+            onClick={(event) => {
+              event.preventDefault()
+              document.getElementById('main-content')?.focus()
+            }}
+          >
+            Skip to content
+          </a>
+          <AppShell>
+            <main className="app-main" id="main-content" tabIndex={-1}>
+              <Outlet />
+            </main>
+          </AppShell>
         </BudgetProvider>
       </OptionsProvider>
     </>
@@ -83,7 +97,7 @@ const appRoutes: RouteObject[] = [
       {
         element: <ConfiguredAppLayout />,
         children: [
-          { index: true, element: <Home />, handle: { title: 'Home' } satisfies RouteHandle },
+          { index: true, element: <Home />, handle: { title: 'Dashboard' } satisfies RouteHandle },
           {
             path: 'characters',
             element: <CharacterListPage />,

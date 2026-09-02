@@ -18,6 +18,10 @@ import { DateTime } from '../../components/DateTime'
 import { CopyButton } from '../../components/CopyButton'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { ImageDialog } from '../../components/ImageDialog'
+import { EmptyState } from '../../components/EmptyState'
+import { Notice } from '../../components/Notice'
+import { PageHeader } from '../../components/PageHeader'
+import { SectionHeader } from '../../components/SectionHeader'
 import { CandidateCarousel } from './CandidateCarousel'
 
 function formatCents(cents: number): string {
@@ -264,8 +268,8 @@ function PanelPreview({ panelId }: { panelId: number }) {
   }
 
   return (
-    <section aria-busy={generating || duplicating || undefined}>
-      <h1>Preview panel</h1>
+    <section className="panel-preview" aria-busy={generating || duplicating || undefined}>
+      <PageHeader title="Preview panel" />
       {attempts && attempts.length > 0 && (
         <CandidateCarousel
           attempts={attempts}
@@ -273,7 +277,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
           onReview={handleReview}
         />
       )}
-      <p>{panel.beat_text}</p>
+      <p className="panel-preview__beat">{panel.beat_text}</p>
       {panelError && <AsyncMessage kind="error">Could not refresh panel: {panelError}</AsyncMessage>}
       {actionMessage && <AsyncMessage kind="error">{actionMessage}</AsyncMessage>}
       {completionMessage && <AsyncMessage kind={completionMessage.kind}>{completionMessage.text}</AsyncMessage>}
@@ -284,6 +288,8 @@ function PanelPreview({ panelId }: { panelId: number }) {
         </AsyncMessage>
       )}
 
+      <div className="panel-preview__workspace">
+        <div className="panel-preview__content">
       {!preview && previewError && (
         <div>
           <AsyncMessage kind="error">Could not load generation preview: {previewError}</AsyncMessage>
@@ -293,7 +299,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
       {!preview && !previewError && <AsyncMessage kind="loading">Loading generation preview…</AsyncMessage>}
       {preview?.can_generate ? (
         <>
-          <h2>Reference-slot allocation</h2>
+          <SectionHeader title="Reference-slot allocation" className="panel-preview__section-header" />
           <ul>
             {preview.attachments.map((a) => (
               <li key={a.image_number}>
@@ -301,29 +307,29 @@ function PanelPreview({ panelId }: { panelId: number }) {
               </li>
             ))}
           </ul>
-          <p className="privacy-note">
-            These reference images are uploaded to Google's Gemini API, together
-            with the prompt below, to generate this panel. They leave your
-            computer.
-          </p>
+          <Notice tone="privacy" className="privacy-note">
+            <p>
+              These reference images are uploaded to Google's Gemini API, together
+              with the prompt below, to generate this panel. They leave your
+              computer.
+            </p>
+          </Notice>
 
           {preview.warnings.length > 0 && (
-            <div className="banner banner--info">
+            <Notice tone="warning">
               {preview.warnings.map((w) => (
-                <p key={w} style={{ margin: 0 }}>
-                  {w}
-                </p>
+                <p key={w}>{w}</p>
               ))}
-            </div>
+            </Notice>
           )}
 
-          <div className="section-heading">
-            <h2 style={{ margin: 0 }}>Exact prompt sent to Gemini</h2>
-            <CopyButton value={preview.prompt} label="Copy prompt" />
-          </div>
+          <SectionHeader
+            title="Exact prompt sent to Gemini"
+            actions={<CopyButton value={preview.prompt} label="Copy prompt" />}
+          />
           <pre className="prompt-preview">{preview.prompt}</pre>
 
-          <p>
+          <p className="panel-preview__cost">
             Estimated cost: <strong>{formatCents(preview.estimated_cost_cents)}</strong> · Spent or
             reserved today: {formatCents(preview.spent_today_cents)} · Remaining after:{' '}
             {formatCents(preview.remaining_after_cents)}
@@ -333,7 +339,9 @@ function PanelPreview({ panelId }: { panelId: number }) {
         <AsyncMessage kind="error">Generation blocked: {preview.blocked_reason}</AsyncMessage>
       ) : null}
 
-      <div className="action-bar">
+        </div>
+        <aside className="panel-preview__sidebar" aria-label="Panel actions">
+      <div className="action-bar panel-preview__actions">
         <div className="action-bar__group action-bar__group--start">
           {panel.is_editable ? (
             <Link to={`/panels/${panel.id}/edit`} className="btn">
@@ -370,8 +378,10 @@ function PanelPreview({ panelId }: { panelId: number }) {
           </div>
         )}
       </div>
+        </aside>
+      </div>
 
-      <h2 style={{ marginTop: '1.5rem' }}>Generation attempts</h2>
+      <SectionHeader title="Generation attempts" className="panel-preview__attempts-heading" />
       {attemptsError && (
         <div>
           <AsyncMessage kind="error">Could not load generation history: {attemptsError}</AsyncMessage>
@@ -380,7 +390,12 @@ function PanelPreview({ panelId }: { panelId: number }) {
       )}
       {!attempts && !attemptsError && <AsyncMessage kind="loading">Loading generation history…</AsyncMessage>}
       {attempts?.length === 0 ? (
-        <p className="field__hint">No generation attempts yet.</p>
+        <EmptyState
+          icon="sparkles"
+          title="No generation attempts yet."
+          description="Generate a candidate when the panel preview is ready."
+          compact
+        />
       ) : attempts ? (
         <div className="attempt-list">
             {attempts.map((attempt) => (
@@ -393,30 +408,34 @@ function PanelPreview({ panelId }: { panelId: number }) {
                     <DateTime value={attempt.created_at} />
                   </span>
                 </div>
-                {attempt.candidates.length > 0 && (
-                  <div className="attempt-row__preview">
-                    <ImageDialog
-                      src={attempt.candidates[0].content_url}
-                      thumbnailAlt={`Preview from attempt ${attempt.id}`}
-                      previewAlt={`Generated image from attempt ${attempt.id}, full-size preview`}
-                      triggerLabel={`Preview image from attempt ${attempt.id}`}
-                      dialogLabel={`Generated image from attempt ${attempt.id}, larger preview`}
-                    />
+                {(attempt.candidates.length > 0 || attempt.error_text) && (
+                  <div className="attempt-row__detail">
+                    {attempt.candidates.length > 0 && (
+                      <div className="attempt-row__preview">
+                        <ImageDialog
+                          src={attempt.candidates[0].content_url}
+                          thumbnailAlt={`Preview from attempt ${attempt.id}`}
+                          previewAlt={`Generated image from attempt ${attempt.id}, full-size preview`}
+                          triggerLabel={`Preview image from attempt ${attempt.id}`}
+                          dialogLabel={`Generated image from attempt ${attempt.id}, larger preview`}
+                        />
+                      </div>
+                    )}
+                    {attempt.error_text && (
+                      <div className="attempt-error">
+                        <p>{friendlyGenerationError(attempt.error_text)}</p>
+                        <details>
+                          <summary>Technical details</summary>
+                          <pre>{attempt.error_text}</pre>
+                        </details>
+                      </div>
+                    )}
                   </div>
                 )}
-                {attempt.error_text && (
-                  <div className="attempt-error">
-                    <p>{friendlyGenerationError(attempt.error_text)}</p>
-                    <details>
-                      <summary>Technical details</summary>
-                      <pre>{attempt.error_text}</pre>
-                    </details>
-                  </div>
-                )}
-                <div className="btn-row attempt-row__actions">
-                  {preview?.can_generate &&
+                {preview?.can_generate &&
                     attempt.state === 'failed' &&
                     attempt.id === attempts[0].id && (
+                  <div className="attempt-row__actions">
                     <button
                       type="button"
                       className="btn btn--primary"
@@ -426,8 +445,8 @@ function PanelPreview({ panelId }: { panelId: number }) {
                     >
                       Try again
                     </button>
-                    )}
-                </div>
+                  </div>
+                )}
               </article>
             ))}
           </div>

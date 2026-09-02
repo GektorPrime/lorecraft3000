@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, duplicatePanel, listPanels } from '../../api/client'
 import type { Panel } from '../../api/types'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { EmptyState } from '../../components/EmptyState'
+import { Icon } from '../../components/Icon'
+import { PageHeader } from '../../components/PageHeader'
 
 export function PanelListPage() {
   const navigate = useNavigate()
@@ -51,38 +54,60 @@ export function PanelListPage() {
 
   return (
     <section aria-busy={duplicatingId !== null || undefined}>
-      <div className="btn-row list-page-header">
-        <h1>Panels</h1>
-        <Link to="/panels/new" className="btn btn--primary">
-          Stage new panel
-        </Link>
-      </div>
+      <PageHeader
+        title="Panels"
+        actions={(
+          <Link to="/panels/new" className="btn btn--primary">
+            <Icon name="plus" size={16} />
+            Stage new panel
+          </Link>
+        )}
+      />
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {!panels && !error && <AsyncMessage kind="loading">Loading panels…</AsyncMessage>}
-      {panels && panels.length === 0 && <p>No panels yet.</p>}
+      {panels && panels.length === 0 && (
+        <EmptyState
+          icon="panels"
+          title="No panels yet"
+          description="Stage a shot from your character library and visual style."
+          action={(
+            <Link to="/panels/new" className="btn btn--primary">
+              <Icon name="plus" size={16} />
+              Stage new panel
+            </Link>
+          )}
+        />
+      )}
       {panels && panels.length > 0 && (
-        <div className="stack-list">
+        <div className="resource-list">
           {panels.map((panel) => (
-            <div key={panel.id} className="h-tile">
-              <div className="h-tile__main">
-                <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
-                  {panel.is_editable ? 'Editable' : 'Locked'}
-                </span>
-                <p className="text-clamp" style={{ margin: '0.4rem 0' }}>{panel.beat_text}</p>
-                <p className="field__hint" style={{ margin: 0 }}>
-                  Cast: {panel.cast.map((m) => m.name).join(', ') || 'none'}
+            <article key={panel.id} className="resource-card">
+              <div className="resource-card__body">
+                <div className="resource-card__header">
+                  <h2 className="resource-card__title">Panel #{panel.id}</h2>
+                  <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
+                    {panel.is_editable ? 'Editable' : 'Locked'}
+                  </span>
+                </div>
+                <p className="resource-card__summary text-clamp" title={panel.beat_text}>
+                  {panel.beat_text}
                 </p>
-                <p className="field__hint" style={{ margin: 0 }}>
-                  {panel.generation_count} generation attempt
-                  {panel.generation_count === 1 ? '' : 's'}
+                <p className="resource-card__meta">
+                  <span>Cast: {panel.cast.map((m) => m.name).join(', ') || 'none'}</span>
+                  <span>
+                    {panel.generation_count} generation attempt
+                    {panel.generation_count === 1 ? '' : 's'}
+                  </span>
                 </p>
               </div>
-              <div className="h-tile__actions">
+              <div className="resource-card__actions">
                 <Link to={`/panels/${panel.id}/preview`} className="btn">
+                  <Icon name="gallery" size={15} />
                   Preview
                 </Link>
                 {panel.is_editable ? (
                   <Link to={`/panels/${panel.id}/edit`} className="btn">
+                    <Icon name="edit" size={15} />
                     Edit
                   </Link>
                 ) : (
@@ -92,11 +117,12 @@ export function PanelListPage() {
                     disabled={duplicatingId !== null}
                     onClick={() => void handleDuplicateAndEdit(panel.id)}
                   >
+                    <Icon name="copy" size={15} />
                     {duplicatingId === panel.id ? 'Duplicating…' : 'Duplicate & edit'}
                   </button>
                 )}
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}

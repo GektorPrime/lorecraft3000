@@ -51,6 +51,9 @@ describe('StyleFormPage', () => {
   it('does not render a reference image control', async () => {
     renderPage('/styles/new')
     expect(screen.queryByLabelText('Reference image IDs')).not.toBeInTheDocument()
+    const form = document.querySelector('form')
+    expect(form).toHaveClass('form-card')
+    expect(form?.closest('section')).toHaveClass('form-page')
   })
 
   it('loads and updates a style without reference image IDs', async () => {
@@ -99,21 +102,21 @@ describe('StyleFormPage', () => {
   })
 
   it('uses the styles destination for clean and dirty Cancel navigation', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     const user = userEvent.setup()
     const router = renderPage('/styles/new')
 
     await user.type(screen.getByLabelText('Name'), 'Charcoal')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.pathname).toBe('/styles/new')
     expect(screen.getByLabelText('Name')).toHaveValue('Charcoal')
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/styles'))
   })
 
   it('treats a hydrated edit form as clean', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     const router = renderPage('/styles/5/edit')
 
@@ -121,11 +124,10 @@ describe('StyleFormPage', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(router.state.location.pathname).toBe('/styles')
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('keeps a failed save dirty and bypasses navigation protection after success', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     vi.mocked(client.createStyle)
       .mockRejectedValueOnce(new Error('save failed'))
@@ -140,11 +142,10 @@ describe('StyleFormPage', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('save failed')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.pathname).toBe('/styles/new')
-    expect(confirm).toHaveBeenCalledTimes(1)
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/styles'))
-    expect(confirm).toHaveBeenCalledTimes(1)
   })
 })

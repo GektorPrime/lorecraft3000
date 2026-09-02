@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OptionsSummary } from './api/types'
 
@@ -28,7 +29,9 @@ function resolvedAppFetch() {
   return vi.fn().mockImplementation((input: RequestInfo | URL) => {
     const url = String(input)
     if (url.endsWith('/options/summary')) return Promise.resolve(jsonResponse(OPTIONS))
+    if (url.endsWith('/characters')) return Promise.resolve(jsonResponse([]))
     if (url.endsWith('/styles')) return Promise.resolve(jsonResponse([]))
+    if (url.endsWith('/panels')) return Promise.resolve(jsonResponse([]))
     throw new Error(`Unexpected request: ${url}`)
   })
 }
@@ -58,11 +61,15 @@ describe('App routing', () => {
     expect(await screen.findByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Styles' })).toBeInTheDocument()
 
-    const nav = screen.getByRole('navigation', { name: 'Primary' })
-    const labels = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(labels).toContain('Gallery')
-    expect(labels.indexOf('Styles')).toBeLessThan(labels.indexOf('Gallery'))
-    expect(labels.indexOf('Gallery')).toBeLessThan(labels.indexOf('Panels'))
+    // The sidebar groups links by workflow rather than preserving the old
+    // topbar's arbitrary flat order.
+    const library = screen.getByRole('list', { name: 'Library' })
+    expect(within(library).getByRole('link', { name: 'Characters' })).toBeInTheDocument()
+    expect(within(library).getByRole('link', { name: 'Styles' })).toBeInTheDocument()
+
+    const work = screen.getByRole('list', { name: 'Work' })
+    expect(within(work).getByRole('link', { name: 'Panels' })).toBeInTheDocument()
+    expect(within(work).getByRole('link', { name: 'Gallery' })).toBeInTheDocument()
   })
 
   it('does not mark Panels active when on Stage new panel', async () => {
@@ -75,6 +82,38 @@ describe('App routing', () => {
     expect(stage).toBeDefined()
     await waitFor(() => expect(stage?.classList.contains('active')).toBe(true))
     expect(panels?.classList.contains('active')).toBe(false)
+  })
+
+  it('opens the mobile navigation as a focus-managed drawer', async () => {
+    const user = userEvent.setup()
+    await renderApp('#/')
+
+    const menu = await screen.findByRole('button', { name: 'Open navigation' })
+    await user.click(menu)
+
+    expect(menu).toHaveAttribute('aria-expanded', 'true')
+    expect(document.activeElement).toBe(screen.getAllByRole('button', { name: 'Close navigation' })[0])
+
+    await user.keyboard('{Escape}')
+
+    expect(menu).toHaveAttribute('aria-expanded', 'false')
+    expect(menu).toHaveFocus()
+  })
+
+  it('opens the command palette from shell chrome and restores trigger focus', async () => {
+    const user = userEvent.setup()
+    await renderApp('#/')
+
+    const trigger = await screen.findByRole('button', { name: 'Open command palette' })
+    await user.click(trigger)
+
+    expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Search commands' })).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
   })
 
   it('renders wildcard routes without entering the configured layout', async () => {

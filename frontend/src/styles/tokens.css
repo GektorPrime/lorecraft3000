@@ -1,0 +1,260 @@
+/* ======================================================================== */
+/* Design tokens                                                            */
+/* ------------------------------------------------------------------------ */
+/* The single source of truth for every colour, size, radius, shadow and     */
+/* duration in the app. No other stylesheet may contain a raw hex, rgba() or */
+/* magic pixel value — if something is missing here, add it here.            */
+/*                                                                           */
+/* Colour tokens are *semantic* (--surface, --text-muted), never literal     */
+/* (--violet-500). That is what lets one palette swap flip the whole app     */
+/* between light and dark without touching a single component rule.         */
+/* ======================================================================== */
+
+:root {
+  /* -------------------------------------------------------------------- */
+  /* Non-colour scales — identical in both themes                          */
+  /* -------------------------------------------------------------------- */
+
+  /* Space: 4px base. Every margin, padding and gap comes from this scale. */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Type */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Inter, Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.55;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-full: 999px;
+
+  /* Z-index: named layers, so nothing ever guesses a number again. */
+  --z-sticky: 100;
+  --z-dropdown: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layout */
+  --content-max: 1100px;
+  --sidebar-width: 260px;
+}
+
+/* ======================================================================== */
+/* Light palette (default)                                                   */
+/* ======================================================================== */
+
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* Surfaces, back to front */
+  --bg: #faf9fb;
+  --bg-subtle: #f2f0f5;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f4f2f7;
+
+  /* Borders */
+  --border: #ded9e3;
+  --border-strong: #c4bcce;
+
+  /* Text */
+  --text: #3a3542;
+  --text-heading: #14121a;
+  --text-muted: #635b70;
+
+  /* Brand. --accent fills solid surfaces; --accent-text is the readable
+     variant for links and text on --bg / --surface. */
+  --accent: #7a3ff2;
+  --accent-hover: #6a2ee6;
+  --accent-text: #6829e0;
+  --accent-contrast: #ffffff;
+  --accent-subtle: rgba(122, 63, 242, 0.1);
+  --accent-border: rgba(122, 63, 242, 0.32);
+
+  /* Status. Each has text / subtle fill / border so badges and banners never
+     reach for a literal colour again. */
+  --danger: #b3261e;
+  --danger-text: #b3261e;
+  --danger-subtle: rgba(179, 38, 30, 0.09);
+  --danger-border: rgba(179, 38, 30, 0.32);
+
+  --success: #1b7a3d;
+  --success-text: #1b7a3d;
+  --success-subtle: #eafaf0;
+  --success-border: #9fd6b0;
+
+  --warning-text: #8a5a00;
+  --warning-subtle: #fff6e5;
+  --warning-border: #e0b566;
+
+  /* Neutral status, e.g. the "retired" badge */
+  --neutral-subtle: #f1f0f3;
+
+  /* Code / prompt blocks: deliberately inverted in light mode. */
+  --code-bg: #14121a;
+  --code-text: #f2f0f5;
+
+  /* Media placeholders and image backdrops */
+  --media-bg: #eeebf1;
+  --scrim: rgba(10, 8, 14, 0.82);
+  --scrim-soft: rgba(20, 18, 26, 0.75);
+  --on-scrim: #ffffff;
+  --on-scrim-border: rgba(255, 255, 255, 0.5);
+
+  /* Elevation */
+  --elev-1: 0 1px 2px rgba(20, 18, 26, 0.04), 0 2px 8px rgba(20, 18, 26, 0.06);
+  --elev-2: 0 2px 4px rgba(20, 18, 26, 0.06), 0 6px 16px rgba(20, 18, 26, 0.1);
+  --elev-3: 0 12px 40px rgba(20, 18, 26, 0.22);
+}
+
+/* ======================================================================== */
+/* Dark palette                                                              */
+/* ------------------------------------------------------------------------ */
+/* Applied when the OS prefers dark and the user has not pinned light, or    */
+/* when the user has explicitly chosen dark. The two selectors share one     */
+/* declaration block so the palettes can never drift apart.                  */
+/* ======================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --bg: #0d0b12;
+    --bg-subtle: #131019;
+    --surface: #17141f;
+    --surface-raised: #1e1a29;
+    --surface-sunken: #100d17;
+
+    --border: #2b2536;
+    --border-strong: #3f3852;
+
+    --text: #d5cfdf;
+    --text-heading: #f6f4fa;
+    --text-muted: #9990a6;
+
+    --accent: #a480ff;
+    --accent-hover: #b797ff;
+    --accent-text: #b393ff;
+    --accent-contrast: #16101f;
+    --accent-subtle: rgba(164, 128, 255, 0.14);
+    --accent-border: rgba(164, 128, 255, 0.38);
+
+    --danger: #ff8f87;
+    --danger-text: #ff9a92;
+    --danger-subtle: rgba(255, 138, 130, 0.13);
+    --danger-border: rgba(255, 138, 130, 0.34);
+
+    --success: #6ee7a4;
+    --success-text: #6ee7a4;
+    --success-subtle: rgba(110, 231, 164, 0.12);
+    --success-border: rgba(110, 231, 164, 0.32);
+
+    --warning-text: #f0be6b;
+    --warning-subtle: rgba(240, 190, 107, 0.12);
+    --warning-border: rgba(240, 190, 107, 0.34);
+
+    --neutral-subtle: #221d2c;
+
+    --code-bg: #090710;
+    --code-text: #d5cfdf;
+
+    --media-bg: #221d2c;
+    --scrim: rgba(4, 3, 7, 0.86);
+    --scrim-soft: rgba(4, 3, 7, 0.78);
+    --on-scrim: #ffffff;
+    --on-scrim-border: rgba(255, 255, 255, 0.5);
+
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --elev-2: 0 2px 4px rgba(0, 0, 0, 0.44), 0 6px 16px rgba(0, 0, 0, 0.38);
+    --elev-3: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0d0b12;
+  --bg-subtle: #131019;
+  --surface: #17141f;
+  --surface-raised: #1e1a29;
+  --surface-sunken: #100d17;
+
+  --border: #2b2536;
+  --border-strong: #3f3852;
+
+  --text: #d5cfdf;
+  --text-heading: #f6f4fa;
+  --text-muted: #9990a6;
+
+  --accent: #a480ff;
+  --accent-hover: #b797ff;
+  --accent-text: #b393ff;
+  --accent-contrast: #16101f;
+  --accent-subtle: rgba(164, 128, 255, 0.14);
+  --accent-border: rgba(164, 128, 255, 0.38);
+
+  --danger: #ff8f87;
+  --danger-text: #ff9a92;
+  --danger-subtle: rgba(255, 138, 130, 0.13);
+  --danger-border: rgba(255, 138, 130, 0.34);
+
+  --success: #6ee7a4;
+  --success-text: #6ee7a4;
+  --success-subtle: rgba(110, 231, 164, 0.12);
+  --success-border: rgba(110, 231, 164, 0.32);
+
+  --warning-text: #f0be6b;
+  --warning-subtle: rgba(240, 190, 107, 0.12);
+  --warning-border: rgba(240, 190, 107, 0.34);
+
+  --neutral-subtle: #221d2c;
+
+  --code-bg: #090710;
+  --code-text: #d5cfdf;
+
+  --media-bg: #221d2c;
+  --scrim: rgba(4, 3, 7, 0.86);
+  --scrim-soft: rgba(4, 3, 7, 0.78);
+  --on-scrim: #ffffff;
+  --on-scrim-border: rgba(255, 255, 255, 0.5);
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --elev-2: 0 2px 4px rgba(0, 0, 0, 0.44), 0 6px 16px rgba(0, 0, 0, 0.38);
+  --elev-3: 0 12px 40px rgba(0, 0, 0, 0.6);
+}

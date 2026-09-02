@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ApiError, createCharacter, getCharacter, listStyles, updateCharacter } from '../../api/client'
 import type { CharacterInput, Style } from '../../api/types'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { PageHeader } from '../../components/PageHeader'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges'
 import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
@@ -56,7 +58,9 @@ function CharacterForm({ characterId }: { characterId: number | null }) {
   const [baseline, setBaseline] = useState<string | null>(
     characterId === null ? snapshot(EMPTY) : null,
   )
-  const allowNavigation = useUnsavedChanges(baseline !== null && snapshot(values) !== baseline)
+  const { allowNavigation, confirmationProps } = useUnsavedChanges(
+    baseline !== null && snapshot(values) !== baseline,
+  )
   const mounted = useRef(true)
   const submitRequest = useRef(0)
 
@@ -161,8 +165,11 @@ function CharacterForm({ characterId }: { characterId: number | null }) {
   const wordCount = values.visual_contract?.trim() ? values.visual_contract.trim().split(/\s+/).length : 0
 
   return (
-    <section>
-      <h1>{characterId === null ? 'New character' : 'Edit character'}</h1>
+    <section className="form-page">
+      <PageHeader
+        title={characterId === null ? 'New character' : 'Edit character'}
+        description="Identity, visual constraints and local story notes."
+      />
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {stylesLoading && (
         <AsyncMessage kind="loading" aria-busy="true">Loading styles…</AsyncMessage>
@@ -184,7 +191,9 @@ function CharacterForm({ characterId }: { characterId: number | null }) {
         </div>
       )}
       {submitting && <AsyncMessage kind="loading">Saving character…</AsyncMessage>}
-      <form onSubmit={handleSubmit} aria-busy={submitting}>
+      <form className="form-card" onSubmit={handleSubmit} aria-busy={submitting}>
+        <fieldset className="form-section">
+          <legend>Identity</legend>
         <div className="field">
           <label htmlFor="name">Name</label>
           <input
@@ -205,10 +214,14 @@ function CharacterForm({ characterId }: { characterId: number | null }) {
           />
           <span className="field__hint">Leave blank to derive from the name. Must be unique.</span>
         </div>
+        </fieldset>
+        <fieldset className="form-section">
+          <legend>Generation contract</legend>
         <div className="field">
           <label htmlFor="visual_contract">Visual contract</label>
           <textarea
             id="visual_contract"
+            className="field__textarea--standard"
             value={values.visual_contract}
             onChange={(e) => setValues((v) => ({ ...v, visual_contract: e.target.value }))}
           />
@@ -229,10 +242,14 @@ function CharacterForm({ characterId }: { characterId: number | null }) {
             Sent to the model as traits to avoid. Example: "no facial hair, no glasses."
           </span>
         </div>
+        </fieldset>
+        <fieldset className="form-section">
+          <legend>Local notes and defaults</legend>
         <div className="field">
           <label htmlFor="lore_md">Lore</label>
           <textarea
             id="lore_md"
+            className="field__textarea--standard"
             value={values.lore_md}
             onChange={(e) => setValues((v) => ({ ...v, lore_md: e.target.value }))}
           />
@@ -261,7 +278,8 @@ function CharacterForm({ characterId }: { characterId: number | null }) {
             ))}
           </select>
         </div>
-        <div className="btn-row">
+        </fieldset>
+        <div className="form-actions">
           <button type="submit" className="btn btn--primary" disabled={submitting}>
             Save
           </button>
@@ -275,6 +293,7 @@ function CharacterForm({ characterId }: { characterId: number | null }) {
           </button>
         </div>
       </form>
+      <ConfirmDialog {...confirmationProps} />
     </section>
   )
 }

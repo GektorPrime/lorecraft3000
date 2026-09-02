@@ -239,6 +239,8 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     if (!(prompt instanceof HTMLElement)) throw new Error('prompt preview was not rendered')
     expect(prompt.tagName).toBe('PRE')
     expect(prompt).toHaveTextContent(READY_PREVIEW.prompt, { normalizeWhitespace: false })
+    expect(prompt.closest('.panel-preview__content')).not.toBeNull()
+    expect(button.closest('.panel-preview__sidebar')).not.toBeNull()
     expect(
       prompt.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
