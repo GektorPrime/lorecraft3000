@@ -73,6 +73,7 @@ class Character(BaseModel):
     negative_traits: str
     default_style_id: int | None
     created_at: str
+    archived_at: str | None = None
     has_canonical_ref_set: bool
     avatar_url: str | None
     avatar_initials: str
@@ -93,6 +94,7 @@ class Style(BaseModel):
     name: str
     style_contract: str
     created_at: str
+    archived_at: str | None = None
 
 
 # ---------------------------------------------------------------------------

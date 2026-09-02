@@ -226,6 +226,7 @@ def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
     assert run_migrations(db) == [
         "010_image_provenance",
         "011_repair_generation_scene_revision",
+        "012_archive_character_style",
     ]
     conn = connect(db)
     try:
@@ -453,7 +454,10 @@ def test_011_repairs_legacy_generation_missing_scene_revision(tmp_path):
         conn.close()
 
     # The drift is invisible to the pre-011 runner: everything is recorded.
-    assert run_migrations(db) == ["011_repair_generation_scene_revision"]
+    assert run_migrations(db) == [
+        "011_repair_generation_scene_revision",
+        "012_archive_character_style",
+    ]
     assert run_migrations(db) == []  # and healing is idempotent
 
     conn = connect(db)

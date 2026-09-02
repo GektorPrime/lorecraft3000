@@ -48,6 +48,7 @@ from app.services.ref_sets import (
 )
 from app.services.scenes import SceneError, SceneImmutableError, SceneNotFoundError, SceneService
 from app.services.styles import (
+    StyleArchivedError,
     StyleError,
     StyleNameCollisionError,
     StyleNotFoundError,
@@ -93,6 +94,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (CandidateNotFoundError, 404),
     (SlugCollisionError, 409),
     (StyleNameCollisionError, 409),
+    (StyleArchivedError, 409),
     (RefSetNotDraftError, 409),
     (SceneImmutableError, 409),
     (GenerationPendingError, 409),
@@ -192,6 +194,7 @@ def _character_out(conn, storage: ImageStorage, character) -> "Character":
         negative_traits=character.negative_traits,
         default_style_id=character.default_style_id,
         created_at=character.created_at,
+        archived_at=character.archived_at,
         has_canonical_ref_set=canonical is not None,
         avatar_url=f"/api/v1/ref-images/{avatar.id}/content" if avatar else None,
         avatar_initials=_initials(character.name),

@@ -141,6 +141,75 @@ def test_update_keeping_own_slug_is_allowed(conn):
 
 
 # ---------------------------------------------------------------------------
+# archive / restore (soft delete)
+# ---------------------------------------------------------------------------
+
+def test_archive_hides_from_list_but_get_still_resolves(conn):
+    service = _service(conn)
+    c = service.create(name="Alice", slug="alice")
+    service.archive(c.id)
+    assert all(x.slug != "alice" for x in service.list())
+    # Existing panels reference characters by id, so archived characters must
+    # still resolve — the display slug is preserved.
+    fetched = service.get(c.id)
+    assert fetched.slug == "alice"
+    assert fetched.archived_at is not None
+
+
+def test_archive_frees_slug_for_reuse(conn):
+    service = _service(conn)
+    c = service.create(name="Alice", slug="alice")
+    service.archive(c.id)
+    reused = service.create(name="Alice", slug="alice")
+    assert reused.id != c.id
+    assert reused.slug == "alice"
+    assert reused.archived_at is None
+
+
+def test_archive_is_idempotent(conn):
+    service = _service(conn)
+    c = service.create(name="Alice", slug="alice")
+    service.archive(c.id)
+    again = service.archive(c.id)
+    assert again.archived_at is not None
+
+
+def test_archive_missing_character_raises(conn):
+    with pytest.raises(CharacterNotFoundError):
+        _service(conn).archive(99999)
+
+
+def test_restore_reclaims_original_slug(conn):
+    service = _service(conn)
+    c = service.create(name="Alice", slug="alice")
+    service.archive(c.id)
+    restored = service.restore(c.id)
+    assert restored.slug == "alice"
+    assert restored.archived_at is None
+    assert any(x.id == c.id for x in service.list())
+
+
+def test_restore_blocked_when_slug_taken_by_active(conn):
+    service = _service(conn)
+    c = service.create(name="Alice", slug="alice")
+    service.archive(c.id)
+    service.create(name="Alice", slug="alice")  # reclaims the freed slug
+    with pytest.raises(SlugCollisionError):
+        service.restore(c.id)
+
+
+def test_list_archived_returns_only_archived(conn):
+    service = _service(conn)
+    active = service.create(name="Active", slug="active")
+    archived = service.create(name="Gone", slug="gone")
+    service.archive(archived.id)
+    archived_slugs = [c.slug for c in service.list_archived()]
+    assert "gone" in archived_slugs
+    assert "active" not in archived_slugs
+    assert active.id not in {c.id for c in service.list_archived()}
+
+
+# ---------------------------------------------------------------------------
 # default_style_id: invalid references are a style error, not a slug collision
 # ---------------------------------------------------------------------------
 

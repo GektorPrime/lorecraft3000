@@ -26,6 +26,9 @@ class Character:
     negative_traits: str
     default_style_id: int | None
     created_at: str
+    # NULL == active. Archived characters stay in the DB (so panels that
+    # reference them keep working) but are hidden from every list/picker.
+    archived_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -34,14 +37,23 @@ class Style:
     name: str
     style_contract: str
     created_at: str
+    # NULL == active. See Character.archived_at.
+    archived_at: str | None = None
 
     @classmethod
     def from_row(cls, row) -> "Style":
+        # display_name holds the human-facing name when an archived row's unique
+        # `name` column has been renamed to its archived sentinel; fall back to
+        # `name` for active rows (and legacy rows created before archiving).
+        keys = row.keys()
+        display = row["display_name"] if "display_name" in keys else None
+        archived_at = row["archived_at"] if "archived_at" in keys else None
         return cls(
             id=row["id"],
-            name=row["name"],
+            name=display if display else row["name"],
             style_contract=row["style_contract"],
             created_at=row["created_at"],
+            archived_at=archived_at,
         )
 
 

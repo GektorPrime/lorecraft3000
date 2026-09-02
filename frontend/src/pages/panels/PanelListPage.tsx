@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ApiError, duplicatePanel, listPanels } from '../../api/client'
+import { ApiError, deletePanel, duplicatePanel, listPanels } from '../../api/client'
 import type { Panel } from '../../api/types'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { PageHeader } from '../../components/PageHeader'
@@ -12,7 +13,11 @@ export function PanelListPage() {
   const [panels, setPanels] = useState<Panel[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<number | null>(null)
   const mounted = useRef(true)
+
+  const busy = duplicatingId !== null || deletingId !== null
 
   const reload = () =>
     listPanels()
@@ -37,7 +42,7 @@ export function PanelListPage() {
   // copy — duplicating alone does not let the user edit anything, so this
   // must navigate, not just refresh the list (issue #15 follow-up).
   const handleDuplicateAndEdit = async (id: number) => {
-    if (duplicatingId !== null) return
+    if (busy) return
     setDuplicatingId(id)
     setError(null)
     try {
@@ -52,8 +57,28 @@ export function PanelListPage() {
     }
   }
 
+  const confirmDelete = async () => {
+    const id = confirmId
+    setConfirmId(null)
+    if (id === null || busy) return
+    setDeletingId(id)
+    setError(null)
+    try {
+      await deletePanel(id)
+      await reload()
+    } catch (err) {
+      if (mounted.current) setError(`Could not delete panel: ${err instanceof ApiError ? err.message : String(err)}`)
+    } finally {
+      if (mounted.current) setDeletingId(null)
+    }
+  }
+
+  // The whole tile opens the panel preview. Action buttons stopPropagation so
+  // they never trigger this navigation.
+  const openPreview = (id: number) => navigate(`/panels/${id}/preview`)
+
   return (
-    <section aria-busy={duplicatingId !== null || undefined}>
+    <section aria-busy={busy || undefined}>
       <PageHeader
         title="Panels"
         actions={(
@@ -81,7 +106,20 @@ export function PanelListPage() {
       {panels && panels.length > 0 && (
         <div className="resource-list">
           {panels.map((panel) => (
-            <article key={panel.id} className="resource-card">
+            <article
+              key={panel.id}
+              className="resource-card resource-card--clickable"
+              role="button"
+              tabIndex={0}
+              aria-label={`Preview panel #${panel.id}`}
+              onClick={() => openPreview(panel.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  openPreview(panel.id)
+                }
+              }}
+            >
               <div className="resource-card__body">
                 <div className="resource-card__header">
                   <h2 className="resource-card__title">Panel #{panel.id}</h2>
@@ -101,12 +139,12 @@ export function PanelListPage() {
                 </p>
               </div>
               <div className="resource-card__actions">
-                <Link to={`/panels/${panel.id}/preview`} className="btn">
-                  <Icon name="gallery" size={15} />
-                  Preview
-                </Link>
                 {panel.is_editable ? (
-                  <Link to={`/panels/${panel.id}/edit`} className="btn">
+                  <Link
+                    to={`/panels/${panel.id}/edit`}
+                    className="btn"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <Icon name="edit" size={15} />
                     Edit
                   </Link>
@@ -114,18 +152,42 @@ export function PanelListPage() {
                   <button
                     type="button"
                     className="btn"
-                    disabled={duplicatingId !== null}
-                    onClick={() => void handleDuplicateAndEdit(panel.id)}
+                    disabled={busy}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handleDuplicateAndEdit(panel.id)
+                    }}
                   >
                     <Icon name="copy" size={15} />
                     {duplicatingId === panel.id ? 'Duplicating…' : 'Duplicate & edit'}
                   </button>
                 )}
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  disabled={busy}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setConfirmId(panel.id)
+                  }}
+                >
+                  <Icon name="trash" size={15} />
+                  {deletingId === panel.id ? 'Deleting…' : 'Delete'}
+                </button>
               </div>
             </article>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmId !== null}
+        title="Delete this panel?"
+        description="This permanently deletes the panel and its entire generation history. This cannot be undone."
+        confirmLabel="Delete panel"
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setConfirmId(null)}
+      />
     </section>
   )
 }
