@@ -267,6 +267,11 @@ function PanelPreview({ panelId }: { panelId: number }) {
               </li>
             ))}
           </ul>
+          <p className="privacy-note">
+            These reference images are uploaded to Google's Gemini API, together
+            with the prompt below, to generate this panel. They leave your
+            computer.
+          </p>
 
           {preview.warnings.length > 0 && (
             <div className="banner banner--info">
