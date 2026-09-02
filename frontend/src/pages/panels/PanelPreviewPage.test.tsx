@@ -232,6 +232,25 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     ).toBeTruthy()
   })
 
+  it('states that reference images are uploaded to Gemini before generating', async () => {
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      is_editable: true,
+      generation_count: 0,
+    })
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+
+    renderPreview()
+
+    const note = await screen.findByText(/uploaded to Google's Gemini API/i)
+    expect(note).toHaveTextContent(/leave your computer/i)
+    // The disclosure appears before the paid generation button.
+    const button = screen.getByRole('button', { name: /Generate one candidate/ })
+    expect(
+      note.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
   it('shows preserved failed generation attempts with a details link', async () => {
     vi.mocked(client.getPanel).mockResolvedValue({
       ...LOCKED_PANEL,
