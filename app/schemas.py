@@ -258,3 +258,4 @@ class GenerationSummary(BaseModel):
     error_text: str | None
     completed_at: str | None
     created_at: str
+    candidates: list[Candidate]

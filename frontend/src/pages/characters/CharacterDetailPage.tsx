@@ -28,7 +28,8 @@ function CharacterDetail({ characterId }: { characterId: number }) {
   } | null>(null)
   const [creatingDraft, setCreatingDraft] = useState(false)
   const [notFound, setNotFound] = useState(false)
-  const [openId, setOpenId] = useState<number | null>(null)
+  const [openIds, setOpenIds] = useState<Set<number>>(new Set())
+  const seededCanonical = useRef(false)
   const requestVersion = useRef(0)
   const hasLoadedCharacter = useRef(false)
   const mounted = useRef(true)
@@ -59,6 +60,13 @@ function CharacterDetail({ characterId }: { characterId: number }) {
       (sets) => {
         if (!mounted.current || version !== requestVersion.current) return null
         setRefSets(sets)
+        // Canonical reference set is expanded by default and stays open; drafts
+        // toggle independently. Seed once so later refreshes don't fight the user.
+        if (!seededCanonical.current) {
+          seededCanonical.current = true
+          const canonical = sets.find((set) => set.status === 'canonical')
+          if (canonical) setOpenIds((prev) => new Set(prev).add(canonical.id))
+        }
         setRefSetsError(null)
         return null
       },
@@ -94,7 +102,7 @@ function CharacterDetail({ characterId }: { characterId: number }) {
     try {
       const draft = await createRefSetDraft(characterId)
       if (!mounted.current) return
-      setOpenId(draft.id)
+      setOpenIds((prev) => new Set(prev).add(draft.id))
       const refreshResult = await reload()
       if (!mounted.current) return
       const refreshError = refreshResult.refSetsError
@@ -140,7 +148,11 @@ function CharacterDetail({ characterId }: { characterId: number }) {
             {character.slug}
           </p>
         </div>
-        <Link to={`/characters/${character.id}/edit`} className="btn">
+        <Link
+          to={`/characters/${character.id}/edit`}
+          className="btn btn--primary"
+          style={{ marginLeft: 'auto' }}
+        >
           Edit
         </Link>
       </div>
@@ -182,21 +194,38 @@ function CharacterDetail({ characterId }: { characterId: number }) {
       )}
       {!refSets && !refSetsError && <AsyncMessage kind="loading">Loading reference sets…</AsyncMessage>}
       {refSets?.length === 0 && <p className="field__hint">No reference sets yet.</p>}
-      {refSets?.map((summary) => (
-        <div key={summary.id}>
-          <button
-            type="button"
-            className="btn"
-            style={{ marginTop: '0.5rem' }}
-            onClick={() => setOpenId(openId === summary.id ? null : summary.id)}
-          >
-            v{summary.version} · <span className={`badge badge--${summary.status}`}>{summary.status}</span> ·{' '}
-            {summary.image_count} image{summary.image_count === 1 ? '' : 's'}
-            {openId === summary.id ? ' (hide)' : ' (manage)'}
-          </button>
-          {openId === summary.id && <RefSetPanel refSetId={summary.id} onChanged={handleRefSetChanged} />}
-        </div>
-      ))}
+      {refSets?.map((summary) => {
+        const isOpen = openIds.has(summary.id)
+        return (
+          <div key={summary.id}>
+            <div className="refset-row">
+              <div className="refset-row__meta">
+                <span>v{summary.version}</span>
+                <span className={`badge badge--${summary.status}`}>{summary.status}</span>
+                <span className="field__hint">
+                  {summary.image_count} image{summary.image_count === 1 ? '' : 's'}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn"
+                aria-expanded={isOpen}
+                onClick={() =>
+                  setOpenIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(summary.id)) next.delete(summary.id)
+                    else next.add(summary.id)
+                    return next
+                  })
+                }
+              >
+                {isOpen ? 'Hide' : 'Manage'}
+              </button>
+            </div>
+            {isOpen && <RefSetPanel refSetId={summary.id} onChanged={handleRefSetChanged} />}
+          </div>
+        )
+      })}
     </section>
   )
 }

@@ -7,6 +7,7 @@ import {
   getPanel,
   listPanelGenerations,
   previewPanel,
+  reviewCandidate,
 } from '../../api/client'
 import type { GenerationSummary, Panel, PanelPreview } from '../../api/types'
 import { useBudget } from '../../api/useBudget'
@@ -14,7 +15,10 @@ import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
 import { NotFoundPage } from '../NotFoundPage'
 import { DateTime } from '../../components/DateTime'
+import { CopyButton } from '../../components/CopyButton'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { ImageDialog } from '../../components/ImageDialog'
+import { CandidateCarousel } from './CandidateCarousel'
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
@@ -57,6 +61,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
   } | null>(null)
   const [generating, setGenerating] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
+  const [reviewingCandidateId, setReviewingCandidateId] = useState<number | null>(null)
   const [notFound, setNotFound] = useState(false)
   const requestVersion = useRef(0)
   const hasLoadedPanel = useRef(false)
@@ -184,10 +189,12 @@ function PanelPreview({ panelId }: { panelId: number }) {
     setActionMessage(null)
     try {
       if (!preview) return
-      const generation = await generatePanel(panelId, preview.prompt_hash)
+      await generatePanel(panelId, preview.prompt_hash)
       await refreshBudget()
       if (!mounted.current) return
-      navigate(`/generations/${generation.id}`)
+      // Stay on this page so the new attempt and its candidates appear in place;
+      // the details page has been removed.
+      await reload()
     } catch (err) {
       if (!mounted.current) return
       const message = err instanceof ApiError ? err.message : String(err)
@@ -217,6 +224,26 @@ function PanelPreview({ panelId }: { panelId: number }) {
     }
   }
 
+  const handleReview = async (candidateId: number, verdict: 'accepted' | 'rejected') => {
+    if (reviewingCandidateId !== null) return
+    setReviewingCandidateId(candidateId)
+    setActionMessage(null)
+    try {
+      await reviewCandidate(candidateId, verdict)
+      if (!mounted.current) return
+      // The outcome is visible in place — the carousel badge flips to
+      // Accepted/Rejected after refresh — so no top-of-page banner is needed.
+      await reload()
+    } catch (err) {
+      if (!mounted.current) return
+      setActionMessage(
+        `Could not ${verdict === 'accepted' ? 'accept' : 'reject'} image: ${err instanceof ApiError ? err.message : String(err)}`,
+      )
+    } finally {
+      if (mounted.current) setReviewingCandidateId(null)
+    }
+  }
+
   if (notFound) return <NotFoundPage />
   if (!panel) {
     return panelError ? (
@@ -239,6 +266,13 @@ function PanelPreview({ panelId }: { panelId: number }) {
   return (
     <section aria-busy={generating || duplicating || undefined}>
       <h1>Preview panel</h1>
+      {attempts && attempts.length > 0 && (
+        <CandidateCarousel
+          attempts={attempts}
+          reviewingCandidateId={reviewingCandidateId}
+          onReview={handleReview}
+        />
+      )}
       <p>{panel.beat_text}</p>
       {panelError && <AsyncMessage kind="error">Could not refresh panel: {panelError}</AsyncMessage>}
       {actionMessage && <AsyncMessage kind="error">{actionMessage}</AsyncMessage>}
@@ -283,7 +317,10 @@ function PanelPreview({ panelId }: { panelId: number }) {
             </div>
           )}
 
-          <h2>Exact prompt sent to Gemini</h2>
+          <div className="section-heading">
+            <h2 style={{ margin: 0 }}>Exact prompt sent to Gemini</h2>
+            <CopyButton value={preview.prompt} label="Copy prompt" />
+          </div>
           <pre className="prompt-preview">{preview.prompt}</pre>
 
           <p>
@@ -291,45 +328,50 @@ function PanelPreview({ panelId }: { panelId: number }) {
             reserved today: {formatCents(preview.spent_today_cents)} · Remaining after:{' '}
             {formatCents(preview.remaining_after_cents)}
           </p>
-
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={generating || hasPendingAttempt}
-            onClick={() => void handleGenerate()}
-          >
-            {generating
-              ? 'Starting generation…'
-              : hasPendingAttempt
-              ? 'Generation in progress'
-              : `Generate one candidate · ${formatCents(preview.estimated_cost_cents)}`}
-          </button>
         </>
       ) : preview ? (
         <AsyncMessage kind="error">Generation blocked: {preview.blocked_reason}</AsyncMessage>
       ) : null}
 
-      <div className="btn-row">
-        {panel.is_editable ? (
-          <Link to={`/panels/${panel.id}/edit`} className="btn">
-            Edit panel
+      <div className="action-bar">
+        <div className="action-bar__group action-bar__group--start">
+          {panel.is_editable ? (
+            <Link to={`/panels/${panel.id}/edit`} className="btn">
+              Edit panel
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="btn"
+              disabled={duplicating}
+              onClick={() => void handleDuplicateAndEdit()}
+            >
+              {duplicating ? 'Duplicating…' : 'Duplicate & edit'}
+            </button>
+          )}
+          <Link to="/panels" className="btn">
+            Back to panels
           </Link>
-        ) : (
-          <button
-            type="button"
-            className="btn"
-            disabled={duplicating}
-            onClick={() => void handleDuplicateAndEdit()}
-          >
-            {duplicating ? 'Duplicating…' : 'Duplicate & edit'}
-          </button>
+        </div>
+        {preview?.can_generate && (
+          <div className="action-bar__group action-bar__group--end">
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={generating || hasPendingAttempt}
+              onClick={() => void handleGenerate()}
+            >
+              {generating
+                ? 'Starting generation…'
+                : hasPendingAttempt
+                ? 'Generation in progress'
+                : `Generate one candidate · ${formatCents(preview.estimated_cost_cents)}`}
+            </button>
+          </div>
         )}
-        <Link to="/panels" className="btn">
-          Back to panels
-        </Link>
       </div>
 
-      <h2>Generation attempts</h2>
+      <h2 style={{ marginTop: '1.5rem' }}>Generation attempts</h2>
       {attemptsError && (
         <div>
           <AsyncMessage kind="error">Could not load generation history: {attemptsError}</AsyncMessage>
@@ -341,46 +383,54 @@ function PanelPreview({ panelId }: { panelId: number }) {
         <p className="field__hint">No generation attempts yet.</p>
       ) : attempts ? (
         <div className="attempt-list">
-          {attempts.map((attempt) => (
-            <article className="attempt-row" key={attempt.id}>
-              <div className="attempt-row__summary">
-                <span className={`badge badge--attempt-${attempt.state}`}>{attempt.state}</span>
-                <strong>Attempt #{attempt.id}</strong>
-                <span className="field__hint">
-                  {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}
-                  <DateTime value={attempt.created_at} />
-                </span>
-              </div>
-              {attempt.error_text && (
-                <div className="attempt-error">
-                  <p>{friendlyGenerationError(attempt.error_text)}</p>
-                  <details>
-                    <summary>Technical details</summary>
-                    <pre>{attempt.error_text}</pre>
-                  </details>
+            {attempts.map((attempt) => (
+              <article className="attempt-row" key={attempt.id}>
+                <div className="attempt-row__summary">
+                  <span className={`badge badge--attempt-${attempt.state}`}>{attempt.state}</span>
+                  <strong>Attempt #{attempt.id}</strong>
+                  <span className="field__hint">
+                    {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}
+                    <DateTime value={attempt.created_at} />
+                  </span>
                 </div>
-              )}
-              <div className="btn-row attempt-row__actions">
-                {preview?.can_generate &&
-                  attempt.state === 'failed' &&
-                  attempt.id === attempts[0].id && (
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    disabled={generating || hasPendingAttempt}
-                    onClick={() => void handleGenerate()}
-                    title="Generates from the panel's current settings"
-                  >
-                    Try again
-                  </button>
-                  )}
-                <Link to={`/generations/${attempt.id}`} className="btn">
-                  View details
-                </Link>
-              </div>
-            </article>
-          ))}
-        </div>
+                {attempt.candidates.length > 0 && (
+                  <div className="attempt-row__preview">
+                    <ImageDialog
+                      src={attempt.candidates[0].content_url}
+                      thumbnailAlt={`Preview from attempt ${attempt.id}`}
+                      previewAlt={`Generated image from attempt ${attempt.id}, full-size preview`}
+                      triggerLabel={`Preview image from attempt ${attempt.id}`}
+                      dialogLabel={`Generated image from attempt ${attempt.id}, larger preview`}
+                    />
+                  </div>
+                )}
+                {attempt.error_text && (
+                  <div className="attempt-error">
+                    <p>{friendlyGenerationError(attempt.error_text)}</p>
+                    <details>
+                      <summary>Technical details</summary>
+                      <pre>{attempt.error_text}</pre>
+                    </details>
+                  </div>
+                )}
+                <div className="btn-row attempt-row__actions">
+                  {preview?.can_generate &&
+                    attempt.state === 'failed' &&
+                    attempt.id === attempts[0].id && (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      disabled={generating || hasPendingAttempt}
+                      onClick={() => void handleGenerate()}
+                      title="Generates from the panel's current settings"
+                    >
+                      Try again
+                    </button>
+                    )}
+                </div>
+              </article>
+            ))}
+          </div>
       ) : null}
     </section>
   )

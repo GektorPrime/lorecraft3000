@@ -21,6 +21,7 @@ vi.mock('../../api/client', async () => {
     listPanelGenerations: vi.fn(),
     duplicatePanel: vi.fn(),
     generatePanel: vi.fn(),
+    reviewCandidate: vi.fn(),
   }
 })
 
@@ -71,6 +72,15 @@ const READY_PREVIEW: PanelPreview = {
   blocked_reason: null,
 }
 
+const CANDIDATE = {
+  id: 900,
+  generation_id: 5,
+  idx: 1,
+  review_status: 'pending',
+  content_url: '/api/v1/candidates/900/content',
+  created_at: '2026-08-31 15:00:02',
+}
+
 const FAILED_ATTEMPT: GenerationSummary = {
   id: 5,
   scene_id: 3,
@@ -82,6 +92,7 @@ const FAILED_ATTEMPT: GenerationSummary = {
   error_text: 'Media resolution is not supported',
   completed_at: '2026-08-31 15:00:01',
   created_at: '2026-08-31 15:00:00',
+  candidates: [],
 }
 
 const HIGH_DEMAND_ATTEMPT: GenerationSummary = {
@@ -153,6 +164,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     vi.mocked(client.listPanelGenerations).mockReset().mockResolvedValue([])
     vi.mocked(client.duplicatePanel).mockReset()
     vi.mocked(client.generatePanel).mockReset()
+    vi.mocked(client.reviewCandidate).mockReset()
     refreshBudget.mockReset().mockResolvedValue(undefined)
   })
   afterEach(() => {
@@ -232,6 +244,26 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     ).toBeTruthy()
   })
 
+  it('copies the exact prompt to the clipboard', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(navigator, 'clipboard', 'get').mockReturnValue({ writeText } as unknown as Clipboard)
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      is_editable: true,
+      generation_count: 0,
+    })
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+
+    renderPreview()
+
+    const copy = await screen.findByRole('button', { name: 'Copy prompt' })
+    await user.click(copy)
+
+    expect(writeText).toHaveBeenCalledWith(READY_PREVIEW.prompt)
+    expect(await screen.findByRole('button', { name: 'Copied!' })).toBeInTheDocument()
+  })
+
   it('states that reference images are uploaded to Gemini before generating', async () => {
     vi.mocked(client.getPanel).mockResolvedValue({
       ...LOCKED_PANEL,
@@ -251,7 +283,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     ).toBeTruthy()
   })
 
-  it('shows preserved failed generation attempts with a details link', async () => {
+  it('shows preserved failed generation attempts with error details', async () => {
     vi.mocked(client.getPanel).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
@@ -266,10 +298,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(timestamp).toHaveAttribute('datetime', '2026-08-31T15:00:00.000Z')
     expect(timestamp).toHaveAttribute('title')
     expect(screen.getByText('Media resolution is not supported')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'View details' })).toHaveAttribute(
-      'href',
-      '/generations/5',
-    )
+    expect(screen.queryByRole('link', { name: 'View details' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Edit panel' })).toBeInTheDocument()
   })
 
@@ -295,7 +324,70 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
     expect(client.generatePanel).toHaveBeenCalledWith(3, READY_PREVIEW.prompt_hash)
     expect(refreshBudget).toHaveBeenCalled()
-    expect(mockNavigate).toHaveBeenCalledWith('/generations/8')
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  it('shows a carousel of candidate previews across attempts and reviews them', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      is_editable: true,
+      generation_count: 1,
+    })
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
+    ])
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.reviewCandidate).mockResolvedValue({
+      ...CANDIDATE,
+      review_status: 'accepted',
+    })
+
+    renderPreview()
+
+    expect(await screen.findByText('1 / 1')).toBeInTheDocument()
+    expect(screen.getByText('Pending review')).toBeInTheDocument()
+
+    // Carousel sits immediately after the page header, before the beat text
+    // and prompt/preview sections.
+    const heading = screen.getByRole('heading', { name: 'Preview panel' })
+    const carousel = screen.getByLabelText('Generated candidate across attempts')
+    const beat = screen.getByText('Mara backs toward the door.')
+    const allocationHeading = screen.getByRole('heading', { name: 'Reference-slot allocation' })
+    expect(
+      heading.compareDocumentPosition(carousel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      carousel.compareDocumentPosition(beat) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      carousel.compareDocumentPosition(allocationHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Accept' }))
+    expect(client.reviewCandidate).toHaveBeenCalledWith(900, 'accepted')
+    // Outcome is shown in place (badge flips), not via a top-of-page banner.
+    expect(screen.queryByText('Candidate accepted.')).not.toBeInTheDocument()
+  })
+
+  it('uses the newest attempt with an image in the carousel', async () => {
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      is_editable: true,
+      generation_count: 2,
+    })
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+      { ...SUCCEEDED_ATTEMPT, id: 10, candidates: [{ ...CANDIDATE, id: 901, generation_id: 10 }] },
+      { ...FAILED_ATTEMPT, candidates: [] },
+    ])
+
+    renderPreview()
+
+    expect(await screen.findByText('1 / 1')).toBeInTheDocument()
+    const carousel = screen.getByLabelText('Generated candidate across attempts')
+    expect(carousel).toHaveTextContent('Attempt #10')
+    const alt = screen.getByAltText('Generated image from attempt 10')
+    expect(alt).toBeInTheDocument()
   })
 
   it('reloads and explains when the reviewed prompt changed', async () => {

@@ -126,6 +126,8 @@ function StyleForm({ styleId }: { styleId: number | null }) {
           <label htmlFor="style_contract">Style contract</label>
           <textarea
             id="style_contract"
+            className="field__textarea--tall"
+            rows={12}
             aria-describedby="style_contract-hint"
             value={values.style_contract}
             onChange={(e) => setValues((v) => ({ ...v, style_contract: e.target.value }))}

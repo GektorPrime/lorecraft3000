@@ -146,6 +146,5 @@ export const generatePanel = (id: number, expectedPromptHash: string) =>
 // generations / candidates
 // ---------------------------------------------------------------------------
 
-export const getGeneration = (id: number) => request<Generation>(`/generations/${id}`)
 export const reviewCandidate = (id: number, verdict: 'accepted' | 'rejected') =>
   request<Candidate>(`/candidates/${id}/review`, json('POST', { verdict }))

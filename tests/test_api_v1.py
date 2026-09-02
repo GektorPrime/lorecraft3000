@@ -722,6 +722,25 @@ def test_panel_generate_and_review_and_content(api):
     assert fetched_generation.json()["candidates"][0]["review_status"] == "accepted"
 
 
+def test_generation_history_includes_candidate_previews(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    generated = _generate_panel(api, panel["id"])
+    assert generated.status_code == 201
+
+    history = api.client.get(f"/api/v1/panels/{panel['id']}/generations")
+    assert history.status_code == 200
+    attempts = history.json()
+    assert len(attempts) == 1
+    attempt = attempts[0]
+    assert attempt["id"] == generated.json()["id"]
+    assert len(attempt["candidates"]) == 1
+    candidate = attempt["candidates"][0]
+    assert candidate["review_status"] == "pending"
+    assert candidate["content_url"] == f"/api/v1/candidates/{candidate['id']}/content"
+
+
 def test_invalid_review_verdict_is_422(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])

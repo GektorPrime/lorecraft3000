@@ -340,6 +340,29 @@ class GenerationService:
             (scene_id,),
         ).fetchall()
 
+    def list_for_scene_with_candidates(
+        self, scene_id: int
+    ) -> list[tuple[sqlite3.Row, list[sqlite3.Row]]]:
+        """Every generation for a panel, newest first, each paired with its
+        candidate rows so callers can render previews and review status for all
+        attempts without an N+1 query."""
+        rows = self.conn.execute(
+            "SELECT * FROM generation WHERE scene_id = ? ORDER BY id DESC",
+            (scene_id,),
+        ).fetchall()
+        if not rows:
+            return []
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in ids)
+        candidate_rows = self.conn.execute(
+            f"SELECT * FROM candidate WHERE generation_id IN ({placeholders}) ORDER BY generation_id, idx",
+            ids,
+        ).fetchall()
+        grouped: dict[int, list[sqlite3.Row]] = {generation_id: [] for generation_id in ids}
+        for candidate in candidate_rows:
+            grouped.setdefault(candidate["generation_id"], []).append(candidate)
+        return [(row, grouped[row["id"]]) for row in rows]
+
     def get_with_candidates(self, generation_id: int) -> tuple[sqlite3.Row, list[sqlite3.Row]]:
         """A generation row and its candidates, or GenerationNotFoundError."""
         row = self.conn.execute(
