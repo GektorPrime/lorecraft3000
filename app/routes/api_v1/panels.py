@@ -89,6 +89,16 @@ def duplicate_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_s
     return _panel_out(conn, storage, scene)
 
 
+@router.delete("/panels/{panel_id}", status_code=204)
+def delete_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
+    """Permanently delete a panel and its full generation history."""
+    try:
+        SceneService(conn, settings).delete(panel_id)
+    except SceneError as exc:
+        _raise_for(exc)
+    return Response(status_code=204)
+
+
 @router.get("/panels/{panel_id}/preview", response_model=PanelPreview)
 def preview_panel(
     panel_id: int,

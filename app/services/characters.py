@@ -34,6 +34,16 @@ class CharacterNotFoundError(CharacterError):
     """Raised when a character id does not exist."""
 
 
+def _archived_slug_sentinel(character_id: int, slug: str) -> str:
+    """The value stored in the UNIQUE ``slug`` column while archived.
+
+    Renaming the unique column frees the human-facing slug for a new active
+    character immediately. The original is preserved in ``display_slug`` and
+    restored by :meth:`CharacterService.restore`.
+    """
+    return f"__archived_{character_id}__{slug}"
+
+
 class InvalidStyleReferenceError(CharacterError):
     """Raised when default_style_id does not reference an existing style.
 
@@ -54,12 +64,27 @@ class CharacterService:
     # ------------------------------------------------------------------
 
     def list(self) -> list[Character]:
+        """Active (non-archived) characters only — this backs every list/picker."""
         rows = self.conn.execute(
-            "SELECT * FROM character ORDER BY name COLLATE NOCASE, id"
+            "SELECT * FROM character WHERE archived_at IS NULL "
+            "ORDER BY name COLLATE NOCASE, id"
+        ).fetchall()
+        return [self._from_row(r) for r in rows]
+
+    def list_archived(self) -> list[Character]:
+        rows = self.conn.execute(
+            "SELECT * FROM character WHERE archived_at IS NOT NULL "
+            "ORDER BY name COLLATE NOCASE, id"
         ).fetchall()
         return [self._from_row(r) for r in rows]
 
     def get(self, character_id: int) -> Character:
+        """Resolve any character, archived or not.
+
+        Archived characters must still resolve so panels whose cast includes
+        them keep rendering and previewing — archiving hides a character from new
+        work, it does not break existing dependencies.
+        """
         row = self.conn.execute(
             "SELECT * FROM character WHERE id = ?", (character_id,)
         ).fetchone()
@@ -68,8 +93,10 @@ class CharacterService:
         return self._from_row(row)
 
     def get_by_slug(self, slug: str) -> Character | None:
+        """Look up an ACTIVE character by slug (archived slugs are freed)."""
         row = self.conn.execute(
-            "SELECT * FROM character WHERE slug = ?", (slug,)
+            "SELECT * FROM character WHERE slug = ? AND archived_at IS NULL",
+            (slug,),
         ).fetchone()
         return self._from_row(row) if row is not None else None
 
@@ -159,6 +186,75 @@ class CharacterService:
         return self.get(character_id)
 
     # ------------------------------------------------------------------
+    # archive / restore (soft delete)
+    # ------------------------------------------------------------------
+
+    def archive(self, character_id: int) -> Character:
+        """Archive a character: hide it from lists while keeping panels intact.
+
+        Panels whose cast already includes this character continue to resolve it
+        (see :meth:`get`). Archiving frees the character's slug for reuse by
+        renaming the unique ``slug`` column to an archived sentinel and
+        preserving the original in ``display_slug``. Idempotent.
+        """
+        character = self.get(character_id)
+        if character.archived_at is not None:
+            return character
+        self.conn.execute(
+            """
+            UPDATE character
+               SET display_slug = slug,
+                   slug = ?,
+                   archived_at = datetime('now')
+             WHERE id = ?
+            """,
+            (_archived_slug_sentinel(character_id, character.slug), character_id),
+        )
+        self.conn.commit()
+        return self.get(character_id)
+
+    def restore(self, character_id: int) -> Character:
+        """Restore an archived character, reclaiming its original slug.
+
+        Fails loudly if another active character has taken the slug meanwhile.
+        """
+        row = self.conn.execute(
+            "SELECT * FROM character WHERE id = ?", (character_id,)
+        ).fetchone()
+        if row is None:
+            raise CharacterNotFoundError(f"character {character_id} not found")
+        if row["archived_at"] is None:
+            return self._from_row(row)
+        original = row["display_slug"] or row["slug"]
+        clash = self.conn.execute(
+            "SELECT 1 FROM character WHERE slug = ? AND archived_at IS NULL",
+            (original,),
+        ).fetchone()
+        if clash is not None:
+            raise SlugCollisionError(
+                f"slug '{original}' is already taken by an active character — "
+                "rename it before restoring this one"
+            )
+        try:
+            self.conn.execute(
+                """
+                UPDATE character
+                   SET slug = ?,
+                       display_slug = NULL,
+                       archived_at = NULL
+                 WHERE id = ?
+                """,
+                (original, character_id),
+            )
+            self.conn.commit()
+        except sqlite3.IntegrityError as exc:
+            self.conn.rollback()
+            raise SlugCollisionError(
+                f"slug '{original}' is already taken — choose a different slug"
+            ) from exc
+        return self.get(character_id)
+
+    # ------------------------------------------------------------------
     # model-facing representation (bio != prompt)
     # ------------------------------------------------------------------
 
@@ -225,13 +321,20 @@ class CharacterService:
 
     @staticmethod
     def _from_row(row) -> Character:
+        keys = row.keys()
+        # display_slug holds the human-facing slug when an archived row's unique
+        # `slug` column has been renamed to its archived sentinel; fall back to
+        # `slug` for active rows (and legacy rows created before archiving).
+        display_slug = row["display_slug"] if "display_slug" in keys else None
+        archived_at = row["archived_at"] if "archived_at" in keys else None
         return Character(
             id=row["id"],
             name=row["name"],
-            slug=row["slug"],
+            slug=display_slug if display_slug else row["slug"],
             lore_md=row["lore_md"],
             visual_contract=row["visual_contract"],
             negative_traits=row["negative_traits"],
             default_style_id=row["default_style_id"],
             created_at=row["created_at"],
+            archived_at=archived_at,
         )

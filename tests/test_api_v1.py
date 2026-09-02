@@ -832,3 +832,131 @@ def test_generation_not_found_is_404(api):
 def test_panel_not_found_is_404(api):
     resp = api.client.get("/api/v1/panels/9999")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# archive / restore (characters, styles) and hard delete (panels)
+# ---------------------------------------------------------------------------
+
+
+def test_character_archive_hides_from_list_and_restore_brings_it_back(api):
+    character = _create_character(api)
+    cid = character["id"]
+
+    archived = api.client.delete(f"/api/v1/characters/{cid}")
+    assert archived.status_code == 204
+
+    active = api.client.get("/api/v1/characters").json()
+    assert cid not in {c["id"] for c in active}
+
+    archived_list = api.client.get("/api/v1/characters/archived").json()
+    assert cid in {c["id"] for c in archived_list}
+
+    # The archived character still resolves individually (existing panels need it).
+    still_there = api.client.get(f"/api/v1/characters/{cid}")
+    assert still_there.status_code == 200
+    assert still_there.json()["archived_at"] is not None
+
+    restored = api.client.post(f"/api/v1/characters/{cid}/restore")
+    assert restored.status_code == 200
+    assert restored.json()["archived_at"] is None
+    assert cid in {c["id"] for c in api.client.get("/api/v1/characters").json()}
+
+
+def test_character_archive_frees_slug_for_reuse(api):
+    character = _create_character(api, name="Alice", slug="alice")
+    assert api.client.delete(f"/api/v1/characters/{character['id']}").status_code == 204
+    reused = api.client.post(
+        "/api/v1/characters",
+        json={"name": "Alice", "slug": "alice", "visual_contract": "x"},
+    )
+    assert reused.status_code == 201
+    assert reused.json()["id"] != character["id"]
+
+
+def test_style_archive_and_restore(api):
+    created = api.client.post("/api/v1/styles", json={"name": "Ink Wash"}).json()
+    sid = created["id"]
+
+    assert api.client.delete(f"/api/v1/styles/{sid}").status_code == 204
+    assert sid not in {s["id"] for s in api.client.get("/api/v1/styles").json()}
+    assert sid in {s["id"] for s in api.client.get("/api/v1/styles/archived").json()}
+
+    # Name is freed for a new active style.
+    reused = api.client.post("/api/v1/styles", json={"name": "Ink Wash"})
+    assert reused.status_code == 201
+
+    # Restoring now clashes with the active style holding the name -> 409.
+    clash = api.client.post(f"/api/v1/styles/{sid}/restore")
+    assert clash.status_code == 409
+
+
+def test_default_style_archive_is_409(api):
+    sid = _default_style_id(api)
+    resp = api.client.delete(f"/api/v1/styles/{sid}")
+    assert resp.status_code == 409
+
+
+def test_archived_style_still_usable_by_existing_panel(api):
+    """Archiving a style must not break panels that already reference it."""
+    style = api.client.post("/api/v1/styles", json={"name": "Ephemeral"}).json()
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = api.client.post(
+        "/api/v1/panels",
+        json={
+            "beat_text": "A lone figure on the moor.",
+            "camera": "eye level",
+            "framing": "wide",
+            "mood": "bleak",
+            "aspect_ratio": "3:2",
+            "cast": [{"character_id": character["id"], "role": "lead", "prominence": 1}],
+            "style_id": style["id"],
+            "model": "gemini-3.1-flash-image",
+            "image_size": "1K",
+        },
+    ).json()
+
+    assert api.client.delete(f"/api/v1/styles/{style['id']}").status_code == 204
+
+    # The panel still loads and previews with the archived style.
+    fetched = api.client.get(f"/api/v1/panels/{panel['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["style_id"] == style["id"]
+    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview")
+    assert preview.status_code == 200
+
+
+def test_panel_hard_delete_removes_panel_and_generation_history(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    pid = panel["id"]
+
+    gen = _generate_panel(api, pid)
+    assert gen.status_code in (200, 201), gen.text
+
+    deleted = api.client.delete(f"/api/v1/panels/{pid}")
+    assert deleted.status_code == 204
+
+    assert api.client.get(f"/api/v1/panels/{pid}").status_code == 404
+    assert pid not in {p["id"] for p in api.client.get("/api/v1/panels").json()}
+
+    # The generation history is gone too (hard delete cascades).
+    conn = connect(api.db_path)
+    try:
+        remaining = conn.execute(
+            "SELECT COUNT(*) FROM generation WHERE scene_id = ?", (pid,)
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert remaining == 0
+
+
+def test_panel_delete_missing_is_404(api):
+    assert api.client.delete("/api/v1/panels/9999").status_code == 404
+
+
+def test_character_and_style_restore_missing_is_404(api):
+    assert api.client.post("/api/v1/characters/9999/restore").status_code == 404
+    assert api.client.post("/api/v1/styles/9999/restore").status_code == 404

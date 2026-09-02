@@ -71,6 +71,21 @@
   transform: translateY(-2px);
 }
 
+/* A card whose whole surface is a click target (e.g. panel tiles open the
+   preview). Action buttons inside stop propagation so they act independently. */
+.resource-card--clickable {
+  cursor: pointer;
+}
+
+.resource-card--clickable:hover {
+  transform: translateY(-2px);
+}
+
+.resource-card--clickable:focus-visible {
+  outline: 2px solid var(--accent, var(--border-strong));
+  outline-offset: 2px;
+}
+
 .resource-card__body {
   min-width: 0;
   flex: 1;
@@ -102,6 +117,7 @@
 
 .resource-card__meta {
   display: flex;
+  align-items: center;
   gap: var(--space-2) var(--space-4);
   flex-wrap: wrap;
   margin: 0;
@@ -251,6 +267,24 @@
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-top: var(--space-4);
+}
+
+/* Archived (soft-deleted) resources: a collapsible section under the active
+   list, with muted cards to signal they are out of the active workflow. */
+.archived-section {
+  margin-top: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.archived-section__toggle {
+  align-self: flex-start;
+}
+
+.resource-card--archived {
+  opacity: 0.7;
+  background: var(--bg-subtle);
 }
 
 .action-bar {

@@ -20,6 +20,7 @@ vi.mock('../../api/client', async () => {
     previewPanel: vi.fn(),
     listPanelGenerations: vi.fn(),
     duplicatePanel: vi.fn(),
+    deletePanel: vi.fn(),
     generatePanel: vi.fn(),
     reviewCandidate: vi.fn(),
   }
@@ -163,6 +164,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     vi.mocked(client.previewPanel).mockReset().mockResolvedValue(BLOCKED_PREVIEW)
     vi.mocked(client.listPanelGenerations).mockReset().mockResolvedValue([])
     vi.mocked(client.duplicatePanel).mockReset()
+    vi.mocked(client.deletePanel).mockReset().mockResolvedValue(undefined)
     vi.mocked(client.generatePanel).mockReset()
     vi.mocked(client.reviewCandidate).mockReset()
     refreshBudget.mockReset().mockResolvedValue(undefined)
@@ -178,6 +180,51 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
     expect(screen.queryByRole('link', { name: 'Edit panel' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Duplicate & edit/ })).toBeInTheDocument()
+  })
+
+  it('shows each candidate review status on its generation attempt', async () => {
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
+      {
+        ...SUCCEEDED_ATTEMPT,
+        id: 8,
+        candidates: [{ ...CANDIDATE, id: 901, generation_id: 8, review_status: 'accepted' }],
+      },
+      {
+        ...SUCCEEDED_ATTEMPT,
+        id: 9,
+        candidates: [{ ...CANDIDATE, id: 902, generation_id: 9, review_status: 'rejected' }],
+      },
+    ])
+    renderPreview()
+
+    await screen.findAllByText('Attempt #7')
+    const attemptList = document.querySelector('.attempt-list')
+    expect(attemptList).not.toBeNull()
+    expect(within(attemptList as HTMLElement).getAllByText('Succeeded')).toHaveLength(3)
+    expect(within(attemptList as HTMLElement).getAllByText('Waiting')).toHaveLength(1)
+    expect(within(attemptList as HTMLElement).getAllByText('Accepted')).toHaveLength(1)
+    expect(within(attemptList as HTMLElement).getAllByText('Rejected')).toHaveLength(1)
+  })
+
+  it('puts the purple Back to panels button in the page header', async () => {
+    renderPreview()
+    await screen.findByText(/Mara backs toward the door\./)
+
+    const back = screen.getByRole('link', { name: 'Back to panels' })
+    expect(back).toHaveClass('btn--primary')
+    expect(back.closest('.page-header__actions')).not.toBeNull()
+  })
+
+  it('deletes the panel from the action block after confirmation', async () => {
+    const user = userEvent.setup()
+    renderPreview()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete panel' }))
+
+    await waitFor(() => expect(client.deletePanel).toHaveBeenCalledWith(3))
+    expect(mockNavigate).toHaveBeenCalledWith('/panels')
   })
 
   it('duplicates and navigates straight to editing the new panel', async () => {
@@ -348,7 +395,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     renderPreview()
 
     expect(await screen.findByText('1 / 1')).toBeInTheDocument()
-    expect(screen.getByText('Pending review')).toBeInTheDocument()
+    expect(screen.getAllByText('Waiting')).toHaveLength(2)
 
     // Carousel sits immediately after the page header, before the beat text
     // and prompt/preview sections.

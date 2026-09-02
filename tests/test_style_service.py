@@ -8,6 +8,7 @@ from app.db import connect
 from app.services.styles import (
     DEFAULT_STYLE_CONTRACT,
     DEFAULT_STYLE_NAME,
+    StyleArchivedError,
     StyleNameCollisionError,
     StyleNotFoundError,
     StyleService,
@@ -123,3 +124,79 @@ def test_update_keeping_own_name_is_allowed(conn):
     updated = service.update(s.id, name="Ink Wash", style_contract="tweaked")
     assert updated.name == "Ink Wash"
     assert updated.style_contract == "tweaked"
+
+
+# ---------------------------------------------------------------------------
+# archive / restore (soft delete)
+# ---------------------------------------------------------------------------
+
+def test_archive_hides_from_list_but_get_still_resolves(conn):
+    service = _service(conn)
+    s = service.create(name="Ink Wash", style_contract="x")
+    service.archive(s.id)
+    assert all(x.name != "Ink Wash" for x in service.list())
+    # Existing panels reference styles by id, so archived styles must still
+    # resolve — the display name is preserved.
+    fetched = service.get(s.id)
+    assert fetched.name == "Ink Wash"
+    assert fetched.archived_at is not None
+
+
+def test_archive_frees_name_for_reuse(conn):
+    service = _service(conn)
+    s = service.create(name="Ink Wash")
+    service.archive(s.id)
+    reused = service.create(name="Ink Wash")
+    assert reused.id != s.id
+    assert reused.name == "Ink Wash"
+    assert reused.archived_at is None
+
+
+def test_archive_is_idempotent(conn):
+    service = _service(conn)
+    s = service.create(name="Ink Wash")
+    service.archive(s.id)
+    again = service.archive(s.id)
+    assert again.archived_at is not None
+
+
+def test_default_style_cannot_be_archived(conn):
+    service = _service(conn)
+    default = service.get_default()
+    with pytest.raises(StyleArchivedError):
+        service.archive(default.id)
+
+
+def test_archive_missing_style_raises(conn):
+    with pytest.raises(StyleNotFoundError):
+        _service(conn).archive(99999)
+
+
+def test_restore_reclaims_original_name(conn):
+    service = _service(conn)
+    s = service.create(name="Ink Wash", style_contract="x")
+    service.archive(s.id)
+    restored = service.restore(s.id)
+    assert restored.name == "Ink Wash"
+    assert restored.archived_at is None
+    assert any(x.id == s.id for x in service.list())
+
+
+def test_restore_blocked_when_name_taken_by_active(conn):
+    service = _service(conn)
+    s = service.create(name="Ink Wash")
+    service.archive(s.id)
+    service.create(name="Ink Wash")  # reclaims the freed name
+    with pytest.raises(StyleNameCollisionError):
+        service.restore(s.id)
+
+
+def test_list_archived_returns_only_archived(conn):
+    service = _service(conn)
+    active = service.create(name="Active")
+    archived = service.create(name="Archived Later")
+    service.archive(archived.id)
+    archived_names = [s.name for s in service.list_archived()]
+    assert "Archived Later" in archived_names
+    assert "Active" not in archived_names
+    assert active.id not in {s.id for s in service.list_archived()}

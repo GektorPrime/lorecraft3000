@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import Response
 
 from app.deps import get_conn, get_storage
 from app.routes.api_v1._common import _character_out, _raise_for
@@ -16,6 +17,11 @@ router = APIRouter(prefix="/api/v1", tags=["api-v1-characters"])
 @router.get("/characters", response_model=list[Character])
 def list_characters(conn=Depends(get_conn), storage=Depends(get_storage)):
     return [_character_out(conn, storage, c) for c in CharacterService(conn).list()]
+
+
+@router.get("/characters/archived", response_model=list[Character])
+def list_archived_characters(conn=Depends(get_conn), storage=Depends(get_storage)):
+    return [_character_out(conn, storage, c) for c in CharacterService(conn).list_archived()]
 
 
 @router.post("/characters", response_model=Character, status_code=201)
@@ -39,6 +45,25 @@ def get_character(character_id: int, conn=Depends(get_conn), storage=Depends(get
     try:
         character = CharacterService(conn).get(character_id)
     except CharacterNotFoundError as exc:
+        _raise_for(exc)
+    return _character_out(conn, storage, character)
+
+
+@router.delete("/characters/{character_id}", status_code=204)
+def archive_character(character_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
+    """Archive (soft-delete) a character. Existing panels keep referencing it."""
+    try:
+        CharacterService(conn).archive(character_id)
+    except CharacterError as exc:
+        _raise_for(exc)
+    return Response(status_code=204)
+
+
+@router.post("/characters/{character_id}/restore", response_model=Character)
+def restore_character(character_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
+    try:
+        character = CharacterService(conn).restore(character_id)
+    except CharacterError as exc:
         _raise_for(exc)
     return _character_out(conn, storage, character)
 

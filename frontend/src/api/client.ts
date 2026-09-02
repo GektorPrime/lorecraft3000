@@ -92,21 +92,36 @@ export const getBudget = () => request<Budget>('/budget')
 // ---------------------------------------------------------------------------
 
 export const listCharacters = () => request<Character[]>('/characters')
+export const listArchivedCharacters = () => request<Character[]>('/characters/archived')
 export const getCharacter = (id: number) => request<Character>(`/characters/${id}`)
 export const createCharacter = (payload: CharacterInput) =>
   request<Character>('/characters', json('POST', payload))
 export const updateCharacter = (id: number, payload: CharacterInput) =>
   request<Character>(`/characters/${id}`, json('PUT', payload))
+// Archive (soft-delete): the character stays linked to existing panels but is
+// hidden from lists/pickers. restoreCharacter reverses it.
+export const archiveCharacter = (id: number) =>
+  request<void>(`/characters/${id}`, { method: 'DELETE' })
+export const restoreCharacter = (id: number) =>
+  request<Character>(`/characters/${id}/restore`, { method: 'POST' })
 
 // ---------------------------------------------------------------------------
 // styles
 // ---------------------------------------------------------------------------
 
 export const listStyles = () => request<Style[]>('/styles')
+export const listArchivedStyles = () => request<Style[]>('/styles/archived')
 export const getStyle = (id: number) => request<Style>(`/styles/${id}`)
 export const createStyle = (payload: StyleInput) => request<Style>('/styles', json('POST', payload))
 export const updateStyle = (id: number, payload: StyleInput) =>
   request<Style>(`/styles/${id}`, json('PUT', payload))
+// Archive (soft-delete): the style stays on existing panels but is hidden from
+// lists/pickers. restoreStyle reverses it. The seeded default style cannot be
+// archived (the backend returns 409).
+export const archiveStyle = (id: number) =>
+  request<void>(`/styles/${id}`, { method: 'DELETE' })
+export const restoreStyle = (id: number) =>
+  request<Style>(`/styles/${id}/restore`, { method: 'POST' })
 
 // ---------------------------------------------------------------------------
 // reference sets / images
@@ -144,6 +159,10 @@ export const updatePanel = (id: number, payload: PanelInput) =>
   request<Panel>(`/panels/${id}`, json('PUT', payload))
 export const duplicatePanel = (id: number) =>
   request<Panel>(`/panels/${id}/duplicate`, { method: 'POST' })
+// Panels are hard-deleted (not archived): this permanently removes the panel
+// and its entire generation history.
+export const deletePanel = (id: number) =>
+  request<void>(`/panels/${id}`, { method: 'DELETE' })
 export const previewPanel = (id: number) => request<PanelPreview>(`/panels/${id}/preview`)
 export const listPanelGenerations = (id: number) =>
   request<GenerationSummary[]>(`/panels/${id}/generations`)

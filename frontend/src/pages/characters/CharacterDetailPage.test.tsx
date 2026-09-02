@@ -13,6 +13,8 @@ vi.mock('../../api/client', async () => {
     getCharacter: vi.fn(),
     listRefSets: vi.fn(),
     createRefSetDraft: vi.fn(),
+    archiveCharacter: vi.fn(),
+    restoreCharacter: vi.fn(),
   }
 })
 
@@ -25,6 +27,7 @@ const CHARACTER: Character = {
   negative_traits: '',
   default_style_id: null,
   created_at: '',
+  archived_at: null,
   has_canonical_ref_set: false,
   avatar_url: null,
   avatar_initials: 'EL',
@@ -32,7 +35,10 @@ const CHARACTER: Character = {
 
 function renderPage(path: string) {
   const router = createMemoryRouter(
-    [{ path: '/characters/:id', element: <CharacterDetailPage /> }],
+    [
+      { path: '/characters/:id', element: <CharacterDetailPage /> },
+      { path: '/characters', element: <h1>Characters</h1> },
+    ],
     { initialEntries: [path] },
   )
   return { router, ...render(<RouterProvider router={router} />) }
@@ -43,6 +49,8 @@ describe('CharacterDetailPage routing', () => {
     vi.mocked(client.getCharacter).mockReset().mockResolvedValue(CHARACTER)
     vi.mocked(client.listRefSets).mockReset().mockResolvedValue([])
     vi.mocked(client.createRefSetDraft).mockReset()
+    vi.mocked(client.archiveCharacter).mockReset().mockResolvedValue(undefined)
+    vi.mocked(client.restoreCharacter).mockReset()
   })
 
   it('rejects malformed IDs without resource requests', async () => {
@@ -133,5 +141,29 @@ describe('CharacterDetailPage routing', () => {
     )
     expect(screen.getByRole('heading', { name: 'Elias' })).toBeInTheDocument()
     expect(screen.getByText('No reference sets yet.')).toBeInTheDocument()
+  })
+
+  it('archives from the detail page after confirmation', async () => {
+    const user = userEvent.setup()
+    renderPage('/characters/1')
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Archive character' }))
+
+    await waitFor(() => expect(client.archiveCharacter).toHaveBeenCalledWith(1))
+    expect(await screen.findByRole('heading', { name: 'Characters' })).toBeInTheDocument()
+  })
+
+  it('restores an archived character from its detail page', async () => {
+    const user = userEvent.setup()
+    const archived = { ...CHARACTER, archived_at: '2026-09-02 10:00:00' }
+    vi.mocked(client.getCharacter).mockResolvedValue(archived)
+    vi.mocked(client.restoreCharacter).mockResolvedValue(CHARACTER)
+    renderPage('/characters/1')
+
+    await user.click(await screen.findByRole('button', { name: 'Restore' }))
+
+    await waitFor(() => expect(client.restoreCharacter).toHaveBeenCalledWith(1))
+    expect(await screen.findByRole('link', { name: 'Edit' })).toBeInTheDocument()
   })
 })

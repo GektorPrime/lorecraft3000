@@ -11,7 +11,7 @@ vi.mock('../../api/client', async () => {
   return {
     ...actual,
     listPanels: vi.fn(),
-    duplicatePanel: vi.fn(),
+    deletePanel: vi.fn(),
   }
 })
 
@@ -37,74 +37,147 @@ const LOCKED_PANEL: Panel = {
   generation_count: 1,
 }
 
-describe('PanelListPage — Duplicate & edit', () => {
+const EDITABLE_PANEL: Panel = {
+  ...LOCKED_PANEL,
+  id: 3,
+  beat_text: 'A quiet dawn over the harbor.',
+  is_editable: true,
+  generation_count: 0,
+}
+
+describe('PanelListPage — locked panel actions', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
     vi.mocked(client.listPanels).mockReset().mockResolvedValue([LOCKED_PANEL])
-    vi.mocked(client.duplicatePanel).mockReset()
   })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('duplicates a locked panel and navigates to editing the new panel', async () => {
-    const user = userEvent.setup()
-    vi.mocked(client.duplicatePanel).mockResolvedValue({
-      ...LOCKED_PANEL,
-      id: 42,
-      is_editable: true,
-      generation_count: 0,
-    })
-
+  it('does not offer Duplicate & edit on the listing page', async () => {
     render(
       <MemoryRouter>
         <PanelListPage />
       </MemoryRouter>,
     )
 
-    const duplicateButton = await screen.findByRole('button', { name: /Duplicate & edit/ })
-    await user.click(duplicateButton)
+    await screen.findByText('Elias draws his sword.')
+    expect(screen.queryByRole('button', { name: /Duplicate & edit/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+})
 
-    await waitFor(() => expect(client.duplicatePanel).toHaveBeenCalledWith(7))
-    // Duplicating alone doesn't edit anything — it must navigate to the new
-    // panel's edit page (issue #15 follow-up).
-    expect(mockNavigate).toHaveBeenCalledWith('/panels/42/edit')
+describe('PanelListPage — preview via tile click', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset()
+    vi.mocked(client.listPanels).mockReset().mockResolvedValue([EDITABLE_PANEL])
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
-  it('keeps the panel list visible when duplication fails', async () => {
+  it('no longer renders a separate Preview button', async () => {
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('A quiet dawn over the harbor.')
+    expect(screen.queryByRole('link', { name: /Preview/ })).not.toBeInTheDocument()
+  })
+
+  it('opens the preview when the whole tile is clicked', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.duplicatePanel).mockRejectedValue(new Error('offline'))
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+    const tile = await screen.findByRole('button', { name: /Preview panel #3/ })
+    await user.click(tile)
+    expect(mockNavigate).toHaveBeenCalledWith('/panels/3/preview')
+  })
+
+  it('does not open the preview when an action button is clicked', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('A quiet dawn over the harbor.')
+    await user.click(screen.getByRole('button', { name: /Delete/ }))
+    expect(mockNavigate).not.toHaveBeenCalledWith('/panels/3/preview')
+  })
+
+  it('does not expose Edit on editable panel cards', async () => {
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('A quiet dawn over the harbor.')
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
+  })
+
+  it('places the status badge first in the metadata row', async () => {
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+    await screen.findByText('A quiet dawn over the harbor.')
+    const metadata = screen.getByText(/Cast:/).closest('.resource-card__meta')
+    expect(metadata?.firstElementChild).toHaveTextContent('Editable')
+  })
+})
+
+describe('PanelListPage — delete', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset()
+    vi.mocked(client.listPanels).mockReset().mockResolvedValue([EDITABLE_PANEL])
+    vi.mocked(client.deletePanel).mockReset().mockResolvedValue(undefined)
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('confirms then permanently deletes the panel and reloads', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.listPanels)
+      .mockResolvedValueOnce([EDITABLE_PANEL])
+      .mockResolvedValueOnce([])
     render(
       <MemoryRouter>
         <PanelListPage />
       </MemoryRouter>,
     )
 
-    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
+    await user.click(await screen.findByRole('button', { name: /Delete/ }))
+    await user.click(await screen.findByRole('button', { name: 'Delete panel' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not duplicate panel: Error: offline')
-    expect(screen.getByText('Elias draws his sword.')).toBeInTheDocument()
-  })
-
-  it('does not redirect when duplication finishes after leaving the page', async () => {
-    const user = userEvent.setup()
-    let finishDuplicate!: (panel: Panel) => void
-    vi.mocked(client.duplicatePanel).mockReturnValue(
-      new Promise((resolve) => {
-        finishDuplicate = resolve
-      }),
+    await waitFor(() => expect(client.deletePanel).toHaveBeenCalledWith(3))
+    await waitFor(() =>
+      expect(screen.queryByText('A quiet dawn over the harbor.')).not.toBeInTheDocument(),
     )
-    const view = render(
-      <MemoryRouter>
-        <PanelListPage />
-      </MemoryRouter>,
-    )
-
-    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
-    view.unmount()
-    finishDuplicate({ ...LOCKED_PANEL, id: 42, is_editable: true })
-    await Promise.resolve()
-
+    // Deleting a panel must not navigate to its (now gone) preview.
     expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  it('surfaces an error and keeps the panel when deletion fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.deletePanel).mockRejectedValue(new Error('offline'))
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /Delete/ }))
+    await user.click(await screen.findByRole('button', { name: 'Delete panel' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete panel: Error: offline')
+    expect(screen.getByText('A quiet dawn over the harbor.')).toBeInTheDocument()
   })
 })

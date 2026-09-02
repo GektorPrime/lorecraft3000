@@ -97,6 +97,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/characters/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Archived Characters */
+        get: operations["list_archived_characters_api_v1_characters_archived_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/characters/{character_id}": {
         parameters: {
             query?: never;
@@ -109,7 +126,11 @@ export interface paths {
         /** Update Character */
         put: operations["update_character_api_v1_characters__character_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Archive Character
+         * @description Archive (soft-delete) a character. Existing panels keep referencing it.
+         */
+        delete: operations["archive_character_api_v1_characters__character_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -127,6 +148,23 @@ export interface paths {
         put?: never;
         /** Create Ref Set Draft */
         post: operations["create_ref_set_draft_api_v1_characters__character_id__ref_sets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/characters/{character_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Character */
+        post: operations["restore_character_api_v1_characters__character_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -214,7 +252,11 @@ export interface paths {
         /** Update Panel */
         put: operations["update_panel_api_v1_panels__panel_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Panel
+         * @description Permanently delete a panel and its full generation history.
+         */
+        delete: operations["delete_panel_api_v1_panels__panel_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -409,6 +451,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/styles/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Archived Styles */
+        get: operations["list_archived_styles_api_v1_styles_archived_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/styles/{style_id}": {
         parameters: {
             query?: never;
@@ -421,6 +480,27 @@ export interface paths {
         /** Update Style */
         put: operations["update_style_api_v1_styles__style_id__put"];
         post?: never;
+        /**
+         * Archive Style
+         * @description Archive (soft-delete) a style. Existing panels keep referencing it.
+         */
+        delete: operations["archive_style_api_v1_styles__style_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/styles/{style_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Style */
+        post: operations["restore_style_api_v1_styles__style_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -543,6 +623,8 @@ export interface components {
         };
         /** Character */
         Character: {
+            /** Archived At */
+            archived_at?: string | null;
             /** Avatar Initials */
             avatar_initials: string;
             /** Avatar Url */
@@ -861,6 +943,8 @@ export interface components {
         };
         /** Style */
         Style: {
+            /** Archived At */
+            archived_at?: string | null;
             /** Created At */
             created_at: string;
             /** Id */
@@ -1072,6 +1156,26 @@ export interface operations {
             };
         };
     };
+    list_archived_characters_api_v1_characters_archived_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Character"][];
+                };
+            };
+        };
+    };
     get_character_api_v1_characters__character_id__get: {
         parameters: {
             query?: never;
@@ -1138,6 +1242,35 @@ export interface operations {
             };
         };
     };
+    archive_character_api_v1_characters__character_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                character_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_ref_sets_api_v1_characters__character_id__ref_sets_get: {
         parameters: {
             query?: never;
@@ -1187,6 +1320,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_character_api_v1_characters__character_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                character_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Character"];
                 };
             };
             /** @description Validation Error */
@@ -1389,6 +1553,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Panel"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_panel_api_v1_panels__panel_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                panel_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1811,6 +2004,26 @@ export interface operations {
             };
         };
     };
+    list_archived_styles_api_v1_styles_archived_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Style"][];
+                };
+            };
+        };
+    };
     get_style_api_v1_styles__style_id__get: {
         parameters: {
             query?: never;
@@ -1856,6 +2069,66 @@ export interface operations {
                 "application/json": components["schemas"]["StyleInput"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Style"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_style_api_v1_styles__style_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                style_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_style_api_v1_styles__style_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                style_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

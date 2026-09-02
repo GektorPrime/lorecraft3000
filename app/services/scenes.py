@@ -194,6 +194,56 @@ class SceneService:
         self.conn.commit()
         return self.get(int(cursor.lastrowid))
 
+    def delete(self, scene_id: int) -> None:
+        """Permanently delete a panel and its full generation history.
+
+        Panels are hard-deleted (unlike characters/styles, which archive): the
+        scene row plus every ``generation`` and its ``candidate`` rows are
+        removed together in one transaction so no orphaned provenance is left
+        behind. Content-addressed image blobs are shared and are not touched
+        here (a candidate row is the only thing removed, not the stored bytes).
+        """
+        if self.conn.execute(
+            "SELECT 1 FROM scene WHERE id = ?", (scene_id,)
+        ).fetchone() is None:
+            raise SceneNotFoundError(f"scene {scene_id} not found")
+        try:
+            self.conn.execute(
+                """
+                DELETE FROM candidate
+                 WHERE generation_id IN (
+                     SELECT id FROM generation WHERE scene_id = ?
+                 )
+                """,
+                (scene_id,),
+            )
+            # image_provenance also references generation(id). It is otherwise
+            # append-only, but a hard panel delete removes the panel's entire
+            # history, provenance included, so nothing is left dangling.
+            self.conn.execute(
+                """
+                DELETE FROM image_provenance
+                 WHERE generation_id IN (
+                     SELECT id FROM generation WHERE scene_id = ?
+                 )
+                """,
+                (scene_id,),
+            )
+            # generation.parent_generation_id self-references generation(id)
+            # (a retried/replayed attempt points at its parent). Clear those
+            # links first so deleting the rows can't trip the self-referencing
+            # foreign key mid-statement.
+            self.conn.execute(
+                "UPDATE generation SET parent_generation_id = NULL WHERE scene_id = ?",
+                (scene_id,),
+            )
+            self.conn.execute("DELETE FROM generation WHERE scene_id = ?", (scene_id,))
+            self.conn.execute("DELETE FROM scene WHERE id = ?", (scene_id,))
+            self.conn.commit()
+        except sqlite3.Error:
+            self.conn.rollback()
+            raise
+
     def _validate(
         self,
         *,
