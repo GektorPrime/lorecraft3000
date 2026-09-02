@@ -13,6 +13,7 @@ import type {
   Candidate,
   Character,
   CharacterInput,
+  GalleryItem,
   Generation,
   GenerationSummary,
   OptionsSummary,
@@ -148,3 +149,9 @@ export const generatePanel = (id: number, expectedPromptHash: string) =>
 
 export const reviewCandidate = (id: number, verdict: 'accepted' | 'rejected') =>
   request<Candidate>(`/candidates/${id}/review`, json('POST', { verdict }))
+
+// ---------------------------------------------------------------------------
+// gallery
+// ---------------------------------------------------------------------------
+
+export const getGallery = () => request<GalleryItem[]>('/gallery')

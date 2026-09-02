@@ -753,6 +753,32 @@ def test_invalid_review_verdict_is_422(api):
     assert resp.status_code == 422
 
 
+def test_gallery_lists_only_accepted_candidates(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    accepted = _generate_panel(api, panel["id"]).json()
+    candidate = accepted["candidates"][0]
+    resp = api.client.post(
+        f"/api/v1/candidates/{candidate['id']}/review", json={"verdict": "accepted"}
+    )
+    assert resp.status_code == 200
+
+    pending_panel = _create_panel(api, [character["id"]])
+    _generate_panel(api, pending_panel["id"])
+
+    gallery = api.client.get("/api/v1/gallery")
+    assert gallery.status_code == 200
+    items = gallery.json()
+    assert len(items) == 1
+    item = items[0]
+    assert item["candidate_id"] == candidate["id"]
+    assert item["content_url"] == f"/api/v1/candidates/{candidate['id']}/content"
+    assert item["panel_id"] == panel["id"]
+    assert item["aspect_ratio"]
+    assert item["beat_text"].strip()
+
+
 def test_generation_not_found_is_404(api):
     resp = api.client.get("/api/v1/generations/9999")
     assert resp.status_code == 404

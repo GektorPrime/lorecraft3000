@@ -33,6 +33,8 @@ export function CandidateCarousel({
   const candidate = attempt.candidates[0]
   const isReviewing = reviewingCandidateId !== null
   const reviewingThis = isReviewing && reviewingCandidateId === candidate.id
+  const showPrevious = () => setIndex((i) => (i - 1 + count) % count)
+  const showNext = () => setIndex((i) => (i + 1) % count)
 
   return (
     <div className="carousel" aria-label="Generated candidate across attempts">
@@ -43,6 +45,8 @@ export function CandidateCarousel({
           previewAlt={`Generated image from attempt ${attempt.id}, full-size preview`}
           triggerLabel={`Preview image from attempt ${attempt.id}`}
           dialogLabel={`Generated image from attempt ${attempt.id}, larger preview`}
+          onPrevious={count > 1 ? showPrevious : undefined}
+          onNext={count > 1 ? showNext : undefined}
         />
         <span className="carousel__counter">{index + 1} / {count}</span>
       </div>
@@ -57,7 +61,7 @@ export function CandidateCarousel({
           type="button"
           className="btn"
           disabled={count <= 1}
-          onClick={() => setIndex((i) => (i - 1 + count) % count)}
+          onClick={showPrevious}
           aria-label="Previous attempt"
         >
           Previous
@@ -66,7 +70,7 @@ export function CandidateCarousel({
           type="button"
           className="btn"
           disabled={count <= 1}
-          onClick={() => setIndex((i) => (i + 1) % count)}
+          onClick={showNext}
           aria-label="Next attempt"
         >
           Next

@@ -56,7 +56,7 @@ describe('Home page', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
   })
 
-  it('renders four square navigation tiles with no raw ID entry and no emoji icons', async () => {
+  it('renders five square navigation tiles with no raw ID entry and no emoji icons', async () => {
     render(<App />)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument())
 
@@ -64,9 +64,10 @@ describe('Home page', () => {
     const tiles = within(nav)
     expect(tiles.getByRole('link', { name: /Characters/ })).toBeInTheDocument()
     expect(tiles.getByRole('link', { name: /Styles/ })).toBeInTheDocument()
+    expect(tiles.getByRole('link', { name: /Gallery/ })).toBeInTheDocument()
     expect(tiles.getByRole('link', { name: /^Panels$/ })).toBeInTheDocument()
     expect(tiles.getByRole('link', { name: /Stage New Panel/ })).toBeInTheDocument()
-    expect(tiles.getAllByRole('link')).toHaveLength(4)
+    expect(tiles.getAllByRole('link')).toHaveLength(5)
 
     // Tile icons are plain text/CSS badges, not emoji.
     const EMOJI_PATTERN = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u

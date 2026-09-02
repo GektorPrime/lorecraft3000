@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 const TILES = [
   { to: '/characters', code: 'CH', label: 'Characters' },
   { to: '/styles', code: 'ST', label: 'Styles' },
+  { to: '/gallery', code: 'GA', label: 'Gallery' },
   { to: '/panels', code: 'PN', label: 'Panels' },
   { to: '/panels/new', code: '+', label: 'Stage New Panel' },
 ] as const

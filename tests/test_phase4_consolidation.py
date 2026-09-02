@@ -59,6 +59,7 @@ WIRE_SURFACE = {
     ("GET", "/api/v1/generations/{generation_id}"),
     ("POST", "/api/v1/candidates/{candidate_id}/review"),
     ("GET", "/api/v1/candidates/{candidate_id}/content"),
+    ("GET", "/api/v1/gallery"),
 }
 
 

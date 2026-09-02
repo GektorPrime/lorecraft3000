@@ -771,6 +771,44 @@ textarea {
   font-size: 0.85rem;
 }
 
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.gallery-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.gallery-card .image-dialog__trigger-image {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+}
+
+.gallery-card__body {
+  padding: 0.6rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.gallery-card__actions {
+  padding: 0 0.7rem 0.7rem;
+}
+
+.gallery-card__actions .btn {
+  width: 100%;
+}
+
 @media (max-width: 640px) {
   .image-dialog {
     padding: 1rem;
