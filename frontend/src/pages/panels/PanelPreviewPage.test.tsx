@@ -201,6 +201,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     await screen.findAllByText('Attempt #7')
     const attemptList = document.querySelector('.attempt-list')
     expect(attemptList).not.toBeNull()
+    expect(within(attemptList as HTMLElement).getAllByText('Succeeded')).toHaveLength(3)
     expect(within(attemptList as HTMLElement).getAllByText('Waiting')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Accepted')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Rejected')).toHaveLength(1)

@@ -441,7 +441,9 @@ function PanelPreview({ panelId }: { panelId: number }) {
             {attempts.map((attempt) => (
               <article className="attempt-row" key={attempt.id}>
                 <div className="attempt-row__summary">
-                  <span className={`badge badge--attempt-${attempt.state}`}>{attempt.state}</span>
+                  <span className={`badge badge--attempt-${attempt.state}`}>
+                    {attempt.state.charAt(0).toUpperCase() + attempt.state.slice(1)}
+                  </span>
                   {attempt.candidates[0] && (
                     <span className={`badge badge--attempt-${attempt.candidates[0].review_status}`}>
                       {REVIEW_STATUS_LABEL[attempt.candidates[0].review_status]
