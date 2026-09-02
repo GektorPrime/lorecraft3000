@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ApiError,
+  deletePanel,
   duplicatePanel,
   generatePanel,
   getPanel,
@@ -17,6 +18,8 @@ import { NotFoundPage } from '../NotFoundPage'
 import { DateTime } from '../../components/DateTime'
 import { CopyButton } from '../../components/CopyButton'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Icon } from '../../components/Icon'
 import { ImageDialog } from '../../components/ImageDialog'
 import { EmptyState } from '../../components/EmptyState'
 import { Notice } from '../../components/Notice'
@@ -65,6 +68,8 @@ function PanelPreview({ panelId }: { panelId: number }) {
   } | null>(null)
   const [generating, setGenerating] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [reviewingCandidateId, setReviewingCandidateId] = useState<number | null>(null)
   const [notFound, setNotFound] = useState(false)
   const requestVersion = useRef(0)
@@ -228,6 +233,22 @@ function PanelPreview({ panelId }: { panelId: number }) {
     }
   }
 
+  const handleDelete = async () => {
+    setConfirmingDelete(false)
+    if (deleting) return
+    setDeleting(true)
+    setActionMessage(null)
+    try {
+      await deletePanel(panelId)
+      if (!mounted.current) return
+      navigate('/panels')
+    } catch (err) {
+      if (!mounted.current) return
+      setActionMessage(`Could not delete panel: ${err instanceof ApiError ? err.message : String(err)}`)
+      setDeleting(false)
+    }
+  }
+
   const handleReview = async (candidateId: number, verdict: 'accepted' | 'rejected') => {
     if (reviewingCandidateId !== null) return
     setReviewingCandidateId(candidateId)
@@ -268,8 +289,15 @@ function PanelPreview({ panelId }: { panelId: number }) {
   }
 
   return (
-    <section className="panel-preview" aria-busy={generating || duplicating || undefined}>
-      <PageHeader title="Preview panel" />
+    <section className="panel-preview" aria-busy={generating || duplicating || deleting || undefined}>
+      <PageHeader
+        title="Preview panel"
+        actions={(
+          <Link to="/panels" className="btn btn--primary">
+            Back to panels
+          </Link>
+        )}
+      />
       {attempts && attempts.length > 0 && (
         <CandidateCarousel
           attempts={attempts}
@@ -357,9 +385,15 @@ function PanelPreview({ panelId }: { panelId: number }) {
               {duplicating ? 'Duplicating…' : 'Duplicate & edit'}
             </button>
           )}
-          <Link to="/panels" className="btn">
-            Back to panels
-          </Link>
+          <button
+            type="button"
+            className="btn btn--danger"
+            disabled={deleting}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <Icon name="trash" size={15} />
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
         </div>
         {preview?.can_generate && (
           <div className="action-bar__group action-bar__group--end">
@@ -451,6 +485,15 @@ function PanelPreview({ panelId }: { panelId: number }) {
             ))}
           </div>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this panel?"
+        description="This permanently deletes the panel and its entire generation history. This cannot be undone."
+        confirmLabel="Delete panel"
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </section>
   )
 }

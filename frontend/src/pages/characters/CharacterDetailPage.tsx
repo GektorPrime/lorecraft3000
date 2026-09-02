@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ApiError, createRefSetDraft, getCharacter, listRefSets } from '../../api/client'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  ApiError,
+  archiveCharacter,
+  createRefSetDraft,
+  getCharacter,
+  listRefSets,
+  restoreCharacter,
+} from '../../api/client'
 import type { Character, RefSetSummary } from '../../api/types'
 import { Avatar } from '../../components/Avatar'
 import { AsyncMessage } from '../../components/AsyncMessage'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { RefSetPanel } from '../../components/RefSetPanel'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
@@ -22,6 +30,7 @@ export function CharacterDetailPage() {
 }
 
 function CharacterDetail({ characterId }: { characterId: number }) {
+  const navigate = useNavigate()
   const [character, setCharacter] = useState<Character | null>(null)
   const [refSets, setRefSets] = useState<RefSetSummary[] | null>(null)
   const [characterError, setCharacterError] = useState<string | null>(null)
@@ -31,6 +40,9 @@ function CharacterDetail({ characterId }: { characterId: number }) {
     text: string
   } | null>(null)
   const [creatingDraft, setCreatingDraft] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [confirmingArchive, setConfirmingArchive] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [openIds, setOpenIds] = useState<Set<number>>(new Set())
   const seededCanonical = useRef(false)
@@ -131,6 +143,45 @@ function CharacterDetail({ characterId }: { characterId: number }) {
     return refreshResult.refSetsError
   }
 
+  const handleArchive = async () => {
+    setConfirmingArchive(false)
+    if (archiving) return
+    setArchiving(true)
+    setActionMessage(null)
+    try {
+      await archiveCharacter(characterId)
+      if (!mounted.current) return
+      navigate('/characters')
+    } catch (err) {
+      if (!mounted.current) return
+      setActionMessage({
+        kind: 'error',
+        text: `Could not archive character: ${err instanceof ApiError ? err.message : String(err)}`,
+      })
+      setArchiving(false)
+    }
+  }
+
+  const handleRestore = async () => {
+    if (restoring) return
+    setRestoring(true)
+    setActionMessage(null)
+    try {
+      const restored = await restoreCharacter(characterId)
+      if (!mounted.current) return
+      setCharacter(restored)
+      setActionMessage({ kind: 'success', text: 'Character restored.' })
+    } catch (err) {
+      if (!mounted.current) return
+      setActionMessage({
+        kind: 'error',
+        text: `Could not restore character: ${err instanceof ApiError ? err.message : String(err)}`,
+      })
+    } finally {
+      if (mounted.current) setRestoring(false)
+    }
+  }
+
   if (notFound) return <NotFoundPage />
   if (characterError && !character) {
     return (
@@ -143,7 +194,10 @@ function CharacterDetail({ characterId }: { characterId: number }) {
   if (!character) return <AsyncMessage kind="loading">Loading character…</AsyncMessage>
 
   return (
-    <section className="character-detail" aria-busy={creatingDraft || undefined}>
+    <section
+      className="character-detail"
+      aria-busy={creatingDraft || archiving || restoring || undefined}
+    >
       <PageHeader
         media={(
           <Avatar
@@ -156,10 +210,32 @@ function CharacterDetail({ characterId }: { characterId: number }) {
         title={character.name}
         description={character.slug}
         actions={(
-          <Link to={`/characters/${character.id}/edit`} className="btn btn--primary">
-            <Icon name="edit" size={16} />
-            Edit
-          </Link>
+          character.archived_at ? (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={restoring}
+              onClick={() => void handleRestore()}
+            >
+              {restoring ? 'Restoring…' : 'Restore'}
+            </button>
+          ) : (
+            <>
+              <Link to={`/characters/${character.id}/edit`} className="btn btn--primary">
+                <Icon name="edit" size={16} />
+                Edit
+              </Link>
+              <button
+                type="button"
+                className="btn btn--danger"
+                disabled={archiving}
+                onClick={() => setConfirmingArchive(true)}
+              >
+                <Icon name="trash" size={16} />
+                {archiving ? 'Deleting…' : 'Delete'}
+              </button>
+            </>
+          )
         )}
       />
 
@@ -189,7 +265,7 @@ function CharacterDetail({ characterId }: { characterId: number }) {
       <SectionHeader
         title="Reference-set versions"
         description="Canonical identity and immutable version history."
-        actions={(
+        actions={!character.archived_at ? (
           <button
             type="button"
             className="btn btn--primary"
@@ -199,7 +275,7 @@ function CharacterDetail({ characterId }: { characterId: number }) {
             <Icon name="plus" size={16} />
             {creatingDraft ? 'Creating draft…' : 'New draft'}
           </button>
-        )}
+        ) : undefined}
       />
 
       {characterError && <AsyncMessage kind="error">Could not refresh character: {characterError}</AsyncMessage>}
@@ -258,6 +334,15 @@ function CharacterDetail({ characterId }: { characterId: number }) {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingArchive}
+        title="Archive this character?"
+        description={`"${character.name}" stays in existing panels but is hidden from active lists and can't be cast in new panels. You can restore it from its detail page.`}
+        confirmLabel="Archive character"
+        onConfirm={() => void handleArchive()}
+        onCancel={() => setConfirmingArchive(false)}
+      />
     </section>
   )
 }

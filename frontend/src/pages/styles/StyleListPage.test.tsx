@@ -17,6 +17,12 @@ vi.mock('../../api/client', async () => {
   }
 })
 
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
 const STYLE: Style = {
   id: 5,
   name: 'Ink Wash',
@@ -35,10 +41,24 @@ const ARCHIVED_STYLE: Style = {
 
 describe('StyleListPage — archive & restore', () => {
   beforeEach(() => {
+    mockNavigate.mockReset()
     vi.mocked(client.listStyles).mockReset().mockResolvedValue([STYLE])
     vi.mocked(client.listArchivedStyles).mockReset().mockResolvedValue([])
     vi.mocked(client.archiveStyle).mockReset().mockResolvedValue(undefined)
     vi.mocked(client.restoreStyle).mockReset()
+  })
+
+  it('opens edit when the whole style tile is clicked', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <StyleListPage />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Ink Wash' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/styles/5/edit')
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -54,6 +74,7 @@ describe('StyleListPage — archive & restore', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: /Delete/ }))
+    expect(mockNavigate).not.toHaveBeenCalled()
     await user.click(await screen.findByRole('button', { name: 'Archive style' }))
 
     await waitFor(() => expect(client.archiveStyle).toHaveBeenCalledWith(5))

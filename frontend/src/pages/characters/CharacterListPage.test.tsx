@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,15 +12,7 @@ vi.mock('../../api/client', async () => {
     ...actual,
     listCharacters: vi.fn(),
     listArchivedCharacters: vi.fn(),
-    archiveCharacter: vi.fn(),
-    restoreCharacter: vi.fn(),
   }
-})
-
-const mockNavigate = vi.fn()
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
-  return { ...actual, useNavigate: () => mockNavigate }
 })
 
 const CHARACTER: Character = {
@@ -46,62 +38,31 @@ const ARCHIVED_CHARACTER: Character = {
   archived_at: '2026-01-01T00:00:00Z',
 }
 
-describe('CharacterListPage — tile click, archive & restore', () => {
+describe('CharacterListPage', () => {
   beforeEach(() => {
-    mockNavigate.mockReset()
     vi.mocked(client.listCharacters).mockReset().mockResolvedValue([CHARACTER])
     vi.mocked(client.listArchivedCharacters).mockReset().mockResolvedValue([])
-    vi.mocked(client.archiveCharacter).mockReset().mockResolvedValue(undefined)
-    vi.mocked(client.restoreCharacter).mockReset()
   })
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
+  afterEach(() => vi.restoreAllMocks())
 
-  it('opens the character detail when the tile is clicked', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <CharacterListPage />
-      </MemoryRouter>,
-    )
-    await user.click(await screen.findByRole('button', { name: /Open Mara/ }))
-    expect(mockNavigate).toHaveBeenCalledWith('/characters/4')
-  })
-
-  it('does not open detail when an action button is clicked', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <CharacterListPage />
-      </MemoryRouter>,
-    )
-    await screen.findByText('Mara')
-    await user.click(screen.getByRole('link', { name: /Edit/ }))
-    expect(mockNavigate).not.toHaveBeenCalledWith('/characters/4')
-  })
-
-  it('archives a character after confirmation and reloads', async () => {
-    const user = userEvent.setup()
-    vi.mocked(client.listCharacters).mockResolvedValueOnce([CHARACTER]).mockResolvedValueOnce([])
+  it('uses the whole tile as the detail link with no redundant actions', async () => {
     render(
       <MemoryRouter>
         <CharacterListPage />
       </MemoryRouter>,
     )
 
-    await user.click(await screen.findByRole('button', { name: /Delete/ }))
-    await user.click(await screen.findByRole('button', { name: 'Archive character' }))
-
-    await waitFor(() => expect(client.archiveCharacter).toHaveBeenCalledWith(4))
-    await waitFor(() => expect(screen.queryByText('Mara')).not.toBeInTheDocument())
-    expect(mockNavigate).not.toHaveBeenCalledWith('/characters/4')
+    expect(await screen.findByRole('link', { name: /Mara/ })).toHaveAttribute(
+      'href',
+      '/characters/4',
+    )
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 
-  it('lists archived characters and restores them', async () => {
+  it('links archived tiles to detail so they can be restored there', async () => {
     const user = userEvent.setup()
     vi.mocked(client.listArchivedCharacters).mockResolvedValue([ARCHIVED_CHARACTER])
-    vi.mocked(client.restoreCharacter).mockResolvedValue({ ...ARCHIVED_CHARACTER, archived_at: null })
     render(
       <MemoryRouter>
         <CharacterListPage />
@@ -109,8 +70,9 @@ describe('CharacterListPage — tile click, archive & restore', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: /Show archived characters/ }))
-    await user.click(await screen.findByRole('button', { name: 'Restore' }))
-
-    await waitFor(() => expect(client.restoreCharacter).toHaveBeenCalledWith(8))
+    expect(screen.getByRole('link', { name: /Old Hero/ })).toHaveAttribute(
+      'href',
+      '/characters/8',
+    )
   })
 })

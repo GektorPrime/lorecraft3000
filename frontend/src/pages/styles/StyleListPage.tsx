@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ApiError,
   archiveStyle,
@@ -15,6 +15,7 @@ import { Icon } from '../../components/Icon'
 import { PageHeader } from '../../components/PageHeader'
 
 export function StyleListPage() {
+  const navigate = useNavigate()
   const [styles, setStyles] = useState<Style[] | null>(null)
   const [archived, setArchived] = useState<Style[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -104,7 +105,20 @@ export function StyleListPage() {
       {styles && styles.length > 0 && (
         <div className="resource-list">
           {styles.map((style) => (
-            <article key={style.id} className="resource-card">
+            <article
+              key={style.id}
+              className="resource-card resource-card--clickable"
+              role="button"
+              tabIndex={0}
+              aria-label={`Edit ${style.name}`}
+              onClick={() => navigate(`/styles/${style.id}/edit`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  navigate(`/styles/${style.id}/edit`)
+                }
+              }}
+            >
               <div className="resource-card__body">
                 <h2 className="resource-card__title">{style.name}</h2>
                 <p className="resource-card__summary text-clamp" title={style.style_contract}>
@@ -112,15 +126,14 @@ export function StyleListPage() {
                 </p>
               </div>
               <div className="resource-card__actions">
-                <Link to={`/styles/${style.id}/edit`} className="btn">
-                  <Icon name="edit" size={15} />
-                  Edit
-                </Link>
                 <button
                   type="button"
                   className="btn btn--danger"
                   disabled={busyId !== null}
-                  onClick={() => setConfirmId(style.id)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setConfirmId(style.id)
+                  }}
                 >
                   <Icon name="trash" size={15} />
                   Delete
