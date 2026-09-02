@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ApiError, deletePanel, duplicatePanel, listPanels } from '../../api/client'
+import { ApiError, deletePanel, listPanels } from '../../api/client'
 import type { Panel } from '../../api/types'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -12,12 +12,11 @@ export function PanelListPage() {
   const navigate = useNavigate()
   const [panels, setPanels] = useState<Panel[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const mounted = useRef(true)
 
-  const busy = duplicatingId !== null || deletingId !== null
+  const busy = deletingId !== null
 
   const reload = () =>
     listPanels()
@@ -37,25 +36,6 @@ export function PanelListPage() {
       mounted.current = false
     }
   }, [])
-
-  // Duplicate a locked panel and go straight to editing the new, editable
-  // copy — duplicating alone does not let the user edit anything, so this
-  // must navigate, not just refresh the list (issue #15 follow-up).
-  const handleDuplicateAndEdit = async (id: number) => {
-    if (busy) return
-    setDuplicatingId(id)
-    setError(null)
-    try {
-      const copy = await duplicatePanel(id)
-      if (!mounted.current) return
-      navigate(`/panels/${copy.id}/edit`)
-    } catch (err) {
-      if (!mounted.current) return
-      setError(`Could not duplicate panel: ${err instanceof ApiError ? err.message : String(err)}`)
-    } finally {
-      if (mounted.current) setDuplicatingId(null)
-    }
-  }
 
   const confirmDelete = async () => {
     const id = confirmId
@@ -139,7 +119,7 @@ export function PanelListPage() {
                 </p>
               </div>
               <div className="resource-card__actions">
-                {panel.is_editable ? (
+                {panel.is_editable && (
                   <Link
                     to={`/panels/${panel.id}/edit`}
                     className="btn"
@@ -148,19 +128,6 @@ export function PanelListPage() {
                     <Icon name="edit" size={15} />
                     Edit
                   </Link>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={busy}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void handleDuplicateAndEdit(panel.id)
-                    }}
-                  >
-                    <Icon name="copy" size={15} />
-                    {duplicatingId === panel.id ? 'Duplicating…' : 'Duplicate & edit'}
-                  </button>
                 )}
                 <button
                   type="button"

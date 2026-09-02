@@ -11,7 +11,6 @@ vi.mock('../../api/client', async () => {
   return {
     ...actual,
     listPanels: vi.fn(),
-    duplicatePanel: vi.fn(),
     deletePanel: vi.fn(),
   }
 })
@@ -46,75 +45,26 @@ const EDITABLE_PANEL: Panel = {
   generation_count: 0,
 }
 
-describe('PanelListPage — Duplicate & edit', () => {
+describe('PanelListPage — locked panel actions', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
     vi.mocked(client.listPanels).mockReset().mockResolvedValue([LOCKED_PANEL])
-    vi.mocked(client.duplicatePanel).mockReset()
   })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('duplicates a locked panel and navigates to editing the new panel', async () => {
-    const user = userEvent.setup()
-    vi.mocked(client.duplicatePanel).mockResolvedValue({
-      ...LOCKED_PANEL,
-      id: 42,
-      is_editable: true,
-      generation_count: 0,
-    })
-
+  it('does not offer Duplicate & edit on the listing page', async () => {
     render(
       <MemoryRouter>
         <PanelListPage />
       </MemoryRouter>,
     )
 
-    const duplicateButton = await screen.findByRole('button', { name: /Duplicate & edit/ })
-    await user.click(duplicateButton)
-
-    await waitFor(() => expect(client.duplicatePanel).toHaveBeenCalledWith(7))
-    // Duplicating alone doesn't edit anything — it must navigate to the new
-    // panel's edit page (issue #15 follow-up).
-    expect(mockNavigate).toHaveBeenCalledWith('/panels/42/edit')
-  })
-
-  it('keeps the panel list visible when duplication fails', async () => {
-    const user = userEvent.setup()
-    vi.mocked(client.duplicatePanel).mockRejectedValue(new Error('offline'))
-    render(
-      <MemoryRouter>
-        <PanelListPage />
-      </MemoryRouter>,
-    )
-
-    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not duplicate panel: Error: offline')
-    expect(screen.getByText('Elias draws his sword.')).toBeInTheDocument()
-  })
-
-  it('does not redirect when duplication finishes after leaving the page', async () => {
-    const user = userEvent.setup()
-    let finishDuplicate!: (panel: Panel) => void
-    vi.mocked(client.duplicatePanel).mockReturnValue(
-      new Promise((resolve) => {
-        finishDuplicate = resolve
-      }),
-    )
-    const view = render(
-      <MemoryRouter>
-        <PanelListPage />
-      </MemoryRouter>,
-    )
-
-    await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
-    view.unmount()
-    finishDuplicate({ ...LOCKED_PANEL, id: 42, is_editable: true })
-    await Promise.resolve()
-
-    expect(mockNavigate).not.toHaveBeenCalled()
+    await screen.findByText('Elias draws his sword.')
+    expect(screen.queryByRole('button', { name: /Duplicate & edit/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 })
 
