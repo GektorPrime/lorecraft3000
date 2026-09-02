@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install dependencies (frozen lockfile)
+        # --frozen fails if uv.lock is out of date with pyproject.toml,
+        # catching lockfile drift as part of CI.
+        run: uv sync --frozen
+      - name: Run backend tests
+        # The paid live Gemini test is marked `live` and deselected here; CI
+        # never makes billed requests and no GEMINI_API_KEY is provided.
+        run: uv run pytest -q -m "not live"
+
+  frontend:
+    name: Frontend lint, types, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies (locked)
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run typecheck
+      - name: Frontend tests
+        run: npm run test --workspace frontend
+
+  build:
+    name: Production build + OpenAPI/type sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install Python dependencies
+        run: uv sync --frozen
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Verify committed OpenAPI snapshot is up to date
+        # Regenerate the snapshot from the backend and fail if it differs from
+        # what is committed, so a DTO change without a regenerated snapshot is
+        # caught loudly instead of drifting.
+        run: |
+          uv run python -m app.scripts.generate_openapi
+          git diff --exit-code frontend/openapi.json
+      - name: Production build
+        # `npm run build` regenerates types from the snapshot, type-checks, and
+        # writes frontend/dist. A drifted committed types file also fails here.
+        run: npm run build
+      - name: Verify generated frontend types are up to date
+        run: git diff --exit-code frontend/src/api/generated/types.d.ts
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Python dependency advisories
+        # pip-audit against the resolved environment. Advisory-only findings
+        # should not permanently block merges on an unfixable transitive
+        # advisory, so this step reports but does not fail the job.
+        continue-on-error: true
+        run: |
+          uv sync --frozen
+          uvx pip-audit || true
+      - name: Node dependency advisories (high/critical fail)
+        run: npm audit --audit-level=high

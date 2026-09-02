@@ -24,11 +24,23 @@ def test_home_route_responds():
         assert "npm run build" in resp.text
 
 
-def test_health_route():
+def test_liveness_route():
     client = TestClient(app, base_url="http://127.0.0.1")
-    resp = client.get("/health")
+    resp = client.get("/health/live")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+def test_health_route_reports_readiness():
+    """/health returns 200 with a per-subsystem breakdown once initialized."""
+    client = TestClient(app, base_url="http://127.0.0.1")
+    with client:
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        assert set(body["checks"]) == {"database", "migrations", "storage"}
+        assert all(check["status"] == "ok" for check in body["checks"].values())
 
 
 def test_lifespan_initializes_db():

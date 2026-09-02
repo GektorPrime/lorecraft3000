@@ -2393,15 +2393,32 @@
     },
     "/health": {
       "get": {
-        "description": "Health check.",
+        "description": "Readiness: verify database, migrations, and storage are ready.\n\nReturns 200 with a per-check breakdown when the app can serve requests, and\n503 with the failing checks named otherwise. The report is read-only and\nnever runs the full storage consistency scan.",
         "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/health/live": {
+      "get": {
+        "description": "Liveness: the process is up and answering. No subsystem checks.",
+        "operationId": "health_live_health_live_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Health Health Get",
+                  "title": "Response Health Live Health Live Get",
                   "type": "object"
                 }
               }
@@ -2409,7 +2426,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Health"
+        "summary": "Health Live"
       }
     }
   }

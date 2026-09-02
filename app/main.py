@@ -27,11 +27,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.deps import settings
 from app.db import connect
+from app.health import readiness_report
 from app.middleware import LocalRequestGuardMiddleware
 from app.migrate import run_migrations
 from app.routes import api_v1
@@ -120,7 +121,21 @@ def home(request: Request):
     )
 
 
-@app.get("/health")
-def health() -> dict:
-    """Health check."""
+@app.get("/health/live")
+def health_live() -> dict:
+    """Liveness: the process is up and answering. No subsystem checks."""
     return {"status": "ok"}
+
+
+@app.get("/health")
+def health() -> JSONResponse:
+    """Readiness: verify database, migrations, and storage are ready.
+
+    Returns 200 with a per-check breakdown when the app can serve requests, and
+    503 with the failing checks named otherwise. The report is read-only and
+    never runs the full storage consistency scan.
+    """
+    report = readiness_report(settings)
+    body = report.as_dict()
+    body["status"] = "ok" if report.ok else "not_ready"
+    return JSONResponse(body, status_code=200 if report.ok else 503)
