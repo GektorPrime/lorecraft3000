@@ -925,7 +925,9 @@ export interface operations {
     budget_api_v1_budget_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Timezone"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -938,6 +940,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Budget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1243,7 +1254,9 @@ export interface operations {
     options_summary_api_v1_options_summary_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Timezone"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1256,6 +1269,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OptionsSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1481,7 +1503,9 @@ export interface operations {
     preview_panel_api_v1_panels__panel_id__preview_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Timezone"?: string | null;
+            };
             path: {
                 panel_id: number;
             };
