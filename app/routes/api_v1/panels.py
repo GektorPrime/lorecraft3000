@@ -8,6 +8,7 @@ from app.deps import get_conn, get_provider, get_storage, settings
 from app.providers.base import ImageProvider
 from app.routes.api_v1._common import (
     _attachment_out,
+    _candidate_out,
     _generation_out,
     _panel_out,
     _raise_for,
@@ -136,7 +137,7 @@ def list_panel_generations(panel_id: int, conn=Depends(get_conn)) -> list[Genera
     except SceneNotFoundError as exc:
         _raise_for(exc)
     service = GenerationService(conn, None, settings, None)
-    rows = service.list_for_scene(panel_id)
+    rows_with_candidates = service.list_for_scene_with_candidates(panel_id)
     return [
         GenerationSummary(
             id=row["id"],
@@ -149,8 +150,9 @@ def list_panel_generations(panel_id: int, conn=Depends(get_conn)) -> list[Genera
             error_text=row["error_text"],
             completed_at=row["completed_at"],
             created_at=row["created_at"],
+            candidates=[_candidate_out(c) for c in candidates],
         )
-        for row in rows
+        for row, candidates in rows_with_candidates
     ]
 
 

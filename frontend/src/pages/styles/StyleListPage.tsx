@@ -25,14 +25,20 @@ export function StyleListPage() {
       {error && <AsyncMessage kind="error">Could not load styles: {error}</AsyncMessage>}
       {!styles && !error && <AsyncMessage kind="loading">Loading styles…</AsyncMessage>}
       {styles && (
-        <div className="card-grid">
+        <div className="stack-list">
           {styles.map((style) => (
-            <div key={style.id} className="card">
-              <h3 style={{ marginTop: 0 }}>{style.name}</h3>
-              <p className="field__hint">{style.style_contract || 'No style contract yet.'}</p>
-              <Link to={`/styles/${style.id}/edit`} className="btn">
-                Edit
-              </Link>
+            <div key={style.id} className="h-tile">
+              <div className="h-tile__main">
+                <h3 style={{ margin: 0 }}>{style.name}</h3>
+                <p className="field__hint text-clamp" style={{ marginTop: '0.25rem' }}>
+                  {style.style_contract || 'No style contract yet.'}
+                </p>
+              </div>
+              <div className="h-tile__actions">
+                <Link to={`/styles/${style.id}/edit`} className="btn">
+                  Edit
+                </Link>
+              </div>
             </div>
           ))}
         </div>

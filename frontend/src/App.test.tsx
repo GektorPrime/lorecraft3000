@@ -59,6 +59,18 @@ describe('App routing', () => {
     expect(await screen.findByRole('heading', { name: 'Styles' })).toBeInTheDocument()
   })
 
+  it('does not mark Panels active when on Stage new panel', async () => {
+    await renderApp('#/panels/new')
+
+    const nav = await screen.findByRole('navigation', { name: 'Primary' })
+    const panels = Array.from(nav.querySelectorAll('a')).find((a) => a.textContent === 'Panels')
+    const stage = Array.from(nav.querySelectorAll('a')).find((a) => a.textContent?.includes('Stage new panel'))
+    expect(panels).toBeDefined()
+    expect(stage).toBeDefined()
+    await waitFor(() => expect(stage?.classList.contains('active')).toBe(true))
+    expect(panels?.classList.contains('active')).toBe(false)
+  })
+
   it('renders wildcard routes without entering the configured layout', async () => {
     await renderApp('#/missing/path')
 
@@ -74,7 +86,6 @@ describe('App routing', () => {
     '#/styles/01/edit',
     '#/panels/-1/edit',
     '#/panels/1.5/preview',
-    '#/generations/9007199254740992',
   ])('redirects malformed dynamic IDs to hash not-found without loading config: %s', async (hash) => {
     globalThis.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
     await renderApp(hash)

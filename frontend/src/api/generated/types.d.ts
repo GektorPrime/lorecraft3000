@@ -636,6 +636,8 @@ export interface components {
         GenerationSummary: {
             /** Actual Cost Usd Cents */
             actual_cost_usd_cents: number | null;
+            /** Candidates */
+            candidates: components["schemas"]["Candidate"][];
             /** Completed At */
             completed_at: string | null;
             /** Cost Usd Cents */

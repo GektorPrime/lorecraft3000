@@ -61,21 +61,23 @@ export function PanelListPage() {
       {!panels && !error && <AsyncMessage kind="loading">Loading panels…</AsyncMessage>}
       {panels && panels.length === 0 && <p>No panels yet.</p>}
       {panels && panels.length > 0 && (
-        <div className="card-grid">
+        <div className="stack-list">
           {panels.map((panel) => (
-            <div key={panel.id} className="card">
-              <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
-                {panel.is_editable ? 'Editable' : 'Locked'}
-              </span>
-              <p>{panel.beat_text}</p>
-              <p className="field__hint">
-                Cast: {panel.cast.map((m) => m.name).join(', ') || 'none'}
-              </p>
-              <p className="field__hint">
-                {panel.generation_count} generation attempt
-                {panel.generation_count === 1 ? '' : 's'}
-              </p>
-              <div className="btn-row" style={{ marginTop: '0.5rem' }}>
+            <div key={panel.id} className="h-tile">
+              <div className="h-tile__main">
+                <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
+                  {panel.is_editable ? 'Editable' : 'Locked'}
+                </span>
+                <p className="text-clamp" style={{ margin: '0.4rem 0' }}>{panel.beat_text}</p>
+                <p className="field__hint" style={{ margin: 0 }}>
+                  Cast: {panel.cast.map((m) => m.name).join(', ') || 'none'}
+                </p>
+                <p className="field__hint" style={{ margin: 0 }}>
+                  {panel.generation_count} generation attempt
+                  {panel.generation_count === 1 ? '' : 's'}
+                </p>
+              </div>
+              <div className="h-tile__actions">
                 <Link to={`/panels/${panel.id}/preview`} className="btn">
                   Preview
                 </Link>

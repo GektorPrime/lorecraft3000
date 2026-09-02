@@ -15,7 +15,6 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
-import { GenerationDetailPage } from './pages/panels/GenerationDetailPage'
 import { PanelFormPage } from './pages/panels/PanelFormPage'
 import { PanelListPage } from './pages/panels/PanelListPage'
 import { PanelPreviewPage } from './pages/panels/PanelPreviewPage'
@@ -143,12 +142,6 @@ const appRoutes: RouteObject[] = [
             loader: requireRouteId,
             element: <PanelPreviewPage />,
             handle: { title: 'Loading Panel Preview' } satisfies RouteHandle,
-          },
-          {
-            path: 'generations/:id',
-            loader: requireRouteId,
-            element: <GenerationDetailPage />,
-            handle: { title: 'Loading Generation' } satisfies RouteHandle,
           },
         ],
       },

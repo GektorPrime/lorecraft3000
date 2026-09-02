@@ -489,6 +489,13 @@
             ],
             "title": "Actual Cost Usd Cents"
           },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -550,7 +557,8 @@
           "state",
           "error_text",
           "completed_at",
-          "created_at"
+          "created_at",
+          "candidates"
         ],
         "title": "GenerationSummary",
         "type": "object"
