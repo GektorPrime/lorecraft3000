@@ -91,13 +91,13 @@ class GenerationService:
         tz_name: str | None = None,
     ) -> GenerationPreview:
         """Run the exact no-spend preflight used by generate()."""
-        selected_model = model or self.settings.default_model
-        selected_size = image_size or self.settings.default_image_size
         scene_row = self.conn.execute(
             "SELECT * FROM scene WHERE id = ?", (scene_id,)
         ).fetchone()
         if scene_row is None:
             raise GenerationError(f"scene {scene_id} not found")
+        selected_model = model or scene_row["model"] or self.settings.default_model
+        selected_size = image_size or scene_row["image_size"] or self.settings.default_image_size
         if scene_row["style_id"] is None:
             raise GenerationError("scene has no style")
 

@@ -58,6 +58,7 @@ WIRE_SURFACE = {
     ("POST", "/api/v1/panels"),
     ("GET", "/api/v1/panels/{panel_id}"),
     ("PUT", "/api/v1/panels/{panel_id}"),
+    ("PATCH", "/api/v1/panels/{panel_id}/model"),
     ("DELETE", "/api/v1/panels/{panel_id}"),
     ("POST", "/api/v1/panels/{panel_id}/duplicate"),
     ("GET", "/api/v1/panels/{panel_id}/preview"),

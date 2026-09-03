@@ -9,9 +9,11 @@ import {
   listPanelGenerations,
   previewPanel,
   reviewCandidate,
+  updatePanelModel,
 } from '../../api/client'
 import type { GenerationSummary, Panel, PanelPreview } from '../../api/types'
 import { useBudget } from '../../api/useBudget'
+import { useOptions } from '../../api/useOptions'
 import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
 import { NotFoundPage } from '../NotFoundPage'
@@ -60,6 +62,7 @@ export function PanelPreviewPage() {
 function PanelPreview({ panelId }: { panelId: number }) {
   const navigate = useNavigate()
   const { refreshBudget } = useBudget()
+  const options = useOptions()
 
   const [panel, setPanel] = useState<Panel | null>(null)
   const [preview, setPreview] = useState<PanelPreview | null>(null)
@@ -73,6 +76,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
     text: string
   } | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [changingModel, setChangingModel] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -199,7 +203,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
   }, [generating, refreshBudget])
 
   const handleGenerate = async () => {
-    if (generating) return
+    if (generating || changingModel) return
     setGenerating(true)
     setActionMessage(null)
     try {
@@ -217,6 +221,32 @@ function PanelPreview({ panelId }: { panelId: number }) {
       await reload()
     } finally {
       if (mounted.current) setGenerating(false)
+    }
+  }
+
+  const handleModelChange = async (model: string) => {
+    if (!panel || changingModel || hasPendingAttempt || model === panel.model) return
+    setChangingModel(true)
+    setActionMessage(null)
+    // Prevent an older page load from restoring the model and preview that
+    // were current before this mutation.
+    requestVersion.current += 1
+    try {
+      const nextPanel = await updatePanelModel(panel.id, model)
+      if (!mounted.current) return
+      setPanel(nextPanel)
+      setPreview(null)
+      await reloadInFlight.current
+      await reload()
+    } catch (err) {
+      if (!mounted.current) return
+      setActionMessage(
+        `Could not change model: ${err instanceof ApiError ? err.message : String(err)}`,
+      )
+      await reloadInFlight.current
+      await reload()
+    } finally {
+      if (mounted.current) setChangingModel(false)
     }
   }
 
@@ -295,7 +325,10 @@ function PanelPreview({ panelId }: { panelId: number }) {
   }
 
   return (
-    <section className="panel-preview" aria-busy={generating || duplicating || deleting || undefined}>
+    <section
+      className="panel-preview"
+      aria-busy={generating || changingModel || duplicating || deleting || undefined}
+    >
       <PageHeader
         title="Preview panel"
         actions={(
@@ -376,6 +409,25 @@ function PanelPreview({ panelId }: { panelId: number }) {
         </div>
         <aside className="panel-preview__sidebar" aria-label="Panel actions">
       <div className="action-bar panel-preview__actions">
+        <div className="field panel-preview__model">
+          <label htmlFor="preview-model">Generation model</label>
+          <select
+            id="preview-model"
+            value={panel.model}
+            disabled={attempts === null || changingModel || generating || hasPendingAttempt}
+            aria-describedby="preview-model-hint"
+            onChange={(event) => void handleModelChange(event.target.value)}
+          >
+            {options.models.map((model) => (
+              <option key={model} value={model}>{model}</option>
+            ))}
+          </select>
+          <span className="field__hint" id="preview-model-hint">
+            {hasPendingAttempt
+              ? 'Locked while a generation is in progress.'
+              : 'Applies to future generations and refreshes the prompt and cost.'}
+          </span>
+        </div>
         <div className="action-bar__group action-bar__group--start">
           {panel.is_editable ? (
             <Link to={`/panels/${panel.id}/edit`} className="btn">
@@ -406,11 +458,13 @@ function PanelPreview({ panelId }: { panelId: number }) {
             <button
               type="button"
               className="btn btn--primary"
-              disabled={generating || hasPendingAttempt}
+              disabled={generating || changingModel || hasPendingAttempt}
               onClick={() => void handleGenerate()}
             >
               {generating
                 ? 'Starting generation…'
+                : changingModel
+                ? 'Updating model…'
                 : hasPendingAttempt
                 ? 'Generation in progress'
                 : `Generate one candidate · ${formatCents(preview.estimated_cost_cents)}`}
@@ -441,15 +495,17 @@ function PanelPreview({ panelId }: { panelId: number }) {
             {attempts.map((attempt) => (
               <article className="attempt-row" key={attempt.id}>
                 <div className="attempt-row__summary">
-                  <span className={`badge badge--attempt-${attempt.state}`}>
-                    {attempt.state.charAt(0).toUpperCase() + attempt.state.slice(1)}
-                  </span>
-                  {attempt.candidates[0] && (
-                    <span className={`badge badge--attempt-${attempt.candidates[0].review_status}`}>
-                      {REVIEW_STATUS_LABEL[attempt.candidates[0].review_status]
-                        ?? attempt.candidates[0].review_status}
+                  <div className="attempt-row__badges">
+                    <span className={`badge badge--attempt-${attempt.state}`}>
+                      {attempt.state.charAt(0).toUpperCase() + attempt.state.slice(1)}
                     </span>
-                  )}
+                    {attempt.candidates[0] && (
+                      <span className={`badge badge--attempt-${attempt.candidates[0].review_status}`}>
+                        {REVIEW_STATUS_LABEL[attempt.candidates[0].review_status]
+                          ?? attempt.candidates[0].review_status}
+                      </span>
+                    )}
+                  </div>
                   <strong>Attempt #{attempt.id}</strong>
                   <span className="field__hint">
                     {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}
@@ -487,7 +543,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
                     <button
                       type="button"
                       className="btn btn--primary"
-                      disabled={generating || hasPendingAttempt}
+                      disabled={generating || changingModel || hasPendingAttempt}
                       onClick={() => void handleGenerate()}
                       title="Generates from the panel's current settings"
                     >

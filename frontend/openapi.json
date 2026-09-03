@@ -838,6 +838,19 @@
         "title": "PanelInput",
         "type": "object"
       },
+      "PanelModelInput": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "PanelModelInput",
+        "type": "object"
+      },
       "PanelPreview": {
         "properties": {
           "attachments": {
@@ -2143,6 +2156,59 @@
           }
         },
         "summary": "List Panel Generations",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}/model": {
+      "patch": {
+        "operationId": "update_panel_model_api_v1_panels__panel_id__model_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelModelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Panel Model",
         "tags": [
           "api-v1",
           "api-v1-panels"

@@ -166,6 +166,10 @@ class PanelInput(BaseModel):
     image_size: str
 
 
+class PanelModelInput(BaseModel):
+    model: str
+
+
 class Panel(BaseModel):
     id: int
     beat_text: str

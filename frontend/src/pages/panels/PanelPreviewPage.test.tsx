@@ -12,6 +12,12 @@ vi.mock('../../api/useBudget', () => ({
   useBudget: () => ({ refreshBudget, budget: {}, refreshError: null }),
 }))
 
+vi.mock('../../api/useOptions', () => ({
+  useOptions: () => ({
+    models: ['gemini-3.1-flash-image', 'gemini-3-pro-image'],
+  }),
+}))
+
 vi.mock('../../api/client', async () => {
   const actual = await vi.importActual<typeof import('../../api/client')>('../../api/client')
   return {
@@ -23,6 +29,7 @@ vi.mock('../../api/client', async () => {
     deletePanel: vi.fn(),
     generatePanel: vi.fn(),
     reviewCandidate: vi.fn(),
+    updatePanelModel: vi.fn(),
   }
 })
 
@@ -167,6 +174,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     vi.mocked(client.deletePanel).mockReset().mockResolvedValue(undefined)
     vi.mocked(client.generatePanel).mockReset()
     vi.mocked(client.reviewCandidate).mockReset()
+    vi.mocked(client.updatePanelModel).mockReset()
     refreshBudget.mockReset().mockResolvedValue(undefined)
   })
   afterEach(() => {
@@ -268,6 +276,39 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     await screen.findByText(/Mara backs toward the door\./)
     expect(screen.getByRole('link', { name: 'Edit panel' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Duplicate & edit/ })).not.toBeInTheDocument()
+  })
+
+  it('changes the model for the whole editable panel and refreshes its preview', async () => {
+    const user = userEvent.setup()
+    const editablePanel = { ...LOCKED_PANEL, is_editable: true, generation_count: 0 }
+    const updatedPanel = { ...editablePanel, model: 'gemini-3-pro-image' }
+    vi.mocked(client.getPanel)
+      .mockResolvedValueOnce(editablePanel)
+      .mockResolvedValueOnce(updatedPanel)
+    vi.mocked(client.previewPanel)
+      .mockResolvedValueOnce(READY_PREVIEW)
+      .mockResolvedValueOnce({ ...READY_PREVIEW, model: 'gemini-3-pro-image' })
+    vi.mocked(client.updatePanelModel).mockResolvedValue(updatedPanel)
+
+    renderPreview()
+    const model = await screen.findByRole('combobox', { name: 'Generation model' })
+    await user.selectOptions(model, 'gemini-3-pro-image')
+
+    await waitFor(() => expect(client.updatePanelModel).toHaveBeenCalledWith(
+      3,
+      'gemini-3-pro-image',
+    ))
+    await waitFor(() => expect(client.previewPanel).toHaveBeenCalledTimes(2))
+    expect(model).toHaveValue('gemini-3-pro-image')
+  })
+
+  it('allows the model to change after a successful generation', async () => {
+    renderPreview()
+
+    const model = await screen.findByRole('combobox', { name: 'Generation model' })
+    expect(model).toBeEnabled()
+    expect(model).toHaveValue('gemini-3.1-flash-image')
+    expect(screen.getByText(/Applies to future generations/)).toBeInTheDocument()
   })
 
   it('shows the complete exact prompt before the paid generation button', async () => {
@@ -550,6 +591,8 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
     const button = await screen.findByRole('button', { name: 'Generation in progress' })
     expect(button).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Generation model' })).toBeDisabled()
+    expect(screen.getByText(/Locked while a generation is in progress/)).toBeInTheDocument()
     expect(screen.getByText(/refreshes automatically/)).toBeInTheDocument()
     expect(screen.getByText(/refreshes automatically/)).toHaveAttribute('role', 'status')
   })

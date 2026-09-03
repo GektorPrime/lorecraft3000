@@ -157,6 +157,8 @@ export const getPanel = (id: number) => request<Panel>(`/panels/${id}`)
 export const createPanel = (payload: PanelInput) => request<Panel>('/panels', json('POST', payload))
 export const updatePanel = (id: number, payload: PanelInput) =>
   request<Panel>(`/panels/${id}`, json('PUT', payload))
+export const updatePanelModel = (id: number, model: string) =>
+  request<Panel>(`/panels/${id}/model`, json('PATCH', { model }))
 export const duplicatePanel = (id: number) =>
   request<Panel>(`/panels/${id}/duplicate`, { method: 'POST' })
 // Panels are hard-deleted (not archived): this permanently removes the panel
