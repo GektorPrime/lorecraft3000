@@ -14,7 +14,15 @@ from app.routes.api_v1._common import (
     _panel_out,
     _raise_for,
 )
-from app.schemas import Generation, GenerationCreate, GenerationSummary, Panel, PanelInput, PanelPreview
+from app.schemas import (
+    Generation,
+    GenerationCreate,
+    GenerationSummary,
+    Panel,
+    PanelInput,
+    PanelModelInput,
+    PanelPreview,
+)
 from app.services.costs import CostError, CostLedger
 from app.services.generation import GenerationError, GenerationService
 from app.services.scenes import SceneError, SceneNotFoundError, SceneService
@@ -75,6 +83,20 @@ def update_panel(panel_id: int, payload: PanelInput, conn=Depends(get_conn), sto
             model=payload.model,
             image_size=payload.image_size,
         )
+    except SceneError as exc:
+        _raise_for(exc)
+    return _panel_out(conn, storage, scene)
+
+
+@router.patch("/panels/{panel_id}/model", response_model=Panel)
+def update_panel_model(
+    panel_id: int,
+    payload: PanelModelInput,
+    conn=Depends(get_conn),
+    storage=Depends(get_storage),
+):
+    try:
+        scene = SceneService(conn, settings).update_model(panel_id, model=payload.model)
     except SceneError as exc:
         _raise_for(exc)
     return _panel_out(conn, storage, scene)
@@ -186,11 +208,9 @@ def generate_panel(
     provider: ImageProvider = Depends(get_provider),
 ):
     try:
-        scene = SceneService(conn, settings).get(panel_id)
+        SceneService(conn, settings).get(panel_id)
         outcome = GenerationService(conn, storage, settings, provider).generate(
             panel_id,
-            model=scene.model,
-            image_size=scene.image_size,
             idempotency_key=idempotency_key,
             expected_prompt_hash=payload.expected_prompt_hash,
         )

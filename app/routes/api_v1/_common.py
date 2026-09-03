@@ -77,8 +77,10 @@ REF_SET_IMMUTABILITY_EXPLANATION = (
 PANEL_IMMUTABILITY_EXPLANATION = (
     "A panel can be edited after failed generation attempts because each "
     "failure preserves its own request snapshot. A pending or successful "
-    "generation locks the panel. Use Duplicate to create a new, editable "
-    "panel while keeping the original and its complete attempt history."
+    "generation locks its visual definition. The model for future attempts "
+    "can still be changed from Preview when no generation is in progress. "
+    "Use Duplicate to change the remaining fields while keeping the original "
+    "and its complete attempt history."
 )
 
 # Most-specific error types must be listed before their base classes so the

@@ -313,6 +313,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/panels/{panel_id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Panel Model */
+        patch: operations["update_panel_model_api_v1_panels__panel_id__model_patch"];
+        trace?: never;
+    };
     "/api/v1/panels/{panel_id}/preview": {
         parameters: {
             query?: never;
@@ -861,6 +878,11 @@ export interface components {
             mood: string;
             /** Style Id */
             style_id: number;
+        };
+        /** PanelModelInput */
+        PanelModelInput: {
+            /** Model */
+            model: string;
         };
         /** PanelPreview */
         PanelPreview: {
@@ -1680,6 +1702,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenerationSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_panel_model_api_v1_panels__panel_id__model_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                panel_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PanelModelInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Panel"];
                 };
             };
             /** @description Validation Error */

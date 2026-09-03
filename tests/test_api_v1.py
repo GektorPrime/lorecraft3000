@@ -569,6 +569,51 @@ def test_panel_editable_until_generation_succeeds_then_backend_rejects_update(ap
     assert still["beat_text"] == "Updated beat."
 
 
+def test_panel_model_can_change_after_success_without_rewriting_history(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    generated = _generate_panel(api, panel["id"]).json()
+
+    changed = api.client.patch(
+        f"/api/v1/panels/{panel['id']}/model",
+        json={"model": "gemini-3-pro-image"},
+    )
+
+    assert changed.status_code == 200
+    assert changed.json()["model"] == "gemini-3-pro-image"
+    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
+    assert preview["model"] == "gemini-3-pro-image"
+    history = api.client.get(f"/api/v1/panels/{panel['id']}/generations").json()
+    assert history[0]["id"] == generated["id"]
+    assert history[0]["model"] == "gemini-3.1-flash-image"
+
+
+def test_panel_model_cannot_change_while_generation_is_pending(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    panel = _create_panel(api, [character["id"]])
+    conn = api.conn()
+    try:
+        conn.execute(
+            "INSERT INTO generation (scene_id, model, state) VALUES (?, ?, 'pending')",
+            (panel["id"], panel["model"]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    rejected = api.client.patch(
+        f"/api/v1/panels/{panel['id']}/model",
+        json={"model": "gemini-3-pro-image"},
+    )
+
+    assert rejected.status_code == 409
+    assert rejected.json()["detail"]["type"] == "SceneImmutableError"
+    unchanged = api.client.get(f"/api/v1/panels/{panel['id']}").json()
+    assert unchanged["model"] == "gemini-3.1-flash-image"
+
+
 def test_generation_idempotency_key_returns_existing_attempt(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])

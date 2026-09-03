@@ -169,6 +169,30 @@ class SceneService:
         self.conn.commit()
         return self.get(scene_id)
 
+    def update_model(self, scene_id: int, *, model: str) -> Scene:
+        """Change the model for future attempts unless one is in progress."""
+        scene = self.get(scene_id)
+        self._validate_model_and_size(model, scene.image_size)
+        cursor = self.conn.execute(
+            """
+            UPDATE scene
+               SET model = ?, revision = revision + 1
+             WHERE id = ?
+               AND NOT EXISTS (
+                   SELECT 1 FROM generation
+                    WHERE scene_id = scene.id AND state = 'pending'
+               )
+            """,
+            (model, scene_id),
+        )
+        if cursor.rowcount != 1:
+            self.conn.rollback()
+            raise SceneImmutableError(
+                f"panel {scene_id} has a generation in progress; its model cannot be changed"
+            )
+        self.conn.commit()
+        return self.get(scene_id)
+
     def duplicate(self, scene_id: int) -> Scene:
         """Create a new panel prefilled from an existing one (new ID).
 
@@ -274,12 +298,7 @@ class SceneService:
         normalized_cast = self._normalize_cast(cast)
         if aspect_ratio not in ASPECT_RATIOS:
             raise SceneError(f"unsupported aspect ratio: {aspect_ratio}")
-        try:
-            capabilities_for(model)
-        except AssemblyError as exc:
-            raise SceneError(str(exc)) from exc
-        if image_size not in self.settings.model_prices_cents.get(model, {}):
-            raise SceneError(f"unsupported image size {image_size} for {model}")
+        self._validate_model_and_size(model, image_size)
         if self.conn.execute("SELECT 1 FROM style WHERE id = ?", (style_id,)).fetchone() is None:
             raise SceneError(f"style {style_id} not found")
         existing = {
@@ -303,6 +322,14 @@ class SceneService:
             "model": model,
             "image_size": image_size,
         }
+
+    def _validate_model_and_size(self, model: str, image_size: str) -> None:
+        try:
+            capabilities_for(model)
+        except AssemblyError as exc:
+            raise SceneError(str(exc)) from exc
+        if image_size not in self.settings.model_prices_cents.get(model, {}):
+            raise SceneError(f"unsupported image size {image_size} for {model}")
 
     @staticmethod
     def _normalize_cast(cast: list[dict]) -> list[dict]:
