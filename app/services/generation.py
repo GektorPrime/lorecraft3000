@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from dataclasses import dataclass
@@ -10,7 +11,12 @@ from datetime import datetime, timezone
 from app.assembler.core import AssemblyError, assemble_prompt
 from app.config import Settings
 from app.domain.generation import CastInput, ReferenceInput, SceneInput
-from app.providers.base import ImageProvider, ProviderReference, ProviderRequest
+from app.providers.base import (
+    ImageProvider,
+    ProviderEditRequest,
+    ProviderReference,
+    ProviderRequest,
+)
 from app.services.characters import CharacterError, CharacterService
 from app.services.costs import CostLedger
 from app.services.ref_sets import RefSetError, RefSetService
@@ -39,6 +45,10 @@ class GenerationOutcome:
     cost_cents: int
     warnings: tuple[str, ...]
     replayed: bool = False
+
+
+class EditError(GenerationError):
+    """Raised when a candidate edit cannot proceed."""
 
 
 @dataclass(frozen=True)
@@ -80,6 +90,20 @@ class GenerationService:
         self.storage = storage
         self.settings = settings
         self.provider = provider
+
+    def _provider_for(self, model: str) -> ImageProvider:
+        """Resolve the provider serving ``model``.
+
+        The route injects a registry (exposing ``for_model``) so selection keys
+        on the model string; tests inject a single provider used for every
+        model. Both paths funnel through here.
+        """
+        if self.provider is None:
+            raise GenerationError("generation provider is not configured")
+        resolver = getattr(self.provider, "for_model", None)
+        if callable(resolver):
+            return resolver(model)
+        return self.provider
 
     def preview(
         self,
@@ -231,11 +255,10 @@ class GenerationService:
         idempotency_key: str | None = None,
         expected_prompt_hash: str | None = None,
     ) -> GenerationOutcome:
-        if self.provider is None:
-            raise GenerationError("generation provider is not configured")
         preview = self.preview(
             scene_id, model=model, image_size=image_size, check_budget=False
         )
+        provider = self._provider_for(preview.model)
         if (
             expected_prompt_hash is not None
             and preview.prompt_hash != expected_prompt_hash
@@ -261,7 +284,7 @@ class GenerationService:
 
         result = None
         try:
-            result = self.provider.generate(preview.provider_request)
+            result = provider.generate(preview.provider_request)
             stored = self.storage.store(
                 result.image_bytes, source_name=f"generation-{generation_id}.png"
             )
@@ -330,6 +353,218 @@ class GenerationService:
             candidate_id,
             stored.sha256,
             preview.prompt_hash,
+            (
+                result.billed_cost_cents
+                if result.billed_cost_cents is not None
+                else estimate
+            ),
+            warnings,
+        )
+
+    def edit_candidate(
+        self,
+        candidate_id: int,
+        instruction: str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> GenerationOutcome:
+        """Produce a new candidate by editing an existing one in place.
+
+        The edit runs on the same provider/model that produced the source image
+        and stays anchored to the panel's canonical character references. The
+        new attempt is a child generation (``parent_generation_id`` points at
+        the source's generation), so provenance and the panel's attempt history
+        remain a connected chain. Cost is reserved and billed exactly like a
+        fresh generation, under the same daily budget gate.
+        """
+        instruction = (instruction or "").strip()
+        if not instruction:
+            raise EditError("an edit instruction is required")
+
+        source = self.conn.execute(
+            """
+            SELECT c.id AS candidate_id, c.sha256 AS sha256,
+                   g.id AS generation_id, g.scene_id AS scene_id,
+                   g.model AS model, g.state AS state,
+                   g.request_json AS request_json, g.prompt_hash AS prompt_hash
+              FROM candidate c
+              JOIN generation g ON g.id = c.generation_id
+             WHERE c.id = ?
+            """,
+            (candidate_id,),
+        ).fetchone()
+        if source is None:
+            raise GenerationNotFoundError(f"candidate {candidate_id} not found")
+        if source["state"] != "succeeded":
+            raise EditError("only a successful candidate can be edited")
+
+        scene_id = source["scene_id"]
+        if scene_id is None:
+            raise EditError("candidate has no panel to edit against")
+        capture = json.loads(source["request_json"] or "{}")
+        model = source["model"]
+        image_size = capture.get("image_size") or self.settings.default_image_size
+        aspect_ratio = capture.get("aspect_ratio") or "3:2"
+        base_prompt = capture.get("prompt", "")
+
+        try:
+            source_bytes, source_meta = self.storage.read(source["sha256"])
+        except ImageStorageError as exc:
+            raise EditError(
+                f"source image {source['sha256']} is unavailable: {exc}"
+            ) from exc
+        source_mime = _FORMAT_MIME.get(source_meta.get("format"), "image/png")
+
+        provider = self._provider_for(model)
+
+        # Rebuild the canonical character references captured on the source
+        # generation so identity stays anchored across the edit.
+        provider_refs: list[ProviderReference] = []
+        attachment_capture: list[dict] = []
+        for attachment in capture.get("attachments", []):
+            try:
+                data, metadata = self.storage.read(attachment["sha256"])
+            except ImageStorageError as exc:
+                raise EditError(
+                    f"reference image {attachment['sha256']} is unavailable: {exc}"
+                ) from exc
+            mime = _FORMAT_MIME.get(metadata.get("format"), "image/png")
+            provider_refs.append(
+                ProviderReference(
+                    attachment["image_number"], attachment["sha256"], mime, data
+                )
+            )
+            attachment_capture.append(dict(attachment))
+
+        # A distinct hash for the edit keeps idempotent replay working: the same
+        # source candidate + instruction replays the same attempt, while a
+        # different instruction is a new attempt.
+        edit_prompt_hash = hashlib.sha256(
+            json.dumps(
+                {
+                    "source_prompt_hash": source["prompt_hash"],
+                    "source_candidate_id": candidate_id,
+                    "instruction": instruction,
+                    "model": model,
+                    "image_size": image_size,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+        edit_request = ProviderEditRequest(
+            model=model,
+            prompt=base_prompt,
+            instruction=instruction,
+            source_image=source_bytes,
+            source_mime_type=source_mime,
+            references=tuple(provider_refs),
+            aspect_ratio=aspect_ratio,
+            image_size=image_size,
+            labels={"scene": str(scene_id)},
+            source_interaction_id=None,
+        )
+
+        request_capture = {
+            "schema_version": 1,
+            "kind": "edit",
+            "model": model,
+            "image_size": image_size,
+            "aspect_ratio": aspect_ratio,
+            "prompt": base_prompt,
+            "prompt_hash": edit_prompt_hash,
+            "edit_instruction": instruction,
+            "source_candidate_id": candidate_id,
+            "source_generation_id": source["generation_id"],
+            "cast": capture.get("cast", []),
+            "attachments": attachment_capture,
+            "warnings": [],
+            "labels": {"scene": str(scene_id)},
+            "store": False,
+        }
+
+        ledger = CostLedger(self.conn, self.settings)
+        reservation = ledger.reserve(
+            scene_id=scene_id,
+            model=model,
+            image_size=image_size,
+            prompt_hash=edit_prompt_hash,
+            request_json=request_capture,
+            parent_generation_id=source["generation_id"],
+            idempotency_key=idempotency_key,
+        )
+        generation_id, estimate = reservation
+        if not reservation.created:
+            return self._replayed_outcome(generation_id)
+
+        result = None
+        try:
+            result = provider.edit(edit_request)
+            stored = self.storage.store(
+                result.image_bytes, source_name=f"generation-{generation_id}.png"
+            )
+            provenance = {
+                "schema_version": 1,
+                "kind": "edit",
+                "generation_id": generation_id,
+                "scene_id": scene_id,
+                "source_candidate_id": candidate_id,
+                "source_generation_id": source["generation_id"],
+                "cast": capture.get("cast", []),
+                "model": model,
+                "params": {"image_size": image_size, "aspect_ratio": aspect_ratio},
+                "assembled_prompt": base_prompt,
+                "edit_instruction": instruction,
+                "input_images": attachment_capture,
+                "prompt_hash": edit_prompt_hash,
+                "interaction_id": result.interaction_id,
+                "cost_cents": (
+                    result.billed_cost_cents
+                    if result.billed_cost_cents is not None
+                    else estimate
+                ),
+                "price_table_version": self.settings.price_table_version,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            candidate_new_id = ledger.succeed(
+                generation_id,
+                interaction_id=result.interaction_id,
+                response_json=result.response_metadata,
+                candidate_sha256=stored.sha256,
+                actual_cost_cents=result.billed_cost_cents,
+                provenance_record={
+                    "prompt_hash": edit_prompt_hash,
+                    "price_table_version": self.settings.price_table_version,
+                    "input_images": attachment_capture,
+                },
+            )
+            try:
+                self.storage.append_provenance(stored.sha256, provenance)
+            except Exception:
+                pass
+        except Exception as exc:
+            ledger.fail(
+                generation_id,
+                str(exc),
+                charge_expected=getattr(exc, "charge_expected", True),
+                actual_cost_cents=(
+                    result.billed_cost_cents if result is not None else None
+                ),
+            )
+            raise EditError(f"edit {generation_id} failed: {exc}") from exc
+
+        generation_row = self.conn.execute(
+            "SELECT warning_text FROM generation WHERE id = ?", (generation_id,)
+        ).fetchone()
+        warnings: tuple[str, ...] = ()
+        if generation_row["warning_text"]:
+            warnings = (generation_row["warning_text"],)
+        return GenerationOutcome(
+            generation_id,
+            candidate_new_id,
+            stored.sha256,
+            edit_prompt_hash,
             (
                 result.billed_cost_cents
                 if result.billed_cost_cents is not None

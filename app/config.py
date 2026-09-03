@@ -29,9 +29,27 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 
 # price_table_version: bump whenever the table below changes.
-PRICE_TABLE_VERSION = "2026-08-31.1"
+PRICE_TABLE_VERSION = "2026-09-03.4"
 
 # Prices in cents (minor units) per image.
+#
+# OpenAI's GPT image models are priced per OUTPUT TOKEN, not per flat image (see
+# https://platform.openai.com/docs/pricing -> "Image generation models"). The
+# per-image cents below are conservative upper bounds derived from the published
+# image-output rate per model at the worst case for our usage: "high" quality at
+# the largest (landscape/portrait) size the adapter can request. Using OpenAI's
+# high-quality per-image estimate of ~6250 output image tokens:
+#
+#   gpt-image-1    : 6250 tok x $40/1M = $0.250 -> 30c (verified output rate $40)
+#   gpt-image-1.5  : 6250 tok x $32/1M = $0.200 -> 25c (verified output rate $32)
+#   gpt-image-2 1K : 6250 tok x $30/1M = $0.188 -> 24c (verified output rate $30)
+#   gpt-image-2 2K : 2560x1440 ~3x pixels => ~18750 tok x $30/1M = $0.562 -> 60c
+#   gpt-image-2 4K : 3840x2160 ~6x pixels => ~37500 tok x $30/1M = $1.125 -> 120c
+#
+# Rounded UP so the local hard cap never undercounts a call regardless of
+# orientation/tier. gpt-image-1/1.5 have no 2K/4K tier (flat price); gpt-image-2
+# scales with tier (see platform playground Size: 1K/2K/4K + docs arbitrary
+# WIDTHxHEIGHT for gpt-image-2). Re-verify against current OpenAI pricing page.
 MODEL_PRICES_CENTS: dict[str, dict[str, int]] = {
     "gemini-3.1-flash-lite-image": {"1K": 4},
     "gemini-3.1-flash-image": {
@@ -46,7 +64,31 @@ MODEL_PRICES_CENTS: dict[str, dict[str, int]] = {
         "4K": 24,
     },
     "gemini-2.5-flash-image": {"1K": 0},  # legacy, price unverified
+    "gpt-image-1": {"1K": 30, "2K": 30, "4K": 30},
+    "gpt-image-1.5": {"1K": 25, "2K": 25, "4K": 25},
+    "gpt-image-2": {"1K": 24, "2K": 60, "4K": 120},
 }
+
+# Which provider adapter serves each model. Selection keys on the model string
+# so a panel can freely choose a Gemini or OpenAI model; edits stay on the same
+# provider that produced the source image (see app/deps.py::get_provider).
+MODEL_PROVIDERS: dict[str, str] = {
+    "gemini-3.1-flash-lite-image": "gemini",
+    "gemini-3.1-flash-image": "gemini",
+    "gemini-3-pro-image": "gemini",
+    "gemini-2.5-flash-image": "gemini",
+    "gpt-image-1": "openai",
+    "gpt-image-1.5": "openai",
+    "gpt-image-2": "openai",
+}
+
+
+def provider_for_model(model: str) -> str:
+    """Return the provider key ('gemini' or 'openai') that serves a model."""
+    try:
+        return MODEL_PROVIDERS[model]
+    except KeyError as exc:
+        raise KeyError(f"no provider is registered for model {model!r}") from exc
 
 DEFAULT_MODEL = "gemini-3.1-flash-image"
 DEFAULT_IMAGE_SIZE = "1K"

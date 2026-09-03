@@ -6,7 +6,11 @@ import base64
 import re
 import time
 
-from app.providers.base import ProviderRequest, ProviderResult
+from app.providers.base import (
+    ProviderEditRequest,
+    ProviderRequest,
+    ProviderResult,
+)
 
 # gemini-3-pro-image periodically returns a 5xx "high demand ... try again
 # later" response. Confirmed (docs + live probing) to be transient Google-side
@@ -61,6 +65,54 @@ class GeminiProvider:
             "store": False,
         }
 
+    def build_edit_request(self, request: ProviderEditRequest) -> dict:
+        """Build a multi-turn edit turn.
+
+        The source image is re-supplied as an input alongside the canonical
+        character references and a text instruction. When the originating
+        interaction id is known it is also passed via ``previous_interaction_id``
+        so Gemini can continue from its own server-side state; the re-supplied
+        bytes keep the edit reliable even when that state is unavailable
+        (our generation turns use store=False).
+        """
+        inputs: list[dict] = [
+            {
+                "type": "text",
+                "text": (
+                    f"{request.prompt}\n\nEDIT INSTRUCTION\n"
+                    f"Modify the provided image as follows, changing only what is "
+                    f"described and preserving everything else, including each "
+                    f"character's identity: {request.instruction.strip()}"
+                ),
+            },
+            {
+                "type": "image",
+                "data": base64.b64encode(request.source_image).decode("ascii"),
+                "mime_type": request.source_mime_type,
+            },
+        ]
+        for reference in request.references:
+            inputs.append(
+                {
+                    "type": "image",
+                    "data": base64.b64encode(reference.data).decode("ascii"),
+                    "mime_type": reference.mime_type,
+                }
+            )
+        payload: dict = {
+            "model": request.model,
+            "input": inputs,
+            "response_format": {
+                "type": "image",
+                "aspect_ratio": request.aspect_ratio,
+                "image_size": request.image_size,
+            },
+            "store": False,
+        }
+        if request.source_interaction_id:
+            payload["previous_interaction_id"] = request.source_interaction_id
+        return payload
+
     @staticmethod
     def sanitized_request(request: ProviderRequest) -> dict:
         return {
@@ -78,6 +130,28 @@ class GeminiProvider:
             "image_size": request.image_size,
             "store": False,
         }
+
+    @staticmethod
+    def _is_auth_failure(exc: Exception) -> bool:
+        """True for missing/invalid API key or permission failures.
+
+        These are client configuration errors that never reach billable
+        inference (401/403, or a local check that raises before any HTTP
+        call). They must never count toward the daily spend cap.
+        """
+        status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+        if isinstance(status, int) and status in (401, 403):
+            return True
+        text = str(exc).lower()
+        return (
+            "api key" in text
+            or "api_key" in text
+            or "gemini_api_key" in text
+            or "not wired" in text
+            or "unauthenticated" in text
+            or "permission denied" in text
+            or "requires an api key" in text
+        )
 
     @staticmethod
     def _is_capacity_failure(exc: Exception) -> bool:
@@ -99,10 +173,7 @@ class GeminiProvider:
             and "try again later" in error_text.lower()
         )
 
-    def _generate_once(self, request: ProviderRequest) -> ProviderResult:
-        interaction = self._client().interactions.create(
-            **self.build_api_request(request)
-        )
+    def _interpret(self, interaction) -> ProviderResult:
         image = getattr(interaction, "output_image", None)
         if image is None or not getattr(image, "data", None):
             raise GeminiProviderError("Gemini returned no output image")
@@ -113,11 +184,17 @@ class GeminiProvider:
             response_metadata={"interaction_id": interaction_id},
         )
 
-    def generate(self, request: ProviderRequest) -> ProviderResult:
+    def _run_with_retries(self, payload: dict, *, action: str) -> ProviderResult:
+        """Call the Interactions API with the shared capacity retry policy.
+
+        ``action`` is only used for the error message ("generation"/"edit"); the
+        capacity, backoff, and billing classification are identical for both.
+        """
         last_exc: Exception | None = None
         for attempt in range(CAPACITY_MAX_ATTEMPTS):
             try:
-                return self._generate_once(request)
+                interaction = self._client().interactions.create(**payload)
+                return self._interpret(interaction)
             except GeminiProviderError:
                 raise
             except Exception as exc:  # noqa: BLE001 — classified below
@@ -135,15 +212,28 @@ class GeminiProvider:
                         r"(?:Error code|code)[:=]\s*(\d{3})", str(exc)
                     )
                     status = int(match.group(1)) if match else None
+                is_auth = self._is_auth_failure(exc)
                 charge_expected = not (
-                    (isinstance(status, int) and 400 <= status < 500) or is_capacity
+                    (isinstance(status, int) and 400 <= status < 500)
+                    or is_capacity
+                    or is_auth
                 )
                 raise GeminiProviderError(
-                    f"Gemini generation failed: {exc}",
+                    f"Gemini {action} failed: {exc}",
                     charge_expected=charge_expected,
                 ) from exc
         # Unreachable in practice (loop either returns or raises), but keeps the
         # type checker satisfied and guards against a zero-attempt config.
         raise GeminiProviderError(
-            f"Gemini generation failed: {last_exc}", charge_expected=False
+            f"Gemini {action} failed: {last_exc}", charge_expected=False
+        )
+
+    def generate(self, request: ProviderRequest) -> ProviderResult:
+        return self._run_with_retries(
+            self.build_api_request(request), action="generation"
+        )
+
+    def edit(self, request: ProviderEditRequest) -> ProviderResult:
+        return self._run_with_retries(
+            self.build_edit_request(request), action="edit"
         )

@@ -1013,6 +1013,43 @@
   justify-content: flex-end;
 }
 
+/* The edit affordance occupies its own full-width row beneath the summary,
+   image, and any error, so its textarea and hint never collide with the
+   three-column grid above. */
+.attempt-row__edit {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--space-2);
+}
+
+.attempt-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 40rem;
+}
+
+.attempt-edit-form label {
+  font-weight: 600;
+}
+
+.attempt-edit-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.attempt-edit-form__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.attempt-edit-form .field__hint {
+  margin: 0;
+}
+
 .attempt-error {
   min-width: 0;
   padding: var(--space-3);

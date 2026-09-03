@@ -5,6 +5,7 @@ description = "Locally hosted comic-panel generator with persistent character id
 requires-python = ">=3.11"
 dependencies = [
     "google-genai>=2.20.0",
+    "openai>=1.40.0",
     "pillow>=10.0.0",
     "python-dotenv>=1.0.0",
     "fastapi>=0.115.0",

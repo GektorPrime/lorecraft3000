@@ -26,6 +26,7 @@ from tests.conftest import make_png_bytes
 class FakeProvider:
     def __init__(self):
         self.requests = []
+        self.edits = []
         self.error = None
 
     def generate(self, request):
@@ -34,6 +35,14 @@ class FakeProvider:
             raise self.error
         return ProviderResult(
             make_png_bytes((30, 60, 90)), "route-interaction", {"fake": True}
+        )
+
+    def edit(self, request):
+        self.edits.append(request)
+        if self.error:
+            raise self.error
+        return ProviderResult(
+            make_png_bytes((60, 90, 30)), "route-edit", {"fake": True, "edited": True}
         )
 
 
@@ -248,3 +257,58 @@ def _generate(route_app, panel):
     )
     assert generated.status_code == 201, generated.text
     return generated.json()
+
+
+def test_edit_candidate_creates_child_generation(route_app):
+    elias, _ = _seed_character_with_canon(route_app, "ELIAS", "elias")
+    panel = _create_panel(route_app, [elias["id"]])
+    generation = _generate(route_app, panel)
+    candidate = generation["candidates"][0]
+
+    edited = route_app.client.post(
+        f"/api/v1/candidates/{candidate['id']}/edit",
+        json={"instruction": "make it night time with neon"},
+    )
+    assert edited.status_code == 201, edited.text
+    body = edited.json()
+    assert body["state"] == "succeeded"
+    assert body["interaction_id"] == "route-edit"
+    assert len(route_app.provider.edits) == 1
+    assert route_app.provider.edits[0].instruction == "make it night time with neon"
+
+    # The edit is a child of the source generation.
+    conn = route_app.conn()
+    try:
+        parent = conn.execute(
+            "SELECT parent_generation_id FROM generation WHERE id = ?",
+            (body["id"],),
+        ).fetchone()["parent_generation_id"]
+    finally:
+        conn.close()
+    assert parent == generation["id"]
+
+    # The new candidate renders as an image.
+    new_candidate = body["candidates"][0]
+    content = route_app.client.get(new_candidate["content_url"])
+    assert content.status_code == 200
+    assert content.headers["content-type"].startswith("image/png")
+
+
+def test_edit_requires_non_empty_instruction(route_app):
+    elias, _ = _seed_character_with_canon(route_app, "ELIAS", "elias")
+    panel = _create_panel(route_app, [elias["id"]])
+    generation = _generate(route_app, panel)
+    candidate = generation["candidates"][0]
+    resp = route_app.client.post(
+        f"/api/v1/candidates/{candidate['id']}/edit",
+        json={"instruction": ""},
+    )
+    assert resp.status_code == 422
+
+
+def test_edit_missing_candidate_returns_404(route_app):
+    resp = route_app.client.post(
+        "/api/v1/candidates/9999/edit",
+        json={"instruction": "make it night"},
+    )
+    assert resp.status_code == 404

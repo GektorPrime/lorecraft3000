@@ -29,6 +29,7 @@ vi.mock('../../api/client', async () => {
     deletePanel: vi.fn(),
     generatePanel: vi.fn(),
     reviewCandidate: vi.fn(),
+    editCandidate: vi.fn(),
     updatePanelModel: vi.fn(),
   }
 })
@@ -174,6 +175,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     vi.mocked(client.deletePanel).mockReset().mockResolvedValue(undefined)
     vi.mocked(client.generatePanel).mockReset()
     vi.mocked(client.reviewCandidate).mockReset()
+    vi.mocked(client.editCandidate).mockReset()
     vi.mocked(client.updatePanelModel).mockReset()
     refreshBudget.mockReset().mockResolvedValue(undefined)
   })
@@ -213,6 +215,49 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(within(attemptList as HTMLElement).getAllByText('Waiting')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Accepted')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Rejected')).toHaveLength(1)
+  })
+
+  it('edits a successful candidate with an instruction and refreshes history', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
+    ])
+    vi.mocked(client.editCandidate).mockResolvedValue(GENERATED)
+    renderPreview()
+
+    await screen.findAllByText('Attempt #7')
+    await user.click(screen.getByRole('button', { name: 'Edit this image' }))
+
+    const box = screen.getByLabelText(/Describe the change to make to this image/)
+    await user.type(box, 'make it night time with neon')
+    await user.click(screen.getByRole('button', { name: 'Submit edit' }))
+
+    await waitFor(() =>
+      expect(client.editCandidate).toHaveBeenCalledWith(
+        CANDIDATE.id,
+        'make it night time with neon',
+      ),
+    )
+  })
+
+  it('disables submit until an edit instruction is entered', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
+    ])
+    renderPreview()
+
+    await screen.findAllByText('Attempt #7')
+    await user.click(screen.getByRole('button', { name: 'Edit this image' }))
+    expect(screen.getByRole('button', { name: 'Submit edit' })).toBeDisabled()
+
+    await user.type(
+      screen.getByLabelText(/Describe the change to make to this image/),
+      'brighten it',
+    )
+    expect(screen.getByRole('button', { name: 'Submit edit' })).toBeEnabled()
   })
 
   it('puts the purple Back to panels button in the page header', async () => {

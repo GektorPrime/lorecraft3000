@@ -185,6 +185,19 @@ export const generatePanel = (id: number, expectedPromptHash: string) =>
 export const reviewCandidate = (id: number, verdict: 'accepted' | 'rejected') =>
   request<Candidate>(`/candidates/${id}/review`, json('POST', { verdict }))
 
+// Edit an existing candidate with a natural-language instruction. Produces a
+// new candidate under a child generation on the same provider/model, keeping
+// character identity anchored to the panel's canonical references.
+export const editCandidate = (id: number, instruction: string) =>
+  request<Generation>(`/candidates/${id}/edit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: JSON.stringify({ instruction }),
+  })
+
 // ---------------------------------------------------------------------------
 // gallery
 // ---------------------------------------------------------------------------

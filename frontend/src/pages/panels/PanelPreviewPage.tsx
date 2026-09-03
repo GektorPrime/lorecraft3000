@@ -4,6 +4,7 @@ import {
   ApiError,
   deletePanel,
   duplicatePanel,
+  editCandidate,
   generatePanel,
   getPanel,
   listPanelGenerations,
@@ -81,6 +82,9 @@ function PanelPreview({ panelId }: { panelId: number }) {
   const [deleting, setDeleting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [reviewingCandidateId, setReviewingCandidateId] = useState<number | null>(null)
+  const [editingCandidateId, setEditingCandidateId] = useState<number | null>(null)
+  const [editInstruction, setEditInstruction] = useState('')
+  const [submittingEdit, setSubmittingEdit] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const requestVersion = useRef(0)
   const hasLoadedPanel = useRef(false)
@@ -285,6 +289,30 @@ function PanelPreview({ panelId }: { panelId: number }) {
     }
   }
 
+  const handleEditSubmit = async (candidateId: number) => {
+    if (submittingEdit || hasPendingAttempt) return
+    const instruction = editInstruction.trim()
+    if (!instruction) return
+    setSubmittingEdit(true)
+    setActionMessage(null)
+    try {
+      await editCandidate(candidateId, instruction)
+      await refreshBudget()
+      if (!mounted.current) return
+      // The edited result appears as a new attempt in the history below.
+      setEditingCandidateId(null)
+      setEditInstruction('')
+      await reload()
+    } catch (err) {
+      if (!mounted.current) return
+      const message = err instanceof ApiError ? err.message : String(err)
+      setActionMessage(`Could not edit image. ${friendlyGenerationError(message)}`)
+      await reload()
+    } finally {
+      if (mounted.current) setSubmittingEdit(false)
+    }
+  }
+
   const handleReview = async (candidateId: number, verdict: 'accepted' | 'rejected') => {
     if (reviewingCandidateId !== null) return
     setReviewingCandidateId(candidateId)
@@ -376,9 +404,10 @@ function PanelPreview({ panelId }: { panelId: number }) {
           </ul>
           <Notice tone="privacy" className="privacy-note">
             <p>
-              These reference images are uploaded to Google's Gemini API, together
-              with the prompt below, to generate this panel. They leave your
-              computer.
+              These reference images are uploaded to{' '}
+              {panel.model.startsWith('gpt-') ? "OpenAI's API" : "Google's Gemini API"},
+              together with the prompt below, to generate this panel. They leave
+              your computer.
             </p>
           </Notice>
 
@@ -549,6 +578,74 @@ function PanelPreview({ panelId }: { panelId: number }) {
                     >
                       Try again
                     </button>
+                  </div>
+                )}
+                {attempt.state === 'succeeded' && attempt.candidates.length > 0 && (
+                  <div className="attempt-row__edit">
+                    {editingCandidateId === attempt.candidates[0].id ? (
+                      <form
+                        className="attempt-edit-form"
+                        onSubmit={(event) => {
+                          event.preventDefault()
+                          void handleEditSubmit(attempt.candidates[0]!.id)
+                        }}
+                      >
+                        <label htmlFor={`edit-${attempt.id}`}>
+                          Describe the change to make to this image
+                        </label>
+                        <textarea
+                          id={`edit-${attempt.id}`}
+                          value={editInstruction}
+                          rows={2}
+                          disabled={submittingEdit}
+                          placeholder="e.g. make it night time; move the lantern to the left"
+                          onChange={(event) => setEditInstruction(event.target.value)}
+                        />
+                        <div className="attempt-edit-form__actions">
+                          <button
+                            type="submit"
+                            className="btn btn--primary"
+                            disabled={
+                              submittingEdit ||
+                              hasPendingAttempt ||
+                              editInstruction.trim().length === 0
+                            }
+                          >
+                            {submittingEdit ? 'Editing…' : 'Submit edit'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn"
+                            disabled={submittingEdit}
+                            onClick={() => {
+                              setEditingCandidateId(null)
+                              setEditInstruction('')
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <span className="field__hint">
+                          Runs on the same model ({attempt.model}) and keeps each
+                          character anchored to their canonical references. Creates a
+                          new attempt and costs another generation.
+                        </span>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={hasPendingAttempt || submittingEdit}
+                        onClick={() => {
+                          setEditingCandidateId(attempt.candidates[0]!.id)
+                          setEditInstruction('')
+                          setActionMessage(null)
+                        }}
+                        title="Refine this image with an instruction"
+                      >
+                        Edit this image
+                      </button>
+                    )}
                   </div>
                 )}
               </article>

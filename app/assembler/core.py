@@ -25,6 +25,12 @@ MODEL_CAPABILITIES = {
         "gemini-3.1-flash-image", 4
     ),
     "gemini-3-pro-image": ModelCapabilities("gemini-3-pro-image", 5),
+    # OpenAI GPT image models accept up to 16 input images on their edit
+    # endpoint; 5 character references matches the Pro budget and stays well
+    # within that.
+    "gpt-image-1": ModelCapabilities("gpt-image-1", 5),
+    "gpt-image-1.5": ModelCapabilities("gpt-image-1.5", 5),
+    "gpt-image-2": ModelCapabilities("gpt-image-2", 5),
 }
 
 
