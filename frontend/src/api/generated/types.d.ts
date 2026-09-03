@@ -62,6 +62,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/candidates/{candidate_id}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Edit Candidate
+         * @description Create a new candidate by editing an existing one with an instruction.
+         *
+         *     The edit runs on the same provider/model that produced the source image and
+         *     is recorded as a child generation of the source, keeping the panel's attempt
+         *     history a connected chain.
+         */
+        post: operations["edit_candidate_api_v1_candidates__candidate_id__edit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/candidates/{candidate_id}/review": {
         parameters: {
             query?: never;
@@ -603,6 +627,11 @@ export interface components {
             /** Review Status */
             review_status: string;
         };
+        /** CandidateEditIn */
+        CandidateEditIn: {
+            /** Instruction */
+            instruction: string;
+        };
         /** CandidateReviewIn */
         CandidateReviewIn: {
             /** Verdict */
@@ -1077,6 +1106,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_candidate_api_v1_candidates__candidate_id__edit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                candidate_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Generation"];
                 };
             };
             /** @description Validation Error */

@@ -232,6 +232,10 @@ class CandidateReviewIn(BaseModel):
     verdict: str
 
 
+class CandidateEditIn(BaseModel):
+    instruction: str = Field(min_length=1)
+
+
 class Generation(BaseModel):
     id: int
     scene_id: int

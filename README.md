@@ -8,7 +8,10 @@ recognizable across scenes. Visual styles are editable.
 - Character library with immutable, versioned canonical reference sets
 - Multi-character panels with explicit reference-slot allocation
 - Exact prompt and cost preview before any paid request
-- Gemini image generation behind a provider adapter
+- Gemini and OpenAI (gpt-image-1) image generation behind provider adapters,
+  selected per panel by model
+- Multi-turn image editing: refine a generated candidate with a natural-language
+  instruction on the same provider, keeping character identity anchored
 - Hard, configurable daily spending limit (`$3` by default)
 - Content-addressed images with complete generation provenance
 - Manual candidate review without automatically changing character canon
@@ -18,7 +21,8 @@ recognizable across scenes. Visual styles are editable.
 ## Setup
 
 Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), Node.js 20+, npm, and a
-billed Gemini API key.
+billed Gemini API key. An OpenAI API key is additionally required only if a
+panel uses an OpenAI model (e.g. `gpt-image-1`).
 
 ```bash
 uv sync
@@ -26,7 +30,8 @@ npm install
 cp .env.example .env
 ```
 
-Set `GEMINI_API_KEY` in `.env`. The default daily limit can be changed with
+Set `GEMINI_API_KEY` in `.env` (and `OPENAI_API_KEY` if using OpenAI models).
+The default daily limit can be changed with
 `LORECRAFT_DAILY_SPEND_CAP_USD`. Spend is counted from midnight in the browser's
 local timezone; the database stores timestamps in UTC.
 

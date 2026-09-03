@@ -32,9 +32,9 @@ def test_default_model_and_size():
 def test_price_table_has_exact_version_and_mappings():
     """Assert the exact price table version and all model->size->price mappings."""
     s = Settings()
-    assert s.price_table_version == "2026-08-31.1"
+    assert s.price_table_version == "2026-09-03.4"
 
-    # Exact mappings for all four models present in app/config.py.
+    # Exact mappings for every model present in app/config.py.
     assert s.model_prices_cents == {
         "gemini-3.1-flash-lite-image": {"1K": 4},
         "gemini-3.1-flash-image": {
@@ -49,6 +49,9 @@ def test_price_table_has_exact_version_and_mappings():
             "4K": 24,
         },
         "gemini-2.5-flash-image": {"1K": 0},
+        "gpt-image-1": {"1K": 30, "2K": 30, "4K": 30},
+        "gpt-image-1.5": {"1K": 25, "2K": 25, "4K": 25},
+        "gpt-image-2": {"1K": 24, "2K": 60, "4K": 120},
     }
 
 

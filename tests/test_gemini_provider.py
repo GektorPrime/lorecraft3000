@@ -148,5 +148,18 @@ def test_consumer_api_400_is_not_retried():
     assert sleeps == []
 
 
-def test_default_provider_uses_configured_timeout():
-    assert get_provider().timeout_seconds == settings.provider_timeout_seconds
+def test_registry_selects_provider_by_model():
+    from app.providers.openai import OpenAIProvider
+
+    registry = get_provider()
+    assert registry.timeout_seconds == settings.provider_timeout_seconds
+    assert isinstance(registry.for_model("gemini-3.1-flash-image"), GeminiProvider)
+    for model in ("gpt-image-1", "gpt-image-1.5", "gpt-image-2"):
+        assert isinstance(registry.for_model(model), OpenAIProvider)
+    # Providers are memoized per key.
+    assert registry.for_model("gpt-image-1") is registry.for_model("gpt-image-2")
+
+
+def test_registry_rejects_unknown_model():
+    with pytest.raises(KeyError):
+        get_provider().for_model("no-such-model")

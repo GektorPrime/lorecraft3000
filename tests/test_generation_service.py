@@ -18,6 +18,7 @@ class FakeProvider:
     def __init__(self, *, error: Exception | None = None):
         self.error = error
         self.requests = []
+        self.edits = []
 
     def generate(self, request):
         self.requests.append(request)
@@ -27,6 +28,16 @@ class FakeProvider:
             make_png_bytes((20, 40, 80)),
             "interaction-fake",
             {"provider": "fake"},
+        )
+
+    def edit(self, request):
+        self.edits.append(request)
+        if self.error:
+            raise self.error
+        return ProviderResult(
+            make_png_bytes((90, 10, 60)),
+            "interaction-edit",
+            {"provider": "fake", "edited": True},
         )
 
 
@@ -362,3 +373,89 @@ def test_duplicate_cast_names_fail_as_ambiguous(conn, storage, tmp_path):
         GenerationService(conn, storage, _settings(tmp_path), FakeProvider()).generate(
             scene_id
         )
+
+
+# ---------------------------------------------------------------------------
+# candidate editing (multi-turn)
+# ---------------------------------------------------------------------------
+
+
+def _generate_one(conn, storage, tmp_path, provider):
+    character, _, ref_image = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id, "role": "stands"}])
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+    outcome = service.generate(scene_id)
+    return service, outcome, ref_image
+
+
+def test_edit_creates_child_generation_with_new_candidate(conn, storage, tmp_path):
+    provider = FakeProvider()
+    service, first, ref_image = _generate_one(conn, storage, tmp_path, provider)
+
+    edited = service.edit_candidate(first.candidate_id, "make it night")
+
+    assert len(provider.edits) == 1
+    edit_request = provider.edits[0]
+    # The instruction and the original prompt context both reach the provider.
+    assert edit_request.instruction == "make it night"
+    assert "canonical reference for ELIAS" in edit_request.prompt
+    # Identity is anchored: the canonical reference travels with the edit.
+    assert [ref.sha256 for ref in edit_request.references] == [ref_image.sha256]
+    assert edit_request.source_image  # source bytes supplied
+
+    row = conn.execute(
+        "SELECT * FROM generation WHERE id = ?", (edited.generation_id,)
+    ).fetchone()
+    assert row["state"] == "succeeded"
+    assert row["parent_generation_id"] == first.generation_id
+    capture = json.loads(row["request_json"])
+    assert capture["kind"] == "edit"
+    assert capture["edit_instruction"] == "make it night"
+    assert capture["source_candidate_id"] == first.candidate_id
+
+
+def test_edit_requires_instruction(conn, storage, tmp_path):
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+    with pytest.raises(GenerationError, match="edit instruction is required"):
+        service.edit_candidate(first.candidate_id, "   ")
+    assert provider.edits == []
+
+
+def test_edit_of_missing_candidate_is_not_found(conn, storage, tmp_path):
+    service = GenerationService(conn, storage, _settings(tmp_path), FakeProvider())
+    from app.services.generation import GenerationNotFoundError
+
+    with pytest.raises(GenerationNotFoundError):
+        service.edit_candidate(999, "make it night")
+
+
+def test_edit_failure_marks_child_failed_and_keeps_reservation(
+    conn, storage, tmp_path
+):
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+    provider.error = RuntimeError("edit boom")
+    with pytest.raises(GenerationError, match="edit boom"):
+        service.edit_candidate(first.candidate_id, "make it night")
+    child = conn.execute(
+        "SELECT state, cost_usd_cents FROM generation WHERE parent_generation_id = ?",
+        (first.generation_id,),
+    ).fetchone()
+    assert tuple(child) == ("failed", 7)
+
+
+def test_edit_is_idempotent_on_replay(conn, storage, tmp_path):
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+    a = service.edit_candidate(
+        first.candidate_id, "make it night", idempotency_key="edit-1"
+    )
+    b = service.edit_candidate(
+        first.candidate_id, "make it night", idempotency_key="edit-1"
+    )
+    assert b.replayed is True
+    assert b.generation_id == a.generation_id
+    assert len(provider.edits) == 1

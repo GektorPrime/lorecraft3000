@@ -81,6 +81,20 @@
         "title": "Candidate",
         "type": "object"
       },
+      "CandidateEditIn": {
+        "properties": {
+          "instruction": {
+            "minLength": 1,
+            "title": "Instruction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instruction"
+        ],
+        "title": "CandidateEditIn",
+        "type": "object"
+      },
       "CandidateReviewIn": {
         "properties": {
           "verdict": {
@@ -1278,6 +1292,76 @@
           }
         },
         "summary": "Candidate Content",
+        "tags": [
+          "api-v1",
+          "api-v1-generations"
+        ]
+      }
+    },
+    "/api/v1/candidates/{candidate_id}/edit": {
+      "post": {
+        "description": "Create a new candidate by editing an existing one with an instruction.\n\nThe edit runs on the same provider/model that produced the source image and\nis recorded as a child generation of the source, keeping the panel's attempt\nhistory a connected chain.",
+        "operationId": "edit_candidate_api_v1_candidates__candidate_id__edit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateEditIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Candidate",
         "tags": [
           "api-v1",
           "api-v1-generations"

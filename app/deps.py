@@ -7,9 +7,10 @@ Routes declare `conn: sqlite3.Connection = Depends(get_conn)` and
 
 from __future__ import annotations
 
-from app.config import Settings
+from app.config import Settings, provider_for_model
 from app.db import connect
 from app.providers.gemini import GeminiProvider
+from app.providers.openai import OpenAIProvider
 from app.storage import ImageStorage
 
 # Single Settings instance for the whole app (env/.env loaded in app.config).
@@ -35,6 +36,33 @@ def get_storage() -> ImageStorage:
     return ImageStorage(settings.store_root)
 
 
-def get_provider():
-    """Construct the real provider only for an explicit generation request."""
-    return GeminiProvider(timeout_seconds=settings.provider_timeout_seconds)
+class ProviderRegistry:
+    """Resolve the concrete image provider for a model.
+
+    Selection keys on the model string (see app/config.py::MODEL_PROVIDERS) so a
+    panel may freely choose a Gemini or OpenAI model, and an edit stays on the
+    same provider that produced the source image. Providers are constructed
+    lazily and memoized so an unused vendor's SDK/client is never initialized.
+    """
+
+    def __init__(self, *, timeout_seconds: int) -> None:
+        self.timeout_seconds = timeout_seconds
+        self._cache: dict[str, object] = {}
+
+    def _build(self, provider_key: str):
+        if provider_key == "gemini":
+            return GeminiProvider(timeout_seconds=self.timeout_seconds)
+        if provider_key == "openai":
+            return OpenAIProvider(timeout_seconds=self.timeout_seconds)
+        raise KeyError(f"unknown provider {provider_key!r}")
+
+    def for_model(self, model: str):
+        provider_key = provider_for_model(model)
+        if provider_key not in self._cache:
+            self._cache[provider_key] = self._build(provider_key)
+        return self._cache[provider_key]
+
+
+def get_provider() -> ProviderRegistry:
+    """Construct the provider registry only for an explicit generation request."""
+    return ProviderRegistry(timeout_seconds=settings.provider_timeout_seconds)
