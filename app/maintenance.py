@@ -368,8 +368,9 @@ def run_identity_backfill(
     embedder = get_embedder()
     if embedder is None:
         raise RuntimeError(
-            "insightface is not installed; install the identity dependency group "
-            "first (uv sync --group identity)"
+            "face checking is unavailable (insightface not installed, or the "
+            "buffalo_l model pack is missing under ~/.insightface/models); "
+            "install with uv sync and fetch the buffalo_l model first"
         )
 
     refs_embedded = 0

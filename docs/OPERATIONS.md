@@ -154,6 +154,46 @@ You can also have the app run a read-only scan at startup and log a summary by
 setting `LORECRAFT_CONSISTENCY_CHECK_ON_STARTUP=true`. This never repairs
 anything and never blocks startup.
 
+## Character identity scoring
+
+Every generated candidate is checked against the canonical reference gallery
+for its panel's cast, and the best per-character similarity is stored as an
+advisory score on the candidate (shown in the UI; it never blocks promotion).
+Scoring needs the InsightFace `buffalo_l` model pack present locally — inside
+`~/.insightface/models/` (or under `$INSIGHTFACE_HOME/models`). The pip
+dependencies are installed by `uv sync`, but the ~320MB model file is a
+runtime asset that is never downloaded implicitly.
+
+Fetch it once (this downloads the model and exits; it does not touch the
+database):
+
+```bash
+python -c "from app.services.identity import FaceEmbedder; FaceEmbedder()"
+```
+
+If the model is missing, identity scoring is skipped at run time and the
+backend logs a warning — generation still succeeds, candidates just carry no
+scores (and the face-embedding columns stay empty) until the model is present.
+
+Pre-feature data can be scored without regenerating anything:
+
+```bash
+# Embed canonical face references and score every candidate still lacking
+# scores (references that predate the feature are embedded first).
+python -m app.maintenance identity backfill
+
+# Re-score everything, even already-scored candidates.
+python -m app.maintenance identity backfill --force
+
+# Only embed missing references, or only score candidates.
+python -m app.maintenance identity backfill --scope refs
+python -m app.maintenance identity backfill --scope candidates
+```
+
+The command exits `2` (after printing the reason) when insightface is not
+installed or the model pack is missing, and `1` if any image could not be
+processed — individual failures are logged and never abort the run.
+
 ## Health checks
 
 The backend exposes two endpoints (both local-only, like the rest of the API):

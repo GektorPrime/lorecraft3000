@@ -116,3 +116,22 @@ class FakeEmbedder:
 def fake_embedder() -> FakeEmbedder:
     """A default FakeEmbedder returning one detectable unit vector."""
     return FakeEmbedder()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_face_model(monkeypatch):
+    """Keep the suite model-independent.
+
+    The real FaceEmbedder loads the ~320MB buffalo_l model on first use (and
+    every module that calls get_embedder imports it into its own namespace,
+    so all call sites must be patched). Tests exercise identity behaviour
+    explicitly with FakeEmbedder instead; stubbing get_embedder to None keeps
+    local runs fast and identical to CI, which has no model downloaded.
+    """
+    for module in (
+        "app.services.identity",
+        "app.services.ref_sets",
+        "app.services.generation",
+        "app.maintenance",
+    ):
+        monkeypatch.setattr(f"{module}.get_embedder", lambda: None)

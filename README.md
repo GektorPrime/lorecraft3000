@@ -13,6 +13,10 @@ recognizable across scenes. Visual styles are editable.
 - Multi-turn image editing: refine a generated candidate with a natural-language
   instruction on the same provider, keeping character identity anchored
 - Hard, configurable daily spending limit (`$3` by default)
+- Advisory identity scoring: every candidate is matched against the panel
+  cast's canonical reference gallery and scored per character, surfaced only
+  in the UI (it never gates or auto-rejects) — see
+  [docs/OPERATIONS.md](docs/OPERATIONS.md) for the one-time model setup
 - Content-addressed images with complete generation provenance
 - Manual candidate review without automatically changing character canon
 - Typed `/api/v1` JSON API backing a separated React + Vite frontend

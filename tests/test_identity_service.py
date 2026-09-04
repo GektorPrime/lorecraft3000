@@ -56,6 +56,16 @@ def test_get_embedder_is_none_without_insightface():
         assert get_embedder() is None
 
 
+def test_get_embedder_is_none_when_model_missing(monkeypatch):
+    """A missing buffalo_l pack disables scoring without downloading it."""
+    monkeypatch.setattr(
+        "app.services.identity._model_root", lambda: "/nonexistent/insightface/models"
+    )
+    from app.services.identity import get_embedder
+
+    assert get_embedder() is None
+
+
 def test_score_against_gallery_matches_exclusive_character():
     own = make_unit_vector(0.8)
     rival = make_unit_vector(0.2)

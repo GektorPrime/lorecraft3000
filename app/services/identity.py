@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import struct
 import threading
 from typing import TYPE_CHECKING
@@ -115,15 +116,33 @@ class FaceEmbedder:
         return vectors
 
 
+def _model_root() -> str:
+    """Directory where InsightFace looks for local model packs."""
+    return os.environ.get("INSIGHTFACE_HOME") or os.path.join(
+        os.path.expanduser("~"), ".insightface", "models"
+    )
+
+
 def get_embedder() -> FaceEmbedder | None:
     """Return the global embedder, constructing it on first call.
 
-    Returns None if insightface is not installed (the dependency is optional).
+    Returns None if insightface is not installed or the buffalo_l model pack
+    is not present locally.  The model is deliberately never downloaded
+    implicitly: pip dependencies are always installed (identity scoring is a
+    core feature), but the ~320MB model file is a runtime asset the operator
+    provides once (e.g. via the maintainer script).
     """
     global _embedder
     if _embedder is not None:
         return _embedder
     if not _insightface_available:
+        return None
+    if not os.path.isdir(os.path.join(_model_root(), "buffalo_l")):
+        log.warning(
+            "InsightFace buffalo_l model not found under %s — "
+            "face embedding disabled (see docs/OPERATIONS.md)",
+            _model_root(),
+        )
         return None
     with _embedder_lock:
         if _embedder is not None:
