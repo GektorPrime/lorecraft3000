@@ -88,7 +88,7 @@ export function PanelListPage() {
           {panels.map((panel) => (
             <article
               key={panel.id}
-              className="resource-card resource-card--clickable"
+              className="resource-card resource-card--clickable panel-list-card"
               role="button"
               tabIndex={0}
               aria-label={`Preview panel #${panel.id}`}
@@ -100,6 +100,13 @@ export function PanelListPage() {
                 }
               }}
             >
+              {panel.latest_attempt_preview_url && (
+                <img
+                  className="panel-list-card__preview"
+                  src={panel.latest_attempt_preview_url}
+                  alt={`Latest generation attempt for panel #${panel.id}`}
+                />
+              )}
               <div className="resource-card__body">
                 <h2 className="resource-card__title">Panel #{panel.id}</h2>
                 <p className="resource-card__summary text-clamp" title={panel.beat_text}>

@@ -12,6 +12,7 @@ import dataclasses
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main as main_module
 from app.config import Settings
 from app.db import connect
 from app.health import readiness_report
@@ -110,7 +111,8 @@ def test_report_never_raises_on_all_failures(tmp_path):
     assert set(report.checks) == {"database", "migrations", "storage"}
 
 
-def test_health_endpoint_ok_returns_200():
+def test_health_endpoint_ok_returns_200(ready_settings, monkeypatch):
+    monkeypatch.setattr(main_module, "settings", ready_settings)
     client = TestClient(app, base_url="http://127.0.0.1")
     with client:
         resp = client.get("/health")

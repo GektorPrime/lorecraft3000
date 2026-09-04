@@ -14,6 +14,8 @@ from dataclasses import dataclass
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main as main_module
+from app.config import Settings
 from app.db import connect
 from app.deps import get_conn, get_provider, get_storage, settings
 from app.main import app
@@ -58,11 +60,16 @@ class RouteApp:
 
 
 @pytest.fixture
-def route_app(tmp_path):
+def route_app(tmp_path, monkeypatch):
     db_path = tmp_path / "vertical.db"
     storage = ImageStorage(tmp_path / "store")
     provider = FakeProvider()
     run_migrations(db_path)
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        Settings(db_path=db_path, store_root=storage.root),
+    )
 
     def override_conn():
         conn = connect(db_path)
@@ -74,9 +81,11 @@ def route_app(tmp_path):
     app.dependency_overrides[get_conn] = override_conn
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_provider] = lambda: provider
-    with TestClient(app, base_url="http://127.0.0.1") as client:
-        yield RouteApp(client, db_path, storage, provider)
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            yield RouteApp(client, db_path, storage, provider)
+    finally:
+        app.dependency_overrides.clear()
 
 
 def _seed_character_with_canon(route_app, name, slug, color=(100, 20, 20)):

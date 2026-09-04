@@ -226,6 +226,7 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
     from app.schemas import Panel
 
     scenes = SceneService(conn, settings)
+    latest_candidate_id = scenes.latest_attempt_candidate_id(scene.id)
     return Panel(
         id=scene.id,
         beat_text=scene.beat_text,
@@ -240,6 +241,11 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
         created_at=scene.created_at,
         is_editable=scenes.is_editable(scene.id),
         generation_count=scenes.generation_count(scene.id),
+        latest_attempt_preview_url=(
+            f"/api/v1/candidates/{latest_candidate_id}/content"
+            if latest_candidate_id is not None
+            else None
+        ),
     )
 
 

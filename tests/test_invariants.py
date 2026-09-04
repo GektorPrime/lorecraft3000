@@ -207,18 +207,16 @@ def test_images_in_retired_ref_set_remain_immutable(conn):
         conn.execute("DELETE FROM ref_image WHERE id = ?", (image_id,))
 
 
-def test_retired_ref_set_can_be_deleted(conn):
-    """Once retired, a ref_set is no longer canonical and can be deleted."""
+def test_retired_ref_set_cannot_be_deleted(conn):
+    """Retired canonical versions remain immutable provenance history."""
     cid = _insert_character(conn)
     rsid = _insert_ref_set(conn, cid, version=1, status="canonical")
     conn.execute(
         "UPDATE ref_set SET status='retired' WHERE id=?", (rsid,)
     )
     conn.commit()
-    conn.execute("DELETE FROM ref_set WHERE id=?", (rsid,))
-    conn.commit()
-    row = conn.execute("SELECT COUNT(*) AS n FROM ref_set WHERE id=?", (rsid,)).fetchone()
-    assert row["n"] == 0
+    with pytest.raises(sqlite3.IntegrityError, match="retired ref_set cannot be deleted"):
+        conn.execute("DELETE FROM ref_set WHERE id=?", (rsid,))
 
 
 def test_canonical_promotion_retires_prior(conn):

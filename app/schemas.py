@@ -184,6 +184,7 @@ class Panel(BaseModel):
     created_at: str
     is_editable: bool
     generation_count: int
+    latest_attempt_preview_url: str | None
 
 
 # ---------------------------------------------------------------------------

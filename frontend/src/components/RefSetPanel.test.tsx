@@ -116,7 +116,11 @@ describe('RefSetPanel destructive confirmations', () => {
   })
 
   it('promotes exactly once and remains disabled while busy', async () => {
+    const canonical = { ...draft, status: 'canonical' as const }
     let finishPromotion!: (value: RefSet) => void
+    vi.mocked(client.getRefSet)
+      .mockResolvedValueOnce(draft)
+      .mockResolvedValueOnce(canonical)
     vi.mocked(client.promoteRefSet).mockReturnValue(
       new Promise((resolve) => {
         finishPromotion = resolve
@@ -131,8 +135,11 @@ describe('RefSetPanel destructive confirmations', () => {
 
     expect(client.promoteRefSet).toHaveBeenCalledOnce()
     expect(button).toBeDisabled()
-    finishPromotion(draft)
-    await waitFor(() => expect(button).toBeEnabled())
+    finishPromotion(canonical)
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Promote to canonical' })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByText('Canonical sets are immutable.')).toBeInTheDocument()
   })
 
   it('reloads when the parent reports a status transition', async () => {

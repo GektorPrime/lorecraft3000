@@ -117,8 +117,7 @@ def test_score_generated_image_maps_cast_scores():
     assert payload["faces_detected"] == 1
 
 
-def test_score_generated_image_omits_absent_characters():
-    """Characters with no detected match simply do not appear."""
+def test_score_generated_image_scores_every_requested_cast_member():
     embedder = FakeEmbedder(faces=[make_unit_vector(0.1)])
     gallery = {
         1: [("a", make_unit_vector(0.4))],

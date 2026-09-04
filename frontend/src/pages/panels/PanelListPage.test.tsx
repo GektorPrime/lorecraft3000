@@ -35,6 +35,7 @@ const LOCKED_PANEL: Panel = {
   created_at: '',
   is_editable: false,
   generation_count: 1,
+  latest_attempt_preview_url: '/api/v1/candidates/44/content',
 }
 
 const EDITABLE_PANEL: Panel = {
@@ -43,6 +44,7 @@ const EDITABLE_PANEL: Panel = {
   beat_text: 'A quiet dawn over the harbor.',
   is_editable: true,
   generation_count: 0,
+  latest_attempt_preview_url: null,
 }
 
 describe('PanelListPage — locked panel actions', () => {
@@ -65,6 +67,10 @@ describe('PanelListPage — locked panel actions', () => {
     expect(screen.queryByRole('button', { name: /Duplicate & edit/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(screen.getByAltText('Latest generation attempt for panel #7')).toHaveAttribute(
+      'src',
+      '/api/v1/candidates/44/content',
+    )
   })
 })
 

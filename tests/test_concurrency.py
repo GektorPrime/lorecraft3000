@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import threading
-import time
 
 from app.config import Settings
 from app.db import connect
@@ -123,6 +122,7 @@ def test_concurrent_generation_yields_one_provider_call(tmp_path):
 
     first_result: dict = {}
     second_error: list[Exception] = []
+    second_finished = threading.Event()
 
     def first() -> None:
         conn = _connect(settings)
@@ -149,14 +149,13 @@ def test_concurrent_generation_yields_one_provider_call(tmp_path):
                 second_error.append(exc)
         finally:
             conn.close()
+            second_finished.set()
 
     t1 = threading.Thread(target=first)
     t2 = threading.Thread(target=second)
     t1.start()
     t2.start()
-    # Give the second thread time to hit the pending guard, then release the
-    # first so it can finish.
-    time.sleep(0.2)
+    assert second_finished.wait(timeout=5), "second request did not reach the pending guard"
     release.set()
     t1.join(timeout=10)
     t2.join(timeout=10)

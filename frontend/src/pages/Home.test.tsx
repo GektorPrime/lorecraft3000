@@ -40,6 +40,7 @@ function panel(id: number, editable = false): Panel {
     mood: 'quiet',
     style_id: 1,
     generation_count: id,
+    latest_attempt_preview_url: null,
     is_editable: editable,
     created_at: `2026-01-${String(id).padStart(2, '0')}T00:00:00Z`,
   }

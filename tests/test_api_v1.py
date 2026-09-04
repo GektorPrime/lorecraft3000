@@ -15,6 +15,8 @@ from dataclasses import dataclass
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main as main_module
+from app.config import Settings
 from app.db import connect
 from app.deps import get_conn, get_provider, get_storage
 from app.main import app
@@ -54,11 +56,16 @@ class ApiApp:
 
 
 @pytest.fixture
-def api(tmp_path):
+def api(tmp_path, monkeypatch):
     db_path = tmp_path / "api.db"
     storage = ImageStorage(tmp_path / "store")
     provider = FakeProvider()
     run_migrations(db_path)
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        Settings(db_path=db_path, store_root=storage.root),
+    )
 
     def override_conn():
         conn = connect(db_path)
@@ -70,9 +77,11 @@ def api(tmp_path):
     app.dependency_overrides[get_conn] = override_conn
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_provider] = lambda: provider
-    with TestClient(app, base_url="http://127.0.0.1") as client:
-        yield ApiApp(client, db_path, storage, provider)
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            yield ApiApp(client, db_path, storage, provider)
+    finally:
+        app.dependency_overrides.clear()
 
 
 def _default_style_id(api) -> int:
@@ -399,6 +408,7 @@ def test_panel_create_and_list(api):
     panel = _create_panel(api, [character["id"]])
     assert panel["is_editable"] is True
     assert panel["generation_count"] == 0
+    assert panel["latest_attempt_preview_url"] is None
     assert panel["cast"][0]["name"] == "Elias"
     assert panel["cast"][0]["avatar_url"] is not None
 
@@ -552,6 +562,12 @@ def test_panel_editable_until_generation_succeeds_then_backend_rejects_update(ap
     generated = _generate_panel(api, panel["id"])
     assert generated.status_code == 201, generated.text
     assert generated.json()["state"] == "succeeded"
+
+    listed_panel = api.client.get("/api/v1/panels").json()[0]
+    candidate_id = generated.json()["candidates"][0]["id"]
+    assert listed_panel["latest_attempt_preview_url"] == (
+        f"/api/v1/candidates/{candidate_id}/content"
+    )
 
     # Now the panel must report non-editable and reject a further update,
     # even though the request itself is well-formed (backend enforcement,

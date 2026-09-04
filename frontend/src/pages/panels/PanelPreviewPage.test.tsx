@@ -54,6 +54,7 @@ const LOCKED_PANEL: Panel = {
   created_at: '',
   is_editable: false,
   generation_count: 1,
+  latest_attempt_preview_url: '/api/v1/candidates/900/content',
 }
 
 const BLOCKED_PREVIEW: PanelPreview = {
@@ -215,14 +216,24 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(within(attemptList as HTMLElement).getAllByText('Waiting')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Accepted')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Rejected')).toHaveLength(1)
+    const summary = within(attemptList as HTMLElement).getAllByText('Attempt #7')[0]
+      .closest('.attempt-row__summary')
+    expect(summary?.lastElementChild).toHaveClass('attempt-row__badges')
   })
 
   it('edits a successful candidate with an instruction and refreshes history', async () => {
     const user = userEvent.setup()
     vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
-      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
-    ])
+    vi.mocked(client.listPanelGenerations)
+      .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
+      .mockResolvedValue([
+        { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
+        {
+          ...SUCCEEDED_ATTEMPT,
+          id: 8,
+          candidates: [{ ...CANDIDATE, id: 901, generation_id: 8 }],
+        },
+      ])
     vi.mocked(client.editCandidate).mockResolvedValue(GENERATED)
     renderPreview()
 
@@ -231,6 +242,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
     const box = screen.getByLabelText(/Describe the change to make to this image/)
     await user.type(box, 'make it night time with neon')
+    refreshBudget.mockClear()
     await user.click(screen.getByRole('button', { name: 'Submit edit' }))
 
     await waitFor(() =>
@@ -239,6 +251,9 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
         'make it night time with neon',
       ),
     )
+    expect(await screen.findByText('Attempt #8')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Describe the change to make to this image/)).not.toBeInTheDocument()
+    expect(refreshBudget).toHaveBeenCalledTimes(2)
   })
 
   it('disables submit until an edit instruction is entered', async () => {
@@ -462,16 +477,21 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
-  it('shows a carousel of candidate previews across attempts and reviews them', async () => {
+  it('shows a carousel and reviews candidates from their attempt controls', async () => {
     const user = userEvent.setup()
     vi.mocked(client.getPanel).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 1,
     })
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
-      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
-    ])
+    vi.mocked(client.listPanelGenerations)
+      .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
+      .mockResolvedValue([
+        {
+          ...SUCCEEDED_ATTEMPT,
+          candidates: [{ ...CANDIDATE, review_status: 'accepted' }],
+        },
+      ])
     vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
     vi.mocked(client.reviewCandidate).mockResolvedValue({
       ...CANDIDATE,
@@ -499,9 +519,17 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
       carousel.compareDocumentPosition(allocationHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: 'Accept' }))
+    const attempt = document.querySelector('.attempt-row')
+    expect(attempt).not.toBeNull()
+    const actions = (attempt as HTMLElement).querySelector('.attempt-row__candidate-actions')
+    expect(actions).not.toBeNull()
+    expect(within(actions as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim()))
+      .toEqual(['Accept', 'Reject', 'Edit this image'])
+    await user.click(within(actions as HTMLElement).getByRole('button', { name: 'Accept' }))
     expect(client.reviewCandidate).toHaveBeenCalledWith(900, 'accepted')
     // Outcome is shown in place (badge flips), not via a top-of-page banner.
+    expect(await screen.findAllByText('Accepted')).toHaveLength(2)
+    expect(screen.queryByText('Waiting')).not.toBeInTheDocument()
     expect(screen.queryByText('Candidate accepted.')).not.toBeInTheDocument()
   })
 

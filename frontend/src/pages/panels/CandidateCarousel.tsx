@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { GenerationSummary } from '../../api/types'
 import { ImageDialog } from '../../components/ImageDialog'
-import { AsyncMessage } from '../../components/AsyncMessage'
 import { Icon } from '../../components/Icon'
 
 interface CastMemberRef {
@@ -16,8 +15,6 @@ interface IdentityScores {
 
 interface CandidateCarouselProps {
   attempts: GenerationSummary[]
-  reviewingCandidateId: number | null
-  onReview: (candidateId: number, verdict: 'accepted' | 'rejected') => void
   /** Panel cast, used to label identity-score chips with character names. */
   cast?: CastMemberRef[]
 }
@@ -51,13 +48,10 @@ function parseIdentityScores(value: unknown): IdentityScores | null {
 }
 
 /** Carousel that cycles through the generated images of each attempt (an
- * attempt stores exactly one candidate image), with per-image review status
- * and accept/reject controls. Used instead of a separate per-attempt detail
- * page. */
+ * attempt stores exactly one candidate image). Review and edit controls live
+ * on the corresponding attempt below. */
 export function CandidateCarousel({
   attempts,
-  reviewingCandidateId,
-  onReview,
   cast,
 }: CandidateCarouselProps) {
   const [index, setIndex] = useState(0)
@@ -68,8 +62,6 @@ export function CandidateCarousel({
   const attempt = reviewed[index % count]
   const candidate = attempt.candidates[0]
   const identityScores = parseIdentityScores(candidate.identity_scores)
-  const isReviewing = reviewingCandidateId !== null
-  const reviewingThis = isReviewing && reviewingCandidateId === candidate.id
   const showPrevious = () => setIndex((i) => (i - 1 + count) % count)
   const showNext = () => setIndex((i) => (i + 1) % count)
 
@@ -141,27 +133,7 @@ export function CandidateCarousel({
             <Icon name="chevronRight" size={16} />
           </button>
         </div>
-        <div className="action-bar__group action-bar__group--end">
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={isReviewing}
-            onClick={() => onReview(candidate.id, 'accepted')}
-          >
-            <Icon name="check" size={16} />
-            Accept
-          </button>
-          <button
-            type="button"
-            className="btn btn--danger"
-            disabled={isReviewing}
-            onClick={() => onReview(candidate.id, 'rejected')}
-          >
-            Reject
-          </button>
-        </div>
       </div>
-      {reviewingThis && <AsyncMessage kind="loading">Reviewing image…</AsyncMessage>}
     </div>
   )
 }

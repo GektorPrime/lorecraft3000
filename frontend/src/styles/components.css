@@ -703,6 +703,14 @@
 /* Panel preview                                                             */
 /* ------------------------------------------------------------------------ */
 
+.panel-list-card__preview {
+  width: 8rem;
+  height: 6rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
 .panel-preview__beat {
   margin-bottom: var(--space-5);
   color: var(--text-heading);
@@ -1052,6 +1060,17 @@
   justify-content: flex-end;
 }
 
+.attempt-row__candidate-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.attempt-row__candidate-actions .btn {
+  justify-content: center;
+  width: 100%;
+}
+
 /* The edit affordance occupies its own full-width row beneath the summary,
    image, and any error, so its textarea and hint never collide with the
    three-column grid above. */
@@ -1130,8 +1149,28 @@
     justify-content: flex-start;
   }
 
+  .attempt-row__candidate-actions {
+    align-items: flex-start;
+  }
+
+  .attempt-row__candidate-actions .btn {
+    width: auto;
+  }
+
   .attempt-row__preview {
     max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .panel-list-card {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .panel-list-card__preview {
+    width: 5rem;
+    height: 5rem;
   }
 }
 

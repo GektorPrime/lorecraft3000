@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 
 import pytest
 
@@ -12,8 +13,7 @@ from tests.conftest import make_png_bytes
 
 def test_store_returns_metadata(storage, png_bytes):
     meta = storage.store(png_bytes, source_name="ref.png")
-    assert meta.sha256  # 64 hex chars
-    assert len(meta.sha256) == 64
+    assert meta.sha256 == hashlib.sha256(png_bytes).hexdigest()
     assert meta.format == "PNG"
     assert meta.size == len(png_bytes)
     assert meta.width == 8
@@ -167,8 +167,7 @@ def test_publish_leaves_no_temp_files(storage, png_bytes):
     assert leftovers == []
 
 
-def test_reader_never_sees_image_without_sidecar(storage, png_bytes):
-    """After a successful store, image and sidecar are both present."""
+def test_successful_store_publishes_image_and_sidecar(storage, png_bytes):
     meta = storage.store(png_bytes)
     image = storage.root / meta.sha256[:2] / f"{meta.sha256}.png"
     sidecar = storage.root / meta.sha256[:2] / f"{meta.sha256}.json"
