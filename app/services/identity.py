@@ -18,6 +18,7 @@ import logging
 import os
 import struct
 import threading
+import warnings
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -113,7 +114,20 @@ class FaceEmbedder:
                 bgr = np.ascontiguousarray(np.asarray(rgb)[:, :, ::-1])
         except Exception:
             return [], [], []
-        faces = self._app.get(bgr)
+        # InsightFace 1.0.1 still calls SimilarityTransform.estimate(), which
+        # scikit-image 0.26 deprecates.  Pinning 0.25 would require a source
+        # build on Python 3.14/macOS ARM, so suppress only this exact upstream
+        # warning until InsightFace adopts SimilarityTransform.from_estimate().
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=(
+                    r"`estimate` is deprecated since version 0\.26 and will "
+                    r"be removed in version 2\.2\..*"
+                ),
+                category=FutureWarning,
+            )
+            faces = self._app.get(bgr)
         if not faces:
             return [], [], []
         vectors = [np.asarray(f.normed_embedding, dtype=np.float32) for f in faces]
