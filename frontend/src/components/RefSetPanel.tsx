@@ -20,6 +20,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 
 interface RefSetPanelProps {
   refSetId: number
+  status: RefSet['status']
   onChanged: () => void | string | null | Promise<void | string | null>
 }
 
@@ -32,7 +33,7 @@ const STATUS_LABEL: Record<RefSet['status'], string> = {
 type PendingConfirmation = { kind: 'promote' } | { kind: 'remove'; imageId: number }
 
 /** Manages one reference-set version: images, promotion, and copy (issue #15). */
-export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
+export function RefSetPanel({ refSetId, status, onChanged }: RefSetPanelProps) {
   const options = useOptions()
   const [refSet, setRefSet] = useState<RefSet | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -72,7 +73,7 @@ export function RefSetPanel({ refSetId, onChanged }: RefSetPanelProps) {
       requestVersion.current += 1
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refSetId])
+  }, [refSetId, status])
 
   if (!refSet) {
     return loadError ? (

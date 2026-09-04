@@ -328,7 +328,13 @@ function CharacterDetail({ characterId }: { characterId: number }) {
                 {isOpen ? 'Hide' : 'Manage'}
               </button>
             </div>
-            {isOpen && <RefSetPanel refSetId={summary.id} onChanged={handleRefSetChanged} />}
+            {isOpen && (
+              <RefSetPanel
+                refSetId={summary.id}
+                status={summary.status}
+                onChanged={handleRefSetChanged}
+              />
+            )}
               </div>
             )
           })}

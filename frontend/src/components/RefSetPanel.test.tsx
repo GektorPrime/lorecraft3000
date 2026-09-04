@@ -55,9 +55,9 @@ const draft: RefSet = {
 
 function renderPanel(refSet: RefSet = draft) {
   vi.mocked(client.getRefSet).mockResolvedValue(refSet)
-  render(
+  return render(
     <OptionsContext.Provider value={options}>
-      <RefSetPanel refSetId={refSet.id} onChanged={vi.fn()} />
+      <RefSetPanel refSetId={refSet.id} status={refSet.status} onChanged={vi.fn()} />
     </OptionsContext.Provider>,
   )
 }
@@ -133,6 +133,30 @@ describe('RefSetPanel destructive confirmations', () => {
     expect(button).toBeDisabled()
     finishPromotion(draft)
     await waitFor(() => expect(button).toBeEnabled())
+  })
+
+  it('reloads when the parent reports a status transition', async () => {
+    const canonical = { ...draft, status: 'canonical' as const }
+    const retired = { ...draft, status: 'retired' as const }
+    vi.mocked(client.getRefSet)
+      .mockResolvedValueOnce(canonical)
+      .mockResolvedValueOnce(retired)
+
+    const view = render(
+      <OptionsContext.Provider value={options}>
+        <RefSetPanel refSetId={draft.id} status="canonical" onChanged={vi.fn()} />
+      </OptionsContext.Provider>,
+    )
+    expect(await screen.findByText('Canonical')).toBeInTheDocument()
+
+    view.rerender(
+      <OptionsContext.Provider value={options}>
+        <RefSetPanel refSetId={draft.id} status="retired" onChanged={vi.fn()} />
+      </OptionsContext.Provider>,
+    )
+
+    expect(await screen.findByText('Retired')).toBeInTheDocument()
+    expect(client.getRefSet).toHaveBeenCalledTimes(2)
   })
 
   it('keeps promotion disabled for an empty draft', async () => {
