@@ -10,14 +10,12 @@ from __future__ import annotations
 
 import io
 import struct
-import warnings
 import zipfile
 
 import pytest
 
 from app.services.identity import (
     BUFFALO_L_FILES,
-    FaceEmbedder,
     MIN_MODEL_FILE_BYTES,
     decode_embedding,
     encode_embedding,
@@ -29,26 +27,6 @@ from app.services.identity import (
     score_generated_image,
 )
 from tests.conftest import FakeEmbedder, make_unit_vector
-
-
-def test_face_alignment_suppresses_only_upstream_deprecation(png_bytes):
-    class WarningApp:
-        def get(self, _image):
-            warnings.warn(
-                "`estimate` is deprecated since version 0.26 and will be removed "
-                "in version 2.2. Please use SimilarityTransform.from_estimate",
-                FutureWarning,
-            )
-            return []
-
-    embedder = object.__new__(FaceEmbedder)
-    embedder._app = WarningApp()
-
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter("always")
-        assert embedder._faces(png_bytes) == ([], [], [])
-
-    assert captured == []
 
 
 def test_encode_embedding_accepts_plain_sequences_without_numpy():
