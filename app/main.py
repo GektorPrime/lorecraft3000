@@ -84,6 +84,24 @@ async def lifespan(app: FastAPI):
                     logger.info("startup consistency check: clean")
             except Exception:
                 logger.exception("startup consistency check failed")
+        # Face-model availability is reported but never blocks startup: identity
+        # scoring degrades gracefully, so a fresh environment is told how to
+        # enable it rather than being refused service.
+        try:
+            from app.services.identity import model_status
+
+            status = model_status()
+            if status["state"] == "ok":
+                logger.info("face model ready (%s)", status["path"])
+            else:
+                logger.warning(
+                    "face model pack is %s (%s); run `python -m app.maintenance "
+                    "models install` to enable identity scoring",
+                    status["state"],
+                    status["path"],
+                )
+        except Exception:
+            logger.exception("face model check failed")
     finally:
         conn.close()
     yield

@@ -404,3 +404,55 @@ def test_backfill_force_rescores_unscored_background_and_leaves_new_fields(
     # ...but --force recomputes anyway.
     forced = run_identity_backfill(conn, storage, scope="candidates", force=True)
     assert forced.candidates_scored == 1
+
+
+# ---------------------------------------------------------------------------
+# Face-model lifecycle CLI
+# ---------------------------------------------------------------------------
+
+
+def _cli_installed_layout(tmp_path, monkeypatch):
+    from app.services.identity import BUFFALO_L_FILES, MIN_MODEL_FILE_BYTES, model_dir
+
+    root = tmp_path / "insightface"
+    monkeypatch.setenv("INSIGHTFACE_HOME", str(root))
+    pack = model_dir()
+    pack.mkdir(parents=True)
+    for name in BUFFALO_L_FILES:
+        (pack / name).write_bytes(b"x" * MIN_MODEL_FILE_BYTES)
+    return pack
+
+
+def test_cli_models_status_installed_reports_ok(tmp_path, monkeypatch, capsys):
+    from app.maintenance import main
+
+    _cli_installed_layout(tmp_path, monkeypatch)
+    assert main(["models", "status"]) == 0
+    assert "installed" in capsys.readouterr().out
+
+
+def test_cli_models_status_missing_exits_nonzero(tmp_path, monkeypatch, capsys):
+    from app.maintenance import main
+
+    monkeypatch.setenv("INSIGHTFACE_HOME", str(tmp_path / "nowhere"))
+    assert main(["models", "status"]) == 1
+    assert "install" in capsys.readouterr().out
+
+
+def test_cli_models_install_wires_url_and_force(tmp_path, monkeypatch):
+    import app.maintenance as maint
+
+    root = tmp_path / "insightface"
+    monkeypatch.setenv("INSIGHTFACE_HOME", str(root))
+
+    seen = {}
+
+    def fake_install(**kwargs):
+        seen.update(kwargs)
+        return str(root / "buffalo_l")
+
+    monkeypatch.setattr(maint, "install_model", fake_install)
+    assert maint.main(["models", "install", "--force", "--url", "http://mirror/pack.zip"]) == 0
+    assert seen["force"] is True
+    assert seen["url"] == "http://mirror/pack.zip"
+    assert seen["verify"] is True

@@ -2,19 +2,27 @@
 
 These run in CI WITHOUT insightface/numpy installed, so they exercise the
 numpy-free surface: graceful degradation when the optional model is absent,
-the BLOB codec, gallery scoring, and the generated-image scoring wrapper with
-a fake embedder.
+the BLOB codec, gallery scoring, the generated-image scoring wrapper with a
+fake embedder, and the model-pack lifecycle.
 """
 
 from __future__ import annotations
 
+import io
 import struct
+import zipfile
 
 import pytest
 
 from app.services.identity import (
+    BUFFALO_L_FILES,
+    MIN_MODEL_FILE_BYTES,
     decode_embedding,
     encode_embedding,
+    install_model,
+    model_dir,
+    model_installed,
+    model_status,
     score_against_gallery,
     score_generated_image,
 )
@@ -119,3 +127,121 @@ def test_score_generated_image_omits_absent_characters():
     payload = score_generated_image(embedder, gallery, b"\x00", (1, 2))
     assert payload is not None
     assert set(payload["cast"]) == {"1", "2"}
+
+
+# ---------------------------------------------------------------------------
+# Model-pack lifecycle
+# ---------------------------------------------------------------------------
+
+_FAKE_BYTES = b"x" * MIN_MODEL_FILE_BYTES
+
+
+def _install_pack(tmp_path, monkeypatch, *, nested=False, undersized=False):
+    """Write a fake pack zip (file URL) and point INSIGHTFACE_HOME at tmp."""
+    root = tmp_path / "insightface"
+    monkeypatch.setenv("INSIGHTFACE_HOME", str(root))
+    size = 1 if undersized else MIN_MODEL_FILE_BYTES
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        for name in BUFFALO_L_FILES:
+            archive.writestr(
+                ("buffalo_l/" if nested else "") + name, b"y" * size
+            )
+    zip_path = tmp_path / "pack.zip"
+    zip_path.write_bytes(buf.getvalue())
+    return zip_path.as_uri()
+
+
+def _write_installed_layout(tmp_path, monkeypatch):
+    root = tmp_path / "insightface"
+    monkeypatch.setenv("INSIGHTFACE_HOME", str(root))
+    pack = model_dir()
+    pack.mkdir(parents=True)
+    for name in BUFFALO_L_FILES:
+        (pack / name).write_bytes(b"x" * MIN_MODEL_FILE_BYTES)
+    return pack
+
+
+def test_model_status_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("INSIGHTFACE_HOME", str(tmp_path / "nowhere"))
+    assert model_status()["state"] == "missing"
+    assert not model_installed()
+
+
+def test_model_status_incomplete(tmp_path, monkeypatch):
+    root = tmp_path / "insightface"
+    monkeypatch.setenv("INSIGHTFACE_HOME", str(root))
+    pack = model_dir()
+    pack.mkdir(parents=True)
+    (pack / BUFFALO_L_FILES[0]).write_bytes(b"x" * MIN_MODEL_FILE_BYTES)
+    status = model_status()
+    assert status["state"] == "incomplete"
+    assert status["files"][BUFFALO_L_FILES[1]] is False
+    assert not model_installed()
+
+
+def test_model_status_ok(tmp_path, monkeypatch):
+    _write_installed_layout(tmp_path, monkeypatch)
+    assert model_status()["state"] == "ok"
+    assert model_installed()
+
+
+def test_install_is_noop_when_pack_installed(tmp_path, monkeypatch):
+    pack = _write_installed_layout(tmp_path, monkeypatch)
+    # A url that would fail loudly if it were ever hit: the early return must
+    # mean no download attempt.
+    result = install_model(url="file:///nonexistent/pack.zip", verify=True)
+    assert result == str(pack)
+    assert model_installed()
+
+
+def test_install_unpacks_flat_pack(tmp_path, monkeypatch):
+    url = _install_pack(tmp_path, monkeypatch, nested=False)
+    install_model(url=url, verify=False)
+    assert model_installed()
+    assert sorted(p.name for p in model_dir().iterdir()) == sorted(BUFFALO_L_FILES)
+
+
+def test_install_flattens_nested_pack(tmp_path, monkeypatch):
+    url = _install_pack(tmp_path, monkeypatch, nested=True)
+    install_model(url=url, verify=False)
+    assert model_installed()
+    assert sorted(p.name for p in model_dir().iterdir()) == sorted(BUFFALO_L_FILES)
+
+
+def test_install_rejects_truncated_pack(tmp_path, monkeypatch):
+    url = _install_pack(tmp_path, monkeypatch, undersized=True)
+    with pytest.raises(RuntimeError, match="truncated"):
+        install_model(url=url, verify=False)
+    assert not model_installed()
+
+
+def test_install_rolls_back_on_load_failure(tmp_path, monkeypatch):
+    """A pack that fails to load must leave the previous install untouched."""
+    pack = _write_installed_layout(tmp_path, monkeypatch)
+    marker = pack / ".probe"
+    marker.write_bytes(b"original")
+    url = _install_pack(tmp_path, monkeypatch)
+
+    class BrokenEmbedder:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("onnx runtime cannot start")
+
+    monkeypatch.setattr("app.services.identity.FaceEmbedder", BrokenEmbedder)
+
+    with pytest.raises(RuntimeError, match="failed to load"):
+        install_model(url=url, verify=True, force=True)
+
+    assert marker.read_bytes() == b"original"
+    assert model_installed()
+
+
+def test_install_force_replaces_installed_pack(tmp_path, monkeypatch):
+    pack = _write_installed_layout(tmp_path, monkeypatch)
+    (pack / ".probe").write_bytes(b"original")
+    url = _install_pack(tmp_path, monkeypatch, nested=True)
+
+    install_model(url=url, verify=False, force=True)
+
+    assert model_installed()
+    assert not (model_dir() / ".probe").exists()

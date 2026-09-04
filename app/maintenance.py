@@ -1,10 +1,12 @@
-"""Storage consistency scan, repair, and identity backfill commands.
+"""Storage consistency scan, repair, identity backfill, and model commands.
 
 Usage::
 
     python -m app.maintenance check                  # read-only report
     python -m app.maintenance repair [--yes]         # apply safe repairs
     python -m app.maintenance identity backfill      # embed refs + score candidates
+    python -m app.maintenance models status          # face-model state
+    python -m app.maintenance models install         # fetch + verify the model pack
 
 ``check`` scans the store and the database, reports each defect class, and
 exits nonzero when inconsistencies are found (so it can gate a backup or a
@@ -20,8 +22,14 @@ and clearly reports every defect it declines to fix.
 ``identity backfill`` embeds face-role reference images that grew into the
 library before face embedding existed, then scores every candidate that lacks
 a stored identity payload (or all of them with ``--force``). It requires the
-optional InsightFace dependency and leaves candidates unfetchable without a
-face untouched instead of failing the whole run.
+InsightFace model pack and leaves candidates unfetchable without a face
+untouched instead of failing the whole run.
+
+``models`` provisions the ~326MB buffalo_l model pack that face embedding
+needs: ``status`` reports whether it is installed, ``install`` fetches,
+verifies, and atomically swaps it into place.  The model is never downloaded
+implicitly, so a fresh environment uses ``models install`` as its first
+identity-scoring step.
 
 The scanner reuses ``ImageStorage``'s completeness definition so the scan and
 the store always agree about what a readable image looks like.
@@ -41,9 +49,14 @@ from app.config import Settings
 from app.db import connect
 from app.migrate import run_migrations
 from app.services.identity import (
+    BUFFALO_L_ZIP_URL,
     FACE_ROLES,
+    MODEL_NAME,
     get_embedder,
+    install_model,
     load_gallery,
+    model_dir,
+    model_status,
     score_generated_image,
     store_embedding,
 )
@@ -369,8 +382,8 @@ def run_identity_backfill(
     if embedder is None:
         raise RuntimeError(
             "face checking is unavailable (insightface not installed, or the "
-            "buffalo_l model pack is missing under ~/.insightface/models); "
-            "install with uv sync and fetch the buffalo_l model first"
+            "buffalo_l model pack is missing); run "
+            "`python -m app.maintenance models install` first"
         )
 
     refs_embedded = 0
@@ -475,6 +488,59 @@ def _print_identity_backfill(report: IdentityBackfillReport) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Model provisioning
+# ---------------------------------------------------------------------------
+
+
+def _print_model_status() -> int:
+    """Print the face-model state; returns a process exit code."""
+    status = model_status()
+    if status["state"] == "ok":
+        print(f"{MODEL_NAME} model pack installed ({status['path']})")
+        return 0
+    print(f"{MODEL_NAME} model pack is {status['state']} ({status['path']})")
+    missing = [name for name, present in status["files"].items() if not present]
+    present = [name for name, present in status["files"].items() if present]
+    if present:
+        print(f"  present: {', '.join(present)}")
+    if missing:
+        print(f"  missing: {', '.join(missing)}")
+    print("  run `python -m app.maintenance models install` to fix this")
+    return 1
+
+
+def _download_hook():
+    """URL-retrieve reporthook that prints a throttled percentage."""
+    last = {"pct": -1}
+
+    def hook(count: int, block_size: int, total_size: int) -> None:
+        if total_size <= 0:
+            return
+        pct = int(count * block_size * 100 / total_size)
+        if pct >= last["pct"] + 10 or pct >= 100:
+            print(f"  {min(pct, 100):3d}%", flush=True)
+            last["pct"] = pct
+
+    return hook
+
+
+def _run_models_install(force: bool, url: str | None) -> int:
+    print(f"installing {MODEL_NAME} model pack ...")
+    try:
+        install_model(
+            url=url or BUFFALO_L_ZIP_URL,
+            progress=_download_hook(),
+            verify=True,
+            force=force,
+        )
+    except Exception as exc:
+        print(f"model install failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"installed {MODEL_NAME} to {model_dir()}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -560,6 +626,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="recompute identity scores for every candidate, not just unscored ones",
     )
+    parser_models = subparsers.add_parser(
+        "models", help="provision the InsightFace model pack used for identity scoring"
+    )
+    models_sub = parser_models.add_subparsers(dest="models_command", required=True)
+    models_sub.add_parser("status", help="report whether the model pack is installed")
+    parser_models_install = models_sub.add_parser(
+        "install", help="fetch, verify, and install the model pack"
+    )
+    parser_models_install.add_argument(
+        "--url", help="override the model pack download URL",
+    )
+    parser_models_install.add_argument(
+        "--force",
+        action="store_true",
+        help="re-download even if the pack is already installed",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -567,6 +649,11 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
+
+    if args.command == "models":
+        if args.models_command == "status":
+            return _print_model_status()
+        return _run_models_install(force=args.force, url=args.url)
 
     db_path = Path(args.db) if args.db else settings.db_path
     store_root = Path(args.store) if args.store else settings.store_root

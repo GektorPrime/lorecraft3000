@@ -159,21 +159,31 @@ anything and never blocks startup.
 Every generated candidate is checked against the canonical reference gallery
 for its panel's cast, and the best per-character similarity is stored as an
 advisory score on the candidate (shown in the UI; it never blocks promotion).
-Scoring needs the InsightFace `buffalo_l` model pack present locally — inside
-`~/.insightface/models/` (or under `$INSIGHTFACE_HOME/models`). The pip
-dependencies are installed by `uv sync`, but the ~320MB model file is a
-runtime asset that is never downloaded implicitly.
+Scoring needs InsightFace's `buffalo_l` model pack present locally. The pip
+dependencies are installed normally by `uv sync`, but the ~320MB model pack is
+a runtime asset that is provisioned once, explicitly — it is never downloaded
+implicitly.
 
-Fetch it once (this downloads the model and exits; it does not touch the
-database):
+Provision it on a fresh machine:
 
 ```bash
-python -c "from app.services.identity import FaceEmbedder; FaceEmbedder()"
+# Check whether the pack is installed (exit 0 when ready).
+python -m app.maintenance models status
+
+# Fetch, verify, and install the pack under ~/.insightface/models/.
+python -m app.maintenance models install
 ```
 
-If the model is missing, identity scoring is skipped at run time and the
-backend logs a warning — generation still succeeds, candidates just carry no
-scores (and the face-embedding columns stay empty) until the model is present.
+`install` is idempotent: it is a no-op when the pack is already present and
+in one piece, and it downloads a new copy over a detected-truncated or missing
+pack. The download is unpacked and verified off to the side and only then
+swapped into place — a failed download or a pack that fails to load leaves the
+previous install untouched. Re-fetch an already-installed pack with `--force`.
+
+The app also checks the pack at startup (warn-only, never blocking) and skips
+scoring with a logged warning if it is missing, rather than attempting a
+background download on the hot path. Generation still succeeds; candidates
+just carry no scores until the model is present.
 
 Pre-feature data can be scored without regenerating anything:
 

@@ -2,11 +2,13 @@
 
 The module is deliberately importable when insightface is not installed —
 every public function returns None / empty on ImportError so the rest of the
-application runs without the optional dependency.  Install it with:
+application runs without the dependency.  Install it with:
 
     uv pip install insightface onnxruntime
 
-The model (buffalo_l, ~326 MB) downloads on first use to ~/.insightface/models/.
+The model (buffalo_l, ~326 MB) is provisioned explicitly, never downloaded
+implicitly: `python -m app.maintenance models install` fetches and verifies it
+under ~/.insightface/models/ (see docs/OPERATIONS.md).
 """
 
 from __future__ import annotations
@@ -16,7 +18,10 @@ import logging
 import os
 import struct
 import threading
+import zipfile
+from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.request import urlretrieve
 
 if TYPE_CHECKING:
     import sqlite3
@@ -36,6 +41,23 @@ FACE_ROLES = ("face_front", "face_3q", "face_profile")
 
 # ArcFace output dimensionality.
 _VECTOR_DIM = 512
+
+# InsightFace model pack used for detection + recognition.
+MODEL_NAME = "buffalo_l"
+
+# Model files provisioned as a unit.  The pack also carries landmark/gender
+# models that FaceAnalysis reports as "ignore"; only the files listed here are
+# required for detection + recognition scoring.
+BUFFALO_L_FILES = ("det_10g.onnx", "w600k_r50.onnx")
+
+# Every pack file is comfortably above 500 KB; anything smaller is corruption.
+MIN_MODEL_FILE_BYTES = 512_000
+
+# Upstream release that ships the complete model pack as one zip.
+BUFFALO_L_ZIP_URL = (
+    "https://github.com/deepinsight/insightface/releases/download/"
+    "v0.7/buffalo_l.zip"
+)
 
 # -----------------------------------------------------------------------
 # Optional InsightFace import — degrade to a no-op when absent.
@@ -70,6 +92,7 @@ class FaceEmbedder:
         self.det_size = det_size
         self._app = FaceAnalysis(
             name="buffalo_l",
+            root=_insightface_root(),
             allowed_modules=["detection", "recognition"],
             providers=["CPUExecutionProvider"],
         )
@@ -116,31 +139,168 @@ class FaceEmbedder:
         return vectors
 
 
+def _insightface_root() -> str:
+    """Parent of the models directory InsightFace searches."""
+    return os.environ.get("INSIGHTFACE_HOME") or os.path.expanduser(
+        os.path.join("~", ".insightface")
+    )
+
+
 def _model_root() -> str:
     """Directory where InsightFace looks for local model packs."""
-    return os.environ.get("INSIGHTFACE_HOME") or os.path.join(
-        os.path.expanduser("~"), ".insightface", "models"
+    return os.path.join(_insightface_root(), "models")
+
+
+def model_dir() -> Path:
+    """Path to the buffalo_l pack directory (may not exist yet)."""
+    return Path(_model_root()) / MODEL_NAME
+
+
+def model_installed() -> bool:
+    """True when every required pack file is present and plausibly intact."""
+    if not model_dir().is_dir():
+        return False
+    return all(
+        (model_dir() / name).is_file()
+        and (model_dir() / name).stat().st_size >= MIN_MODEL_FILE_BYTES
+        for name in BUFFALO_L_FILES
     )
+
+
+def model_status() -> dict:
+    """Human-usable description of the installed model state.
+
+    Returns the state, the path examined, and the files found so a caller
+    (maintenance command, startup, health) can report what is missing.
+    """
+    directory = model_dir()
+    found = {name: (directory / name).is_file() for name in BUFFALO_L_FILES}
+    if not Path(_model_root()).is_dir():
+        state = "missing"
+    elif all(found.values()):
+        state = "ok"
+    elif any(found.values()):
+        state = "incomplete"
+    else:
+        state = "missing"
+    return {"state": state, "path": str(directory), "files": found}
+
+
+def install_model(
+    *,
+    url: str = BUFFALO_L_ZIP_URL,
+    progress=None,
+    verify: bool = True,
+    force: bool = False,
+) -> str:
+    """Provision the buffalo_l pack under the InsightFace model root.
+
+    Downloads the pack zip to a staging location inside the model root, unpacks
+    it, checks all required files are present (and, by default, that the pack
+    actually loads), then atomically swaps it into place.  An already-installed
+    pack is a no-op unless ``force`` is set.  A failed verification restores
+    the previous install if there was one, so the live path is never left
+    half-populated.
+    """
+    target = model_dir()
+    if verify and model_installed() and not force:
+        return str(target)
+
+    root = Path(_model_root())
+    root.mkdir(parents=True, exist_ok=True)
+    staging = root / f".{MODEL_NAME}.staging-{os.getpid()}"
+    zip_path = root / f".{MODEL_NAME}.download-{os.getpid()}.zip"
+    try:
+        zip_path.unlink(missing_ok=True)
+        print(f"fetching {MODEL_NAME} model pack from {url}")
+        urlretrieve(url, zip_path, reporthook=progress)
+        with zipfile.ZipFile(zip_path) as archive:
+            archive.extractall(staging)
+        # _verify_staging normalises root-vs-nested layouts in place.
+        _verify_staging(staging)
+        _swap_live(staging, target)
+        if verify:
+            try:
+                FaceEmbedder()
+            except Exception as exc:
+                _restore(target)
+                raise RuntimeError(
+                    f"downloaded {MODEL_NAME} pack failed to load: {exc}"
+                ) from exc
+        return str(target)
+    finally:
+        zip_path.unlink(missing_ok=True)
+        _rmtree(staging)
+        _rmtree(root / f".{MODEL_NAME}.old-{os.getpid()}")
+
+
+def _rmtree(path: Path) -> None:
+    import shutil
+
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def _swap_live(staging: Path, target: Path) -> None:
+    aside = target.parent / f".{MODEL_NAME}.old-{os.getpid()}"
+    _rmtree(aside)
+    if target.exists():
+        target.rename(aside)
+    staging.rename(target)
+
+
+def _restore(target: Path) -> None:
+    """Undo a swap: move any retired install back into place."""
+    aside = target.parent / f".{MODEL_NAME}.old-{os.getpid()}"
+    _rmtree(target)
+    if aside.exists():
+        aside.rename(target)
+
+
+def _verify_staging(staging: Path) -> None:
+    """Reject a freshly unpacked pack that is incomplete or truncated."""
+    if not all((staging / name).is_file() for name in BUFFALO_L_FILES):
+        nested = staging / MODEL_NAME
+        if nested.is_dir() and all(
+            (nested / name).is_file() for name in BUFFALO_L_FILES
+        ):
+            # Some archives nest the files under ./buffalo_l/ — flatten it.
+            for child in list(nested.iterdir()):
+                child.rename(staging / child.name)
+            _rmtree(nested)
+    missing = [name for name in BUFFALO_L_FILES if not (staging / name).is_file()]
+    if missing:
+        raise RuntimeError(
+            f"downloaded model pack is missing required files: {', '.join(missing)}"
+        )
+    undersized = [
+        name
+        for name in BUFFALO_L_FILES
+        if (staging / name).stat().st_size < MIN_MODEL_FILE_BYTES
+    ]
+    if undersized:
+        raise RuntimeError(
+            f"downloaded model pack has truncated files: {', '.join(undersized)}"
+        )
 
 
 def get_embedder() -> FaceEmbedder | None:
     """Return the global embedder, constructing it on first call.
 
-    Returns None if insightface is not installed or the buffalo_l model pack
-    is not present locally.  The model is deliberately never downloaded
-    implicitly: pip dependencies are always installed (identity scoring is a
-    core feature), but the ~320MB model file is a runtime asset the operator
-    provides once (e.g. via the maintainer script).
+    Returns None when insightface is not installed or the buffalo_l pack is not
+    installed — never downloads implicitly.  The pack is provisioned once via
+    `python -m app.maintenance models install`.
     """
     global _embedder
     if _embedder is not None:
         return _embedder
     if not _insightface_available:
         return None
-    if not os.path.isdir(os.path.join(_model_root(), "buffalo_l")):
+    if not model_installed():
         log.warning(
-            "InsightFace buffalo_l model not found under %s — "
-            "face embedding disabled (see docs/OPERATIONS.md)",
+            "InsightFace model pack %s not installed under %s — face embedding "
+            "disabled (run `python -m app.maintenance models install`)",
+            MODEL_NAME,
             _model_root(),
         )
         return None
