@@ -53,7 +53,9 @@ class ProviderRegistry:
         if provider_key == "gemini":
             return GeminiProvider(timeout_seconds=self.timeout_seconds)
         if provider_key == "openai":
-            return OpenAIProvider(timeout_seconds=self.timeout_seconds)
+            # OpenAI high-quality edits with 4-5 refs can exceed 120s;
+            # give it a longer bound and keep retries non-billable.
+            return OpenAIProvider(timeout_seconds=max(180, self.timeout_seconds))
         raise KeyError(f"unknown provider {provider_key!r}")
 
     def for_model(self, model: str):

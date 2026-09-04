@@ -222,6 +222,12 @@ class OpenAIProvider:
             or "incorrect api key" in text
         )
 
+    @staticmethod
+    def _is_timeout(exc: Exception) -> bool:
+        name = type(exc).__name__.lower()
+        msg = str(exc).lower()
+        return "timeout" in name or "timeout" in msg or "timed out" in msg
+
     @classmethod
     def _is_capacity_failure(cls, exc: Exception) -> bool:
         status = cls._status_of(exc)
@@ -252,20 +258,22 @@ class OpenAIProvider:
             except Exception as exc:  # noqa: BLE001 — classified below
                 last_exc = exc
                 is_capacity = self._is_capacity_failure(exc)
+                is_timeout = self._is_timeout(exc)
                 has_retries_left = attempt < CAPACITY_MAX_ATTEMPTS - 1
                 if is_capacity and has_retries_left:
                     self._sleep(CAPACITY_BACKOFF_SECONDS[attempt])
                     continue
                 status = self._status_of(exc)
                 is_auth = self._is_auth_failure(exc)
-                # A request defect (4xx), an auth/missing-key failure, or a
-                # capacity failure (429/5xx) that produced no image after
-                # exhausting retries is not billed. Only an unclassifiable
-                # error stays billable.
+                # A request defect (4xx), an auth/missing-key failure, a
+                # timeout, or a capacity failure (429/5xx) that produced no
+                # image after exhausting retries is not billed. Only an
+                # unclassifiable error stays billable.
                 charge_expected = not (
                     (isinstance(status, int) and 400 <= status < 500)
                     or is_capacity
                     or is_auth
+                    or is_timeout
                 )
                 raise OpenAIProviderError(
                     f"OpenAI {action} failed: {exc}",
