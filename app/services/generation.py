@@ -19,6 +19,11 @@ from app.providers.base import (
 )
 from app.services.characters import CharacterError, CharacterService
 from app.services.costs import CostLedger
+from app.services.identity import (
+    get_embedder,
+    load_gallery,
+    score_generated_image,
+)
 from app.services.ref_sets import RefSetError, RefSetService
 from app.services.styles import StyleError, StyleService
 from app.storage import ImageStorage, ImageStorageError
@@ -329,6 +334,33 @@ class GenerationService:
             # successful generation into a failed one.
             try:
                 self.storage.append_provenance(stored.sha256, provenance)
+            except Exception:
+                pass
+            # Identity scoring is advisory and equally non-fatal: a face-check
+            # failure (or missing insightface) must never fail a paid
+            # generation. The cast ids come from the same request_capture that
+            # was assembled and reviewed for this generation.
+            try:
+                embedder = get_embedder()
+                if embedder is not None:
+                    cast_ids = tuple(
+                        int(entry["character_id"])
+                        for entry in preview.request_capture.get("cast", [])
+                        if isinstance(entry, dict)
+                        and isinstance(entry.get("character_id"), int)
+                    )
+                    if cast_ids:
+                        data, _ = self.storage.read(stored.sha256)
+                        payload = score_generated_image(
+                            embedder, load_gallery(self.conn), data, cast_ids
+                        )
+                        if payload is not None:
+                            with self.conn:
+                                self.conn.execute(
+                                    "UPDATE candidate SET identity_scores = ? "
+                                    "WHERE id = ?",
+                                    (json.dumps(payload, sort_keys=True), candidate_id),
+                                )
             except Exception:
                 pass
         except Exception as exc:

@@ -1,9 +1,10 @@
-"""Storage consistency scan and repair command (Work Package 5).
+"""Storage consistency scan, repair, and identity backfill commands.
 
 Usage::
 
-    python -m app.maintenance check                # read-only report
-    python -m app.maintenance repair [--yes]       # apply safe repairs
+    python -m app.maintenance check                  # read-only report
+    python -m app.maintenance repair [--yes]         # apply safe repairs
+    python -m app.maintenance identity backfill      # embed refs + score candidates
 
 ``check`` scans the store and the database, reports each defect class, and
 exits nonzero when inconsistencies are found (so it can gate a backup or a
@@ -15,6 +16,12 @@ missing or damaged sidecars — base metadata derived from the image file plus a
 extension map, with the ``provenance`` list rebuilt from the authoritative
 ``image_provenance`` rows (Work Package 3). It never deletes user image bytes
 and clearly reports every defect it declines to fix.
+
+``identity backfill`` embeds face-role reference images that grew into the
+library before face embedding existed, then scores every candidate that lacks
+a stored identity payload (or all of them with ``--force``). It requires the
+optional InsightFace dependency and leaves candidates unfetchable without a
+face untouched instead of failing the whole run.
 
 The scanner reuses ``ImageStorage``'s completeness definition so the scan and
 the store always agree about what a readable image looks like.
@@ -33,6 +40,13 @@ from pathlib import Path
 from app.config import Settings
 from app.db import connect
 from app.migrate import run_migrations
+from app.services.identity import (
+    FACE_ROLES,
+    get_embedder,
+    load_gallery,
+    score_generated_image,
+    store_embedding,
+)
 from app.storage import ImageStorage, _FORMAT_FROM_EXT
 
 # ---------------------------------------------------------------------------
@@ -299,6 +313,167 @@ def run_repair(
 
 
 # ---------------------------------------------------------------------------
+# Identity backfill
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IdentityBackfillReport:
+    """Results of an identity backfill pass."""
+
+    refs_embedded: int = 0
+    refs_no_face: tuple[str, ...] = ()
+    candidates_scored: int = 0
+    candidates_no_face: int = 0
+    candidates_skipped_bad_cast: int = 0
+    errors: tuple[str, ...] = ()
+
+
+def _candidate_cast_ids(
+    request_json: str, scene_cast_json: str
+) -> tuple[int, ...]:
+    """Character ids a candidate was generated for, from captured request."""
+    for raw in (request_json, scene_cast_json):
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        entries = payload.get("cast", []) if isinstance(payload, dict) else []
+        ids = [
+            int(entry["character_id"])
+            for entry in entries
+            if isinstance(entry, dict) and isinstance(entry.get("character_id"), int)
+        ]
+        if ids:
+            return tuple(ids)
+    return ()
+
+
+def run_identity_backfill(
+    conn: sqlite3.Connection,
+    storage: ImageStorage,
+    *,
+    scope: str = "all",
+    force: bool = False,
+) -> IdentityBackfillReport:
+    """Embed canonical face references and score candidates without scores.
+
+    Requires the optional InsightFace dependency (see app/services/identity.py);
+    without it the report is returned empty and the caller reports the miss.
+    Failures to embed or read a single image are counted as errors and never
+    abort the run, mirroring the non-fatal bias of generation-time scoring.
+    """
+    embedder = get_embedder()
+    if embedder is None:
+        raise RuntimeError(
+            "insightface is not installed; install the identity dependency group "
+            "first (uv sync --group identity)"
+        )
+
+    refs_embedded = 0
+    refs_no_face: list[str] = []
+    errors: list[str] = []
+
+    if scope in ("all", "refs"):
+        placeholders = ", ".join("?" for _ in FACE_ROLES)
+        missing_refs = conn.execute(
+            f"""
+            SELECT ri.sha256, ri.role
+              FROM ref_image ri
+              JOIN ref_set rs ON rs.id = ri.ref_set_id
+              LEFT JOIN face_embedding fe ON fe.sha256 = ri.sha256
+             WHERE rs.status = 'canonical'
+               AND ri.role IN ({placeholders})
+               AND fe.sha256 IS NULL
+            """,
+            FACE_ROLES,
+        ).fetchall()
+        for row in missing_refs:
+            sha, role = row["sha256"], row["role"]
+            try:
+                data, _ = storage.read(sha)
+            except Exception as exc:
+                errors.append(f"ref {sha[:12]} unreadable: {exc}")
+                continue
+            vec = embedder.embed(data)
+            if vec is None:
+                refs_no_face.append(f"{sha[:12]} ({role})")
+                continue
+            store_embedding(conn, sha, vec)
+            refs_embedded += 1
+            conn.commit()
+
+    candidates_scored = 0
+    candidates_no_face = 0
+    candidates_skipped_bad_cast = 0
+
+    if scope in ("all", "candidates"):
+        if force:
+            where = ""
+        else:
+            where = "WHERE cd.identity_scores = '{}'"
+        rows = conn.execute(
+            f"""
+            SELECT cd.id AS candidate_id, cd.sha256, g.request_json,
+                   sc.cast_json
+              FROM candidate cd
+              JOIN generation g ON g.id = cd.generation_id
+              JOIN scene sc ON sc.id = g.scene_id
+            {where}
+            """,
+        ).fetchall()
+        gallery = load_gallery(conn)
+        for row in rows:
+            cast_ids = _candidate_cast_ids(row["request_json"], row["cast_json"])
+            if not cast_ids:
+                candidates_skipped_bad_cast += 1
+                continue
+            try:
+                data, _ = storage.read(row["sha256"])
+            except Exception as exc:
+                errors.append(f"candidate {row['candidate_id']} unreadable: {exc}")
+                continue
+            payload = score_generated_image(
+                embedder, gallery, data, tuple(cast_ids)
+            )
+            if payload is None:
+                candidates_no_face += 1
+                continue
+            with conn:
+                conn.execute(
+                    "UPDATE candidate SET identity_scores = ? WHERE id = ?",
+                    (json.dumps(payload, sort_keys=True), row["candidate_id"]),
+                )
+            candidates_scored += 1
+
+    return IdentityBackfillReport(
+        refs_embedded=refs_embedded,
+        refs_no_face=tuple(sorted(refs_no_face)),
+        candidates_scored=candidates_scored,
+        candidates_no_face=candidates_no_face,
+        candidates_skipped_bad_cast=candidates_skipped_bad_cast,
+        errors=tuple(sorted(errors)),
+    )
+
+
+def _print_identity_backfill(report: IdentityBackfillReport) -> None:
+    print(f"  reference embeddings written:  {report.refs_embedded}")
+    if report.refs_no_face:
+        print(f"  references with no face:      {len(report.refs_no_face)}")
+        for item in report.refs_no_face:
+            print(f"    no face: {item}")
+    print(f"  candidates scored:             {report.candidates_scored}")
+    print(f"  candidates with no face:       {report.candidates_no_face}")
+    print(f"  candidates skipped (no cast):  {report.candidates_skipped_bad_cast}")
+    if report.errors:
+        print(f"  errors:                        {len(report.errors)}")
+        for error in report.errors:
+            print(f"    {error}")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -365,6 +540,25 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="apply repairs; without this flag only a dry-run plan is printed",
     )
+    parser_identity = subparsers.add_parser(
+        "identity", help="face-embedding and identity-score maintenance"
+    )
+    identity_sub = parser_identity.add_subparsers(dest="identity_command", required=True)
+    parser_backfill = identity_sub.add_parser(
+        "backfill",
+        help="embed references and score candidates that predate face checking",
+    )
+    parser_backfill.add_argument("--db", help="SQLite database path (defaults to settings)")
+    parser_backfill.add_argument("--store", help="store root (defaults to settings)")
+    parser_backfill.add_argument(
+        "--scope", choices=("all", "refs", "candidates"), default="all",
+        help="which objects to process (default all)",
+    )
+    parser_backfill.add_argument(
+        "--force",
+        action="store_true",
+        help="recompute identity scores for every candidate, not just unscored ones",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -394,6 +588,19 @@ def main(argv: list[str] | None = None) -> int:
             report = run_check(conn, storage)
             _print_report(report)
             return 1 if report.issue_count else 0
+        if args.command == "identity":
+            try:
+                report = run_identity_backfill(
+                    conn,
+                    storage,
+                    scope=args.scope,
+                    force=args.force,
+                )
+            except RuntimeError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+            _print_identity_backfill(report)
+            return 1 if report.errors else 0
         plan = run_repair(conn, storage, apply=False)
         if not args.yes:
             print("dry run; pass --yes to apply")

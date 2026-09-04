@@ -227,6 +227,8 @@ def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
         "010_image_provenance",
         "011_repair_generation_scene_revision",
         "012_archive_character_style",
+        "013_face_embedding",
+        "014_candidate_identity",
     ]
     conn = connect(db)
     try:
@@ -457,6 +459,8 @@ def test_011_repairs_legacy_generation_missing_scene_revision(tmp_path):
     assert run_migrations(db) == [
         "011_repair_generation_scene_revision",
         "012_archive_character_style",
+        "013_face_embedding",
+        "014_candidate_identity",
     ]
     assert run_migrations(db) == []  # and healing is idempotent
 

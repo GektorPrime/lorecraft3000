@@ -21,7 +21,7 @@ from app.services.ref_sets import (
     RefSetService,
 )
 from app.services.validation import ALLOWED_ROLES
-from tests.conftest import make_png_bytes
+from tests.conftest import FakeEmbedder, make_png_bytes
 
 
 def _character(conn, name="Elias", slug="elias") -> int:
@@ -447,3 +447,44 @@ def test_copy_does_not_share_rows(conn, storage):
     service.remove_image(d2.id, service.images(d2.id)[0].id)
     assert len(service.images(d1.id)) == 1
     assert service.images(d1.id)[0].id == img.id
+
+
+# ---------------------------------------------------------------------------
+# Identity embedding on upload
+# ---------------------------------------------------------------------------
+
+_FACE_ROLES = ("face_front", "face_3q", "face_profile")
+
+
+def _has_embedding(conn, sha256: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM face_embedding WHERE sha256 = ?", (sha256,)
+    ).fetchone() is not None
+
+
+def test_add_image_face_role_stores_embedding(conn, storage):
+    service = _service(conn, storage)
+    cid = _character(conn)
+    ref_set = service.create_draft(cid)
+    for role in _FACE_ROLES:
+        img = service.add_image(ref_set.id, make_png_bytes((10, 20, 30)), role, embedder=FakeEmbedder())
+        assert _has_embedding(conn, img.sha256)
+
+
+def test_add_image_non_face_role_skips_embedding(conn, storage):
+    service = _service(conn, storage)
+    cid = _character(conn)
+    ref_set = service.create_draft(cid)
+    img = service.add_image(ref_set.id, make_png_bytes((40, 50, 60)), "outfit", embedder=FakeEmbedder())
+    assert not _has_embedding(conn, img.sha256)
+
+
+def test_add_image_embedder_failure_does_not_abort(conn, storage):
+    """Embedding errors are swallowed; the image is still stored."""
+    service = _service(conn, storage)
+    cid = _character(conn)
+    ref_set = service.create_draft(cid)
+    embedder = FakeEmbedder(error=RuntimeError("model unavailable"))
+    img = service.add_image(ref_set.id, make_png_bytes((10, 20, 30)), "face_front", embedder=embedder)
+    assert img.sha256
+    assert not _has_embedding(conn, img.sha256)

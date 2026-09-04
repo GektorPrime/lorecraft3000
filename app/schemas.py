@@ -226,6 +226,7 @@ class Candidate(BaseModel):
     review_status: str
     content_url: str
     created_at: str
+    identity_scores: dict[str, object] | None = None
 
 
 class CandidateReviewIn(BaseModel):

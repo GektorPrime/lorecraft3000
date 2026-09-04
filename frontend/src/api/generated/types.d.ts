@@ -622,6 +622,10 @@ export interface components {
             generation_id: number;
             /** Id */
             id: number;
+            /** Identity Scores */
+            identity_scores?: {
+                [key: string]: unknown;
+            } | null;
             /** Idx */
             idx: number;
             /** Review Status */

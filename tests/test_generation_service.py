@@ -8,6 +8,7 @@ from app.config import Settings
 from app.providers.base import ProviderResult
 from app.services.characters import CharacterService
 from app.services.generation import GenerationError, GenerationService, PreviewChangedError
+from tests.conftest import FakeEmbedder
 from app.services.costs import CostLedger, IdempotencyConflictError
 from app.services.ref_sets import RefSetService
 from app.services.styles import StyleService
@@ -459,3 +460,60 @@ def test_edit_is_idempotent_on_replay(conn, storage, tmp_path):
     assert b.replayed is True
     assert b.generation_id == a.generation_id
     assert len(provider.edits) == 1
+
+
+def test_identity_scoring_populates_candidate(conn, storage, tmp_path, monkeypatch):
+    """With an embedder available, a candidate gains advisory identity scores."""
+    embedder = FakeEmbedder()
+    gallery = {1: [("sha", embedder.face)]}
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: embedder)
+    monkeypatch.setattr("app.services.generation.load_gallery", lambda _conn: gallery)
+
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+
+    row = conn.execute(
+        "SELECT identity_scores FROM candidate WHERE id = ?", (first.candidate_id,)
+    ).fetchone()
+    payload = json.loads(row["identity_scores"])
+    assert set(payload["cast"]) == {"1"}
+    assert payload["faces_detected"] == 1
+    assert payload["cast"]["1"] > 0.5
+
+
+def test_identity_scoring_failure_is_non_fatal(
+    conn, storage, tmp_path, monkeypatch
+):
+    """A broken embedder must never fail a paid generation."""
+    monkeypatch.setattr(
+        "app.services.generation.get_embedder",
+        lambda: FakeEmbedder(error=RuntimeError("face model crashed")),
+    )
+
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+
+    state = conn.execute(
+        "SELECT state FROM generation WHERE id = ?",
+        (first.generation_id,),
+    ).fetchone()
+    assert state["state"] == "succeeded"
+    row = conn.execute(
+        "SELECT identity_scores FROM candidate WHERE id = ?", (first.candidate_id,)
+    ).fetchone()
+    assert json.loads(row["identity_scores"]) == {}
+
+
+def test_identity_scoring_absent_embedder_leaves_scores_empty(
+    conn, storage, tmp_path, monkeypatch
+):
+    """No insightface installed behaves the same as in CI: scores stay {}."""
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: None)
+
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+
+    row = conn.execute(
+        "SELECT identity_scores FROM candidate WHERE id = ?", (first.candidate_id,)
+    ).fetchone()
+    assert json.loads(row["identity_scores"]) == {}

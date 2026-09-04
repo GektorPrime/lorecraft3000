@@ -61,6 +61,18 @@
             "title": "Id",
             "type": "integer"
           },
+          "identity_scores": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Scores"
+          },
           "idx": {
             "title": "Idx",
             "type": "integer"

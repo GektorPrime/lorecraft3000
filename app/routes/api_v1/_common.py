@@ -259,6 +259,13 @@ def _attachment_out(attachment: dict) -> "GenerationAttachment":
 def _candidate_out(row) -> "Candidate":
     from app.schemas import Candidate
 
+    identity_scores = None
+    raw = row["identity_scores"]
+    if raw:
+        try:
+            identity_scores = json.loads(raw)
+        except json.JSONDecodeError:
+            identity_scores = None
     return Candidate(
         id=row["id"],
         generation_id=row["generation_id"],
@@ -266,6 +273,7 @@ def _candidate_out(row) -> "Candidate":
         review_status=row["review_status"],
         content_url=f"/api/v1/candidates/{row['id']}/content",
         created_at=row["created_at"],
+        identity_scores=identity_scores,
     )
 
 

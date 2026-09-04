@@ -8,7 +8,7 @@ import pytest
 
 from app.maintenance import run_check, run_repair
 from app.storage import ImageStorage
-from tests.conftest import make_png_bytes
+from tests.conftest import FakeEmbedder, make_png_bytes
 
 
 def _store_image(storage: ImageStorage, color=(200, 30, 30)) -> str:
@@ -239,3 +239,168 @@ def test_cli_repair_dry_run_does_not_apply(tmp_path):
 
     assert main(["repair", "--yes", "--db", str(db), "--store", str(store)]) == 0
     assert (store / sha[:2] / f"{sha}.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# Identity backfill
+# ---------------------------------------------------------------------------
+
+
+def _canonical_character(conn, storage, name="ELIAS", slug="elias"):
+    from app.services.characters import CharacterService
+    from app.services.ref_sets import RefSetService
+
+    character = CharacterService(conn).create(
+        name=name, slug=slug, visual_contract=f"A painted face for {name}."
+    )
+    refs = RefSetService(conn, storage)
+    ref_set = refs.create_draft(character.id)
+    # No embedder here, so add_image leaves face_embedding empty — the
+    # precondition the backfill command exists to repair.
+    refs.add_image(
+        ref_set.id, make_png_bytes((10, 20, 30)), "face_front", source_name=f"{slug}.png"
+    )
+    refs.promote(ref_set.id)
+    return character
+
+
+def _generated_candidate(conn, storage, tmp_path, character_id):
+    """Run a real generation (no embedder) so the candidate starts with {}."""
+    from app.config import Settings
+    from app.services.generation import GenerationService
+    from app.services.styles import StyleService
+    from tests.test_generation_service import FakeProvider
+
+    style = StyleService(conn).get_default()
+    scene_id = conn.execute(
+        "INSERT INTO scene (beat_text, camera, framing, mood, aspect_ratio, "
+        "cast_json, style_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            "Two painted faces study a map.",
+            "eye level",
+            "medium two-shot",
+            "determined",
+            "16:9",
+            json.dumps([{"character_id": character_id, "prominence": 1}]),
+            style.id,
+        ),
+    ).lastrowid
+    conn.commit()
+    settings = Settings(
+        db_path=conn.execute("PRAGMA database_list").fetchone()[2],
+        store_root=tmp_path / "store",
+    )
+    outcome = GenerationService(conn, storage, settings, FakeProvider()).generate(scene_id)
+    return outcome
+
+
+def test_backfill_raises_without_embedder(conn, storage, monkeypatch):
+    monkeypatch.setattr("app.maintenance.get_embedder", lambda: None)
+    from app.maintenance import run_identity_backfill
+
+    with pytest.raises(RuntimeError, match="insightface"):
+        run_identity_backfill(conn, storage)
+
+
+def test_backfill_embeds_canonical_face_refs(conn, storage, monkeypatch):
+    _canonical_character(conn, storage)
+    ref = conn.execute("SELECT sha256 FROM ref_image WHERE role = 'face_front'").fetchone()
+    assert ref is not None
+    assert conn.execute(
+        "SELECT 1 FROM face_embedding WHERE sha256 = ?", (ref["sha256"],)
+    ).fetchone() is None
+
+    monkeypatch.setattr("app.maintenance.get_embedder", lambda: FakeEmbedder())
+    from app.maintenance import run_identity_backfill
+
+    report = run_identity_backfill(conn, storage, scope="refs")
+    assert report.refs_embedded == 1
+    assert report.errors == ()
+    assert conn.execute(
+        "SELECT 1 FROM face_embedding WHERE sha256 = ?", (ref["sha256"],)
+    ).fetchone() is not None
+    # Idempotent: a second pass finds nothing left to embed.
+    second = run_identity_backfill(conn, storage, scope="refs")
+    assert second.refs_embedded == 0
+
+
+def test_backfill_ref_without_face_is_reported_not_fatal(conn, storage, monkeypatch):
+    _canonical_character(conn, storage)
+    monkeypatch.setattr(
+        "app.maintenance.get_embedder", lambda: FakeEmbedder(faces=[])
+    )
+    from app.maintenance import run_identity_backfill
+
+    report = run_identity_backfill(conn, storage, scope="refs")
+    assert report.refs_embedded == 0
+    assert report.refs_no_face
+    assert report.errors == ()
+
+
+def test_backfill_scores_unscored_candidates(conn, storage, tmp_path, monkeypatch):
+    character = _canonical_character(conn, storage)
+    outcome = _generated_candidate(conn, storage, tmp_path, character.id)
+    before = conn.execute(
+        "SELECT identity_scores FROM candidate WHERE id = ?", (outcome.candidate_id,)
+    ).fetchone()
+    assert json.loads(before["identity_scores"]) == {}
+
+    embedder = FakeEmbedder()
+    monkeypatch.setattr("app.maintenance.get_embedder", lambda: embedder)
+    monkeypatch.setattr(
+        "app.maintenance.load_gallery", lambda _conn: {character.id: [("sha", embedder.face)]}
+    )
+    from app.maintenance import run_identity_backfill
+
+    report = run_identity_backfill(conn, storage, scope="candidates")
+    assert report.candidates_scored == 1
+    assert report.candidates_no_face == 0
+    after = conn.execute(
+        "SELECT identity_scores FROM candidate WHERE id = ?", (outcome.candidate_id,)
+    ).fetchone()
+    payload = json.loads(after["identity_scores"])
+    assert set(payload["cast"]) == {str(character.id)}
+    assert payload["faces_detected"] == 1
+
+
+def test_backfill_candidate_without_face_is_skipped_not_failed(
+    conn, storage, tmp_path, monkeypatch
+):
+    character = _canonical_character(conn, storage)
+    outcome = _generated_candidate(conn, storage, tmp_path, character.id)
+
+    monkeypatch.setattr(
+        "app.maintenance.get_embedder", lambda: FakeEmbedder(faces=[])
+    )
+    monkeypatch.setattr(
+        "app.maintenance.load_gallery", lambda _conn: {character.id: []}
+    )
+    from app.maintenance import run_identity_backfill
+
+    report = run_identity_backfill(conn, storage, scope="candidates")
+    assert report.candidates_no_face == 1
+    assert report.candidates_scored == 0
+    assert report.candidates_skipped_bad_cast == 0
+
+
+def test_backfill_force_rescores_unscored_background_and_leaves_new_fields(
+    conn, storage, tmp_path, monkeypatch
+):
+    """--force re-runs scoring; a plain run only touches {}-scored candidates."""
+    character = _canonical_character(conn, storage)
+    outcome = _generated_candidate(conn, storage, tmp_path, character.id)
+
+    embedder = FakeEmbedder()
+    monkeypatch.setattr("app.maintenance.get_embedder", lambda: embedder)
+    monkeypatch.setattr(
+        "app.maintenance.load_gallery", lambda _conn: {character.id: [("sha", embedder.face)]}
+    )
+    from app.maintenance import run_identity_backfill
+
+    run_identity_backfill(conn, storage, scope="candidates")
+    # Rescored, so a plain run finds nothing to do...
+    report = run_identity_backfill(conn, storage, scope="candidates")
+    assert report.candidates_scored == 0
+    # ...but --force recomputes anyway.
+    forced = run_identity_backfill(conn, storage, scope="candidates", force=True)
+    assert forced.candidates_scored == 1

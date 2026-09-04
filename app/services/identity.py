@@ -74,10 +74,11 @@ class FaceEmbedder:
         )
         self._app.prepare(ctx_id=-1, det_size=(det_size, det_size))
 
-    def embed(self, image_bytes: bytes) -> np.ndarray | None:
-        """Return a 512-d L2-normalised unit vector, or None if no face found.
+    def _faces(self, image_bytes: bytes) -> tuple[list[np.ndarray], ...]:
+        """Detect every face in the image; returns (vectors, bboxes, scores).
 
-        The vector is returned as float32 for compact BLOB storage.
+        Returns three parallel lists.  Callers needing only the largest face
+        use ``embed`` instead.  Pillow decode failures yield empty lists.
         """
         import numpy as np  # required by insightface; import the same way it does
         from PIL import Image
@@ -87,13 +88,31 @@ class FaceEmbedder:
                 rgb = img.convert("RGB")
                 bgr = np.ascontiguousarray(np.asarray(rgb)[:, :, ::-1])
         except Exception:
-            return None
+            return [], [], []
         faces = self._app.get(bgr)
         if not faces:
+            return [], [], []
+        vectors = [np.asarray(f.normed_embedding, dtype=np.float32) for f in faces]
+        bboxes = [tuple(float(v) for v in f.bbox) for f in faces]
+        scores = [float(f.det_score) for f in faces]
+        return vectors, bboxes, scores
+
+    def embed(self, image_bytes: bytes) -> np.ndarray | None:
+        """Return the largest face's 512-d unit vector, or None if none found."""
+        vectors, bboxes, _ = self._faces(image_bytes)
+        if not vectors:
             return None
-        # Take the largest detected face (highest bbox area).
-        best = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
-        return np.asarray(best.normed_embedding, dtype=np.float32)
+        # Largest by bbox area — the subject of a single-character panel.
+        best_idx = max(
+            range(len(bboxes)),
+            key=lambda i: (bboxes[i][2] - bboxes[i][0]) * (bboxes[i][3] - bboxes[i][1]),
+        )
+        return vectors[best_idx]
+
+    def detect(self, image_bytes: bytes) -> list[np.ndarray]:
+        """Return every detected face's 512-d unit vector (empty if none)."""
+        vectors, _, _ = self._faces(image_bytes)
+        return vectors
 
 
 def get_embedder() -> FaceEmbedder | None:
@@ -124,17 +143,26 @@ def get_embedder() -> FaceEmbedder | None:
 
 
 def encode_embedding(vector: np.ndarray) -> bytes:
-    """Encode a float32 vector to a compact BLOB (4 bytes per dimension)."""
-    return struct.pack(f"<{_VECTOR_DIM}f", *vector.tolist())
+    """Encode a vector to a compact BLOB (4 bytes per dimension).
+
+    Accepts numpy arrays (production) and plain sequences (tests), so the
+    encoder needs no numpy import of its own.
+    """
+    values = vector.tolist() if hasattr(vector, "tolist") else list(vector)
+    return struct.pack(f"<{_VECTOR_DIM}f", *values)
 
 
 def decode_embedding(blob: bytes) -> np.ndarray | None:
-    """Decode a BLOB back to a float32 vector, or None on wrong size."""
-    import numpy as np
+    """Decode a BLOB back to a float32 vector, or None on wrong size.
 
+    The size check runs before importing numpy so a malformed blob is
+    rejected even in environments without numpy installed.
+    """
     expected = _VECTOR_DIM * 4
     if len(blob) != expected:
         return None
+    import numpy as np
+
     values = struct.unpack(f"<{_VECTOR_DIM}f", blob)
     return np.array(values, dtype=np.float32)
 
@@ -189,17 +217,48 @@ def score_against_gallery(
 
     ``exclude_sha`` holds out one reference image so a leave-one-out trial
     cannot match an image against itself.  Both probe and gallery vectors are
-    L2-normalised, so dot product equals cosine similarity.
+    L2-normalised, so cosine similarity is their dot product; computed as a
+    plain zip-sum so the function needs no numpy import of its own.
     """
-    import numpy as np
-
     scores: dict[int, float] = {}
     for character_id, entries in gallery.items():
         sims = [
-            float(np.dot(probe, vec))
+            sum(p * v for p, v in zip(probe, vec))
             for sha, vec in entries
             if sha != exclude_sha
         ]
         if sims:
-            scores[character_id] = max(sims)
+            scores[character_id] = float(max(sims))
     return scores
+
+
+def score_generated_image(
+    embedder: FaceEmbedder,
+    gallery: dict[int, list[tuple[str, np.ndarray]]],
+    image_bytes: bytes,
+    cast_ids: tuple[int, ...],
+) -> dict[str, object] | None:
+    """Score a generated image against the cast's reference gallery.
+
+    Every detected face is matched against every character.  The returned
+    payload maps each cast character to its best similarity across all faces:
+
+        {"cast": {"<character_id>": score, ...}, "faces_detected": <n>}
+
+    Returns None when no face is found or insightface is unavailable.
+    """
+    faces = embedder.detect(image_bytes)
+    if not faces:
+        return None
+    scores: dict[int, float] = {}
+    for face in faces:
+        per_character = score_against_gallery(face, gallery)
+        for character_id, score in per_character.items():
+            if character_id in cast_ids:
+                scores[character_id] = max(
+                    scores.get(character_id, score), score
+                )
+    if not scores:
+        return None
+    return {"cast": {str(k): round(v, 4) for k, v in sorted(scores.items())},
+            "faces_detected": len(faces)}

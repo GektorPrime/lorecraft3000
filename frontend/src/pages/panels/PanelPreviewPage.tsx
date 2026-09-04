@@ -370,6 +370,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
           attempts={attempts}
           reviewingCandidateId={reviewingCandidateId}
           onReview={handleReview}
+          cast={panel.cast}
         />
       )}
       <p className="panel-preview__beat">{panel.beat_text}</p>

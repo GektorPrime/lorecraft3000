@@ -4,16 +4,50 @@ import { ImageDialog } from '../../components/ImageDialog'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { Icon } from '../../components/Icon'
 
+interface CastMemberRef {
+  character_id: number
+  name: string
+}
+
+interface IdentityScores {
+  cast?: Record<string, number>
+  faces_detected?: number
+}
+
 interface CandidateCarouselProps {
   attempts: GenerationSummary[]
   reviewingCandidateId: number | null
   onReview: (candidateId: number, verdict: 'accepted' | 'rejected') => void
+  /** Panel cast, used to label identity-score chips with character names. */
+  cast?: CastMemberRef[]
 }
 
 const REVIEW_STATUS_LABEL: Record<string, string> = {
   pending: 'Waiting',
   accepted: 'Accepted',
   rejected: 'Rejected',
+}
+
+/** Tone thresholds for identity-score chips — advisory, never gates anything. */
+function scoreTone(score: number): 'strong' | 'ok' | 'weak' {
+  if (score >= 0.5) return 'strong'
+  if (score >= 0.3) return 'ok'
+  return 'weak'
+}
+
+function parseIdentityScores(value: unknown): IdentityScores | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as { cast?: unknown; faces_detected?: unknown }
+  const payload: IdentityScores = {}
+  if (raw.cast && typeof raw.cast === 'object') {
+    const cast: Record<string, number> = {}
+    for (const [key, val] of Object.entries(raw.cast)) {
+      if (typeof val === 'number' && Number.isFinite(val)) cast[key] = val
+    }
+    if (Object.keys(cast).length > 0) payload.cast = cast
+  }
+  if (typeof raw.faces_detected === 'number') payload.faces_detected = raw.faces_detected
+  return payload.cast || payload.faces_detected ? payload : null
 }
 
 /** Carousel that cycles through the generated images of each attempt (an
@@ -24,6 +58,7 @@ export function CandidateCarousel({
   attempts,
   reviewingCandidateId,
   onReview,
+  cast,
 }: CandidateCarouselProps) {
   const [index, setIndex] = useState(0)
   const reviewed = attempts.filter((attempt) => attempt.candidates.length > 0)
@@ -32,10 +67,26 @@ export function CandidateCarousel({
 
   const attempt = reviewed[index % count]
   const candidate = attempt.candidates[0]
+  const identityScores = parseIdentityScores(candidate.identity_scores)
   const isReviewing = reviewingCandidateId !== null
   const reviewingThis = isReviewing && reviewingCandidateId === candidate.id
   const showPrevious = () => setIndex((i) => (i - 1 + count) % count)
   const showNext = () => setIndex((i) => (i + 1) % count)
+
+  const identityChips = (cast ?? []).flatMap((member) => {
+    const score = identityScores?.cast?.[String(member.character_id)]
+    return score === undefined
+      ? []
+      : [(
+        <span
+          key={member.character_id}
+          className={`identity-chip identity-chip--${scoreTone(score)}`}
+          title={`Detected similarity to ${member.name}`}
+        >
+          {member.name}: {score.toFixed(2)}
+        </span>
+      )]
+  })
 
   return (
     <div className="carousel" aria-label="Generated candidate across attempts">
@@ -57,6 +108,16 @@ export function CandidateCarousel({
         </span>
         <span className="field__hint">Attempt #{attempt.id}</span>
       </div>
+      {identityChips.length > 0 && (
+        <div className="carousel__identity" aria-label="Character identity scores">
+          {identityChips}
+          {identityScores?.faces_detected !== undefined && (
+            <span className="field__hint">
+              {identityScores.faces_detected} face{identityScores.faces_detected === 1 ? '' : 's'} detected
+            </span>
+          )}
+        </div>
+      )}
       <div className="action-bar carousel__controls">
         <div className="action-bar__group action-bar__group--start">
           <button
