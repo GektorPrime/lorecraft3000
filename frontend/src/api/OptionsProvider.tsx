@@ -36,6 +36,28 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     }
   }, [loadOptions])
 
+  // After a laptop sleep the in-flight fetch can hang until the timeout
+  // above surfaces an error, or the Vite proxy's keep-alive to the backend
+  // is stale. Recover automatically when the tab becomes visible again or
+  // the browser goes online, without requiring a server restart.
+  useEffect(() => {
+    if (options) return
+    const maybeReload = () => {
+      if (document.visibilityState !== 'visible') return
+      void loadOptions()
+    }
+    const onOnline = () => void loadOptions()
+    const onFocus = () => void loadOptions()
+    document.addEventListener('visibilitychange', maybeReload)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', maybeReload)
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [loadOptions, options])
+
   if (error) {
     return (
       <div>

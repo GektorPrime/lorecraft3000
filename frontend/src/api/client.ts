@@ -50,16 +50,36 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const { headers: initHeaders, ...rest } = init ?? {}
+  const { headers: initHeaders, signal: initSignal, ...rest } = init ?? {}
   const headers = { ...(initHeaders ?? {}) } as Record<string, string>
   if (!(rest.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json'
   }
   headers['X-Timezone'] = browserTimezone()
-  const response = await fetch(`${BASE}${path}`, {
-    headers,
-    ...rest,
-  })
+  // Laptop sleep can leave a fetch hanging forever (no resolve nor reject);
+  // bound it so OptionsProvider and other pages can show the Retry UI and
+  // recover without a server restart. Callers that need a custom abort
+  // signal can pass one.
+  let timeoutId: number | undefined
+  let signal = initSignal
+  if (!signal) {
+    const controller = new AbortController()
+    signal = controller.signal
+    timeoutId = window.setTimeout(
+      () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+      15_000,
+    )
+  }
+  let response: Response
+  try {
+    response = await fetch(`${BASE}${path}`, {
+      headers,
+      signal,
+      ...rest,
+    })
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+  }
   if (response.status === 204) {
     return undefined as T
   }
@@ -168,15 +188,23 @@ export const deletePanel = (id: number) =>
 export const previewPanel = (id: number) => request<PanelPreview>(`/panels/${id}/preview`)
 export const listPanelGenerations = (id: number) =>
   request<GenerationSummary[]>(`/panels/${id}/generations`)
-export const generatePanel = (id: number, expectedPromptHash: string) =>
-  request<Generation>(`/panels/${id}/generate`, {
+export const generatePanel = (id: number, expectedPromptHash: string) => {
+  const controller = new AbortController()
+  const t = window.setTimeout(
+    () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+    180_000,
+  )
+  controller.signal.addEventListener('abort', () => window.clearTimeout(t), { once: true })
+  return request<Generation>(`/panels/${id}/generate`, {
     method: 'POST',
+    signal: controller.signal,
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': crypto.randomUUID(),
     },
     body: JSON.stringify({ expected_prompt_hash: expectedPromptHash }),
-  })
+  }).finally(() => window.clearTimeout(t))
+}
 
 // ---------------------------------------------------------------------------
 // generations / candidates
@@ -188,15 +216,23 @@ export const reviewCandidate = (id: number, verdict: 'accepted' | 'rejected') =>
 // Edit an existing candidate with a natural-language instruction. Produces a
 // new candidate under a child generation on the same provider/model, keeping
 // character identity anchored to the panel's canonical references.
-export const editCandidate = (id: number, instruction: string) =>
-  request<Generation>(`/candidates/${id}/edit`, {
+export const editCandidate = (id: number, instruction: string) => {
+  const controller = new AbortController()
+  const t = window.setTimeout(
+    () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+    180_000,
+  )
+  controller.signal.addEventListener('abort', () => window.clearTimeout(t), { once: true })
+  return request<Generation>(`/candidates/${id}/edit`, {
     method: 'POST',
+    signal: controller.signal,
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': crypto.randomUUID(),
     },
     body: JSON.stringify({ instruction }),
-  })
+  }).finally(() => window.clearTimeout(t))
+}
 
 // ---------------------------------------------------------------------------
 // gallery
