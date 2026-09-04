@@ -4,9 +4,6 @@
 # Virtual environment
 .venv/
 
-# Throwaway venv for the identity-scoring feasibility spike (spike_identity.py)
-.venv-spike/
-
 # Generated output
 out/
 
