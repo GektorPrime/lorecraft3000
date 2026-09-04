@@ -54,6 +54,17 @@ class SceneService:
         ).fetchone()
         return int(row["n"])
 
+    def latest_attempt_candidate_id(self, scene_id: int) -> int | None:
+        row = self.conn.execute(
+            "SELECT c.id AS candidate_id FROM generation AS g "
+            "LEFT JOIN candidate AS c ON c.generation_id = g.id "
+            "WHERE g.scene_id = ? ORDER BY g.id DESC, c.idx ASC LIMIT 1",
+            (scene_id,),
+        ).fetchone()
+        if row is None or row["candidate_id"] is None:
+            return None
+        return int(row["candidate_id"])
+
     def locking_generation_count(self, scene_id: int) -> int:
         row = self.conn.execute(
             "SELECT COUNT(*) AS n FROM generation "

@@ -777,6 +777,17 @@
             "title": "Is Editable",
             "type": "boolean"
           },
+          "latest_attempt_preview_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Attempt Preview Url"
+          },
           "model": {
             "title": "Model",
             "type": "string"
@@ -803,7 +814,8 @@
           "image_size",
           "created_at",
           "is_editable",
-          "generation_count"
+          "generation_count",
+          "latest_attempt_preview_url"
         ],
         "title": "Panel",
         "type": "object"

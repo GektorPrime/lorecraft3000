@@ -54,6 +54,7 @@ const LOCKED_PANEL: Panel = {
   created_at: '',
   is_editable: false,
   generation_count: 1,
+  latest_attempt_preview_url: '/api/v1/candidates/900/content',
 }
 
 const BLOCKED_PREVIEW: PanelPreview = {
@@ -215,6 +216,9 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(within(attemptList as HTMLElement).getAllByText('Waiting')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Accepted')).toHaveLength(1)
     expect(within(attemptList as HTMLElement).getAllByText('Rejected')).toHaveLength(1)
+    const summary = within(attemptList as HTMLElement).getAllByText('Attempt #7')[0]
+      .closest('.attempt-row__summary')
+    expect(summary?.lastElementChild).toHaveClass('attempt-row__badges')
   })
 
   it('edits a successful candidate with an instruction and refreshes history', async () => {
@@ -462,7 +466,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
-  it('shows a carousel of candidate previews across attempts and reviews them', async () => {
+  it('shows a carousel and reviews candidates from their attempt controls', async () => {
     const user = userEvent.setup()
     vi.mocked(client.getPanel).mockResolvedValue({
       ...LOCKED_PANEL,
@@ -499,7 +503,13 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
       carousel.compareDocumentPosition(allocationHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: 'Accept' }))
+    const attempt = document.querySelector('.attempt-row')
+    expect(attempt).not.toBeNull()
+    const actions = (attempt as HTMLElement).querySelector('.attempt-row__candidate-actions')
+    expect(actions).not.toBeNull()
+    expect(within(actions as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim()))
+      .toEqual(['Accept', 'Reject', 'Edit this image'])
+    await user.click(within(actions as HTMLElement).getByRole('button', { name: 'Accept' }))
     expect(client.reviewCandidate).toHaveBeenCalledWith(900, 'accepted')
     // Outcome is shown in place (badge flips), not via a top-of-page banner.
     expect(screen.queryByText('Candidate accepted.')).not.toBeInTheDocument()

@@ -368,8 +368,6 @@ function PanelPreview({ panelId }: { panelId: number }) {
       {attempts && attempts.length > 0 && (
         <CandidateCarousel
           attempts={attempts}
-          reviewingCandidateId={reviewingCandidateId}
-          onReview={handleReview}
           cast={panel.cast}
         />
       )}
@@ -525,6 +523,11 @@ function PanelPreview({ panelId }: { panelId: number }) {
             {attempts.map((attempt) => (
               <article className="attempt-row" key={attempt.id}>
                 <div className="attempt-row__summary">
+                  <strong>Attempt #{attempt.id}</strong>
+                  <span className="field__hint">
+                    {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}
+                    <DateTime value={attempt.created_at} />
+                  </span>
                   <div className="attempt-row__badges">
                     <span className={`badge badge--attempt-${attempt.state}`}>
                       {attempt.state.charAt(0).toUpperCase() + attempt.state.slice(1)}
@@ -536,11 +539,6 @@ function PanelPreview({ panelId }: { panelId: number }) {
                       </span>
                     )}
                   </div>
-                  <strong>Attempt #{attempt.id}</strong>
-                  <span className="field__hint">
-                    {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}
-                    <DateTime value={attempt.created_at} />
-                  </span>
                 </div>
                 {(attempt.candidates.length > 0 || attempt.error_text) && (
                   <div className="attempt-row__detail">
@@ -582,8 +580,48 @@ function PanelPreview({ panelId }: { panelId: number }) {
                   </div>
                 )}
                 {attempt.state === 'succeeded' && attempt.candidates.length > 0 && (
+                  <div className="attempt-row__actions attempt-row__candidate-actions">
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      disabled={reviewingCandidateId !== null}
+                      onClick={() => void handleReview(attempt.candidates[0]!.id, 'accepted')}
+                    >
+                      <Icon name="check" size={16} />
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--danger"
+                      disabled={reviewingCandidateId !== null}
+                      onClick={() => void handleReview(attempt.candidates[0]!.id, 'rejected')}
+                    >
+                      Reject
+                    </button>
+                    {editingCandidateId !== attempt.candidates[0].id && (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={hasPendingAttempt || submittingEdit}
+                        onClick={() => {
+                          setEditingCandidateId(attempt.candidates[0]!.id)
+                          setEditInstruction('')
+                          setActionMessage(null)
+                        }}
+                        title="Refine this image with an instruction"
+                      >
+                        Edit this image
+                      </button>
+                    )}
+                    {reviewingCandidateId === attempt.candidates[0].id && (
+                      <span className="field__hint">Reviewing image…</span>
+                    )}
+                  </div>
+                )}
+                {attempt.state === 'succeeded' &&
+                  attempt.candidates.length > 0 &&
+                  editingCandidateId === attempt.candidates[0].id && (
                   <div className="attempt-row__edit">
-                    {editingCandidateId === attempt.candidates[0].id ? (
                       <form
                         className="attempt-edit-form"
                         onSubmit={(event) => {
@@ -632,21 +670,6 @@ function PanelPreview({ panelId }: { panelId: number }) {
                           new attempt and costs another generation.
                         </span>
                       </form>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={hasPendingAttempt || submittingEdit}
-                        onClick={() => {
-                          setEditingCandidateId(attempt.candidates[0]!.id)
-                          setEditInstruction('')
-                          setActionMessage(null)
-                        }}
-                        title="Refine this image with an instruction"
-                      >
-                        Edit this image
-                      </button>
-                    )}
                   </div>
                 )}
               </article>

@@ -399,6 +399,7 @@ def test_panel_create_and_list(api):
     panel = _create_panel(api, [character["id"]])
     assert panel["is_editable"] is True
     assert panel["generation_count"] == 0
+    assert panel["latest_attempt_preview_url"] is None
     assert panel["cast"][0]["name"] == "Elias"
     assert panel["cast"][0]["avatar_url"] is not None
 
@@ -552,6 +553,12 @@ def test_panel_editable_until_generation_succeeds_then_backend_rejects_update(ap
     generated = _generate_panel(api, panel["id"])
     assert generated.status_code == 201, generated.text
     assert generated.json()["state"] == "succeeded"
+
+    listed_panel = api.client.get("/api/v1/panels").json()[0]
+    candidate_id = generated.json()["candidates"][0]["id"]
+    assert listed_panel["latest_attempt_preview_url"] == (
+        f"/api/v1/candidates/{candidate_id}/content"
+    )
 
     # Now the panel must report non-editable and reject a further update,
     # even though the request itself is well-formed (backend enforcement,

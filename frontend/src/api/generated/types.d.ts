@@ -878,6 +878,8 @@ export interface components {
             image_size: string;
             /** Is Editable */
             is_editable: boolean;
+            /** Latest Attempt Preview Url */
+            latest_attempt_preview_url: string | null;
             /** Model */
             model: string;
             /** Mood */

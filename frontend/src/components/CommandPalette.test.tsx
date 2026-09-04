@@ -50,6 +50,7 @@ const PANEL: Panel = {
   mood: 'tense',
   style_id: 4,
   generation_count: 1,
+  latest_attempt_preview_url: null,
   is_editable: false,
   created_at: '2026-01-01T00:00:00Z',
 }

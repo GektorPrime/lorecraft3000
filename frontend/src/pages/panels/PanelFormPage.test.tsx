@@ -85,6 +85,7 @@ const EDITABLE_PANEL: Panel = {
   created_at: '',
   is_editable: true,
   generation_count: 0,
+  latest_attempt_preview_url: null,
 }
 
 vi.mock('../../api/useOptions', () => ({
