@@ -23,16 +23,44 @@ candidate tables — generated images are never auto-promoted into a ref set.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from typing import NoReturn
 
 from app.domain.models import RefImage, RefSet, RefSetSummary
+from app.services.identity import (
+    FACE_ROLES,
+    FaceEmbedder,
+    get_embedder,
+    store_embedding,
+)
 from app.services.validation import ALLOWED_ROLES
 from app.storage import ImageStorage, ImageStorageError
+
+log = logging.getLogger(__name__)
 
 
 class RefSetError(Exception):
     """Base error for the reference-set service."""
+
+
+def _embed_image(
+    conn: sqlite3.Connection,
+    sha256: str,
+    data: bytes,
+    embedder: FaceEmbedder | None,
+) -> None:
+    """Compute and store a face embedding.  Never raises."""
+    if embedder is None:
+        embedder = get_embedder()
+    if embedder is None:
+        return
+    try:
+        vector = embedder.embed(data)
+        if vector is not None:
+            store_embedding(conn, sha256, vector)
+    except Exception:
+        log.warning("face embedding failed for %s — continuing without it", sha256[:12])
 
 
 class RefSetNotFoundError(RefSetError):
@@ -199,12 +227,19 @@ class RefSetService:
         role: str,
         *,
         source_name: str | None = None,
+        embedder: FaceEmbedder | None = None,
     ) -> RefImage:
         """Store image bytes via content-addressed storage and attach to a draft.
 
         Raises RefSetNotDraftError if the set is not a draft, InvalidRoleError
         for roles outside the allowed set, ImageRejectedError if the bytes are
         not a storable image.
+
+        For face-role images, an optional FaceEmbedder is used to compute a
+        512-d ArcFace vector.  The embedding is stored in the face_embedding
+        table keyed by content hash.  If the embedder is not provided, the
+        singleton is fetched via get_embedder().  Embedding failures never
+        prevent the image from being stored.
         """
         self._require_draft(ref_set_id)
         self._validate_role(role)
@@ -226,6 +261,11 @@ class RefSetService:
             )
         except sqlite3.IntegrityError as exc:
             self._raise_image_immutability_error(ref_set_id, exc)
+        # Embed face-role images eagerly so the vector is available the moment
+        # the image is uploaded (not deferred to promote).  Failures are logged
+        # and swallowed — the image is still usable without an embedding.
+        if role in FACE_ROLES:
+            _embed_image(self.conn, meta.sha256, data, embedder)
         self.conn.commit()
         return self._get_image(cur.lastrowid)
 

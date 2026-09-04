@@ -20,6 +20,10 @@ dev = [
     "pytest>=8.0.0",
     "httpx>=0.27.0",
 ]
+identity = [
+    "insightface>=1.0.1",
+    "onnxruntime>=1.19.0",
+]
 
 [tool.uv]
 # Script-based project: uv sync installs dependencies only, no package build.

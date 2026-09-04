@@ -11,6 +11,7 @@ from app.config import Settings, provider_for_model
 from app.db import connect
 from app.providers.gemini import GeminiProvider
 from app.providers.openai import OpenAIProvider
+from app.services.identity import FaceEmbedder, get_embedder
 from app.storage import ImageStorage
 
 # Single Settings instance for the whole app (env/.env loaded in app.config).
@@ -68,3 +69,8 @@ class ProviderRegistry:
 def get_provider() -> ProviderRegistry:
     """Construct the provider registry only for an explicit generation request."""
     return ProviderRegistry(timeout_seconds=settings.provider_timeout_seconds)
+
+
+def get_face_embedder() -> FaceEmbedder | None:
+    """Return the singleton FaceEmbedder, or None if insightface is not installed."""
+    return get_embedder()
