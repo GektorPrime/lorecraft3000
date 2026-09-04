@@ -59,8 +59,9 @@ npm test
 This runs both the backend pytest suite and frontend Vitest suite. Run only the
 backend suite with `uv run pytest` when needed.
 
-The default suite uses a fake provider and never makes paid requests. The live
-Gemini smoke test is skipped unless explicitly enabled:
+The default suite uses fake providers and never makes paid requests. The live
+Gemini and OpenAI smoke tests are skipped unless explicitly enabled. Enabling
+them authorizes both paid calls and requires both provider API keys:
 
 ```bash
 LORECRAFT_RUN_LIVE_TESTS=1 uv run pytest -m live

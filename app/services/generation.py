@@ -418,7 +418,8 @@ class GenerationService:
             SELECT c.id AS candidate_id, c.sha256 AS sha256,
                    g.id AS generation_id, g.scene_id AS scene_id,
                    g.model AS model, g.state AS state,
-                   g.request_json AS request_json, g.prompt_hash AS prompt_hash
+                   g.request_json AS request_json, g.prompt_hash AS prompt_hash,
+                   g.interaction_id AS interaction_id
               FROM candidate c
               JOIN generation g ON g.id = c.generation_id
              WHERE c.id = ?
@@ -495,7 +496,7 @@ class GenerationService:
             aspect_ratio=aspect_ratio,
             image_size=image_size,
             labels={"scene": str(scene_id)},
-            source_interaction_id=None,
+            source_interaction_id=source["interaction_id"],
         )
 
         request_capture = {

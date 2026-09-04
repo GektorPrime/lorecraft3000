@@ -377,6 +377,7 @@ describe('PanelFormPage — field descriptions', () => {
     await user.type(await screen.findByLabelText('Action'), 'Elias enters')
     await user.type(screen.getByLabelText('Camera'), 'eye level')
     await user.type(screen.getByLabelText('Shot framing'), 'wide shot')
+    await user.click(screen.getByRole('button', { name: /Elias/ }))
     const beforeUnload = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(beforeUnload)
     expect(beforeUnload.defaultPrevented).toBe(true)
@@ -389,6 +390,9 @@ describe('PanelFormPage — field descriptions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save and preview' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/panels/20/preview'))
+    expect(client.createPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cast: [{ character_id: 1, role: '', prominence: 1 }] }),
+    )
   })
 
   it('lets duplication finish without navigating after the locked page is left', async () => {

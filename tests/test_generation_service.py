@@ -42,6 +42,16 @@ class FakeProvider:
         )
 
 
+class FakeProviderRegistry:
+    def __init__(self, provider):
+        self.provider = provider
+        self.models = []
+
+    def for_model(self, model):
+        self.models.append(model)
+        return self.provider
+
+
 def _settings(tmp_path):
     return Settings(
         daily_spend_cap_usd=3.0,
@@ -142,6 +152,22 @@ def test_two_character_fake_generation_captures_complete_provenance(
     assert provenance["created_at"]
     assert len(provenance["input_images"]) == 2
     assert "SECRET" not in json.dumps(provenance)
+
+
+def test_generation_resolves_provider_from_selected_model(conn, storage, tmp_path):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id}])
+    provider = FakeProvider()
+    registry = FakeProviderRegistry(provider)
+
+    GenerationService(conn, storage, _settings(tmp_path), registry).generate(
+        scene_id, model="gemini-3-pro-image"
+    )
+
+    assert registry.models == ["gemini-3-pro-image"]
+    assert len(provider.requests) == 1
 
 
 def test_provider_failure_marks_generation_failed_and_keeps_reservation(
@@ -405,6 +431,7 @@ def test_edit_creates_child_generation_with_new_candidate(conn, storage, tmp_pat
     # Identity is anchored: the canonical reference travels with the edit.
     assert [ref.sha256 for ref in edit_request.references] == [ref_image.sha256]
     assert edit_request.source_image  # source bytes supplied
+    assert edit_request.source_interaction_id == "interaction-fake"
 
     row = conn.execute(
         "SELECT * FROM generation WHERE id = ?", (edited.generation_id,)

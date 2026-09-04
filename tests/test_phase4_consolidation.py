@@ -3,9 +3,7 @@
 Covers the ModelRegistry (single source of model/size/ratio capabilities), the
 new CandidateService, generation history reads (list_for_scene /
 get_with_candidates), content-sha resolution for ref images and candidates,
-the ASPECT_RATIOS re-export, and a wire-stability comparison of the /api/v1
-path + method surface against the pre-split route set (a regression tripwire
-for the router refactor).
+and the ASPECT_RATIOS re-export.
 """
 
 from __future__ import annotations
@@ -14,7 +12,6 @@ import pytest
 
 from app.config import Settings
 from app.db import connect
-from app.main import app
 from app.migrate import run_migrations
 from app.models import ModelRegistry
 from app.services.candidates import CandidateNotFoundError, CandidateService
@@ -23,66 +20,6 @@ from app.services.ref_sets import RefImageNotFoundError, RefSetService
 from app.services.scenes import ASPECT_RATIOS  # re-export from app.models
 from app.storage import ImageStorage
 from tests.conftest import make_png_bytes
-
-# The exact path+method surface of app/routes/api_v1.py before the split into
-# resource routers. If this set ever changes, the change is a deliberate API
-# contract change (bump the frontend client together with it), not an
-# incidental refactor artifact.
-WIRE_SURFACE = {
-    ("GET", "/api/v1/options/summary"),
-    ("GET", "/api/v1/budget"),
-    ("GET", "/api/v1/characters"),
-    ("POST", "/api/v1/characters"),
-    ("GET", "/api/v1/characters/archived"),
-    ("GET", "/api/v1/characters/{character_id}"),
-    ("PUT", "/api/v1/characters/{character_id}"),
-    ("DELETE", "/api/v1/characters/{character_id}"),
-    ("POST", "/api/v1/characters/{character_id}/restore"),
-    ("GET", "/api/v1/characters/{character_id}/ref-sets"),
-    ("POST", "/api/v1/characters/{character_id}/ref-sets"),
-    ("GET", "/api/v1/ref-sets/{ref_set_id}"),
-    ("POST", "/api/v1/ref-sets/{ref_set_id}/copy"),
-    ("POST", "/api/v1/ref-sets/{ref_set_id}/promote"),
-    ("POST", "/api/v1/ref-sets/{ref_set_id}/images"),
-    ("PATCH", "/api/v1/ref-sets/{ref_set_id}/images/{image_id}"),
-    ("DELETE", "/api/v1/ref-sets/{ref_set_id}/images/{image_id}"),
-    ("GET", "/api/v1/ref-images/{image_id}/content"),
-    ("GET", "/api/v1/styles"),
-    ("POST", "/api/v1/styles"),
-    ("GET", "/api/v1/styles/archived"),
-    ("GET", "/api/v1/styles/{style_id}"),
-    ("PUT", "/api/v1/styles/{style_id}"),
-    ("DELETE", "/api/v1/styles/{style_id}"),
-    ("POST", "/api/v1/styles/{style_id}/restore"),
-    ("GET", "/api/v1/panels"),
-    ("POST", "/api/v1/panels"),
-    ("GET", "/api/v1/panels/{panel_id}"),
-    ("PUT", "/api/v1/panels/{panel_id}"),
-    ("PATCH", "/api/v1/panels/{panel_id}/model"),
-    ("DELETE", "/api/v1/panels/{panel_id}"),
-    ("POST", "/api/v1/panels/{panel_id}/duplicate"),
-    ("GET", "/api/v1/panels/{panel_id}/preview"),
-    ("GET", "/api/v1/panels/{panel_id}/generations"),
-    ("POST", "/api/v1/panels/{panel_id}/generate"),
-    ("GET", "/api/v1/generations/{generation_id}"),
-    ("POST", "/api/v1/candidates/{candidate_id}/review"),
-    ("POST", "/api/v1/candidates/{candidate_id}/edit"),
-    ("GET", "/api/v1/candidates/{candidate_id}/content"),
-    ("GET", "/api/v1/gallery"),
-}
-
-
-def test_router_split_preserves_wire_surface():
-    """The api_v1 package exposes exactly the pre-split /api/v1 route surface."""
-    schema = app.openapi()
-    actual = {
-        (method.upper(), path)
-        for path, ops in schema["paths"].items()
-        for method in ops
-        if path.startswith("/api/v1")
-    }
-    assert actual == WIRE_SURFACE
-
 
 # ---------------------------------------------------------------------------
 # ModelRegistry

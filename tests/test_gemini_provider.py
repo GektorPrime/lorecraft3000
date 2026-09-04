@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.providers.base import ProviderReference, ProviderRequest
+from app.providers.base import ProviderEditRequest, ProviderReference, ProviderRequest
 from app.providers.gemini import GeminiProvider, GeminiProviderError
 from app.deps import get_provider, settings
 
@@ -58,6 +58,28 @@ def test_adapter_extracts_image_and_interaction_id():
     result = provider.generate(_request("gemini-3.1-flash-image"))
     assert result.image_bytes == b"output"
     assert result.interaction_id == "interaction-1"
+
+
+def test_edit_request_preserves_source_context_and_interaction():
+    request = ProviderEditRequest(
+        model="gemini-3.1-flash-image",
+        prompt="original prompt",
+        instruction="make it night",
+        source_image=b"source-image",
+        source_mime_type="image/png",
+        references=(ProviderReference(1, "a" * 64, "image/png", b"reference"),),
+        aspect_ratio="3:2",
+        image_size="1K",
+        labels={"scene": "1"},
+        source_interaction_id="interaction-original",
+    )
+
+    payload = GeminiProvider().build_edit_request(request)
+
+    assert payload["previous_interaction_id"] == "interaction-original"
+    assert base64.b64decode(payload["input"][1]["data"]) == b"source-image"
+    assert base64.b64decode(payload["input"][2]["data"]) == b"reference"
+    assert "make it night" in payload["input"][0]["text"]
 
 
 def test_consumer_api_400_is_marked_non_billable():

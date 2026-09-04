@@ -28,6 +28,7 @@ MIGRATIONS: list[str] = [
     "app.migrations.012_archive_character_style",
     "app.migrations.013_face_embedding",
     "app.migrations.014_candidate_identity",
+    "app.migrations.015_preserve_retired_ref_sets",
 ]
 
 

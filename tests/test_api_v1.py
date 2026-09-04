@@ -15,6 +15,8 @@ from dataclasses import dataclass
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main as main_module
+from app.config import Settings
 from app.db import connect
 from app.deps import get_conn, get_provider, get_storage
 from app.main import app
@@ -54,11 +56,16 @@ class ApiApp:
 
 
 @pytest.fixture
-def api(tmp_path):
+def api(tmp_path, monkeypatch):
     db_path = tmp_path / "api.db"
     storage = ImageStorage(tmp_path / "store")
     provider = FakeProvider()
     run_migrations(db_path)
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        Settings(db_path=db_path, store_root=storage.root),
+    )
 
     def override_conn():
         conn = connect(db_path)
@@ -70,9 +77,11 @@ def api(tmp_path):
     app.dependency_overrides[get_conn] = override_conn
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_provider] = lambda: provider
-    with TestClient(app, base_url="http://127.0.0.1") as client:
-        yield ApiApp(client, db_path, storage, provider)
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            yield ApiApp(client, db_path, storage, provider)
+    finally:
+        app.dependency_overrides.clear()
 
 
 def _default_style_id(api) -> int:

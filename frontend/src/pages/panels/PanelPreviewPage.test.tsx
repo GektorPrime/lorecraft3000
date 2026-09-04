@@ -224,9 +224,16 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
   it('edits a successful candidate with an instruction and refreshes history', async () => {
     const user = userEvent.setup()
     vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
-      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
-    ])
+    vi.mocked(client.listPanelGenerations)
+      .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
+      .mockResolvedValue([
+        { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
+        {
+          ...SUCCEEDED_ATTEMPT,
+          id: 8,
+          candidates: [{ ...CANDIDATE, id: 901, generation_id: 8 }],
+        },
+      ])
     vi.mocked(client.editCandidate).mockResolvedValue(GENERATED)
     renderPreview()
 
@@ -235,6 +242,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
     const box = screen.getByLabelText(/Describe the change to make to this image/)
     await user.type(box, 'make it night time with neon')
+    refreshBudget.mockClear()
     await user.click(screen.getByRole('button', { name: 'Submit edit' }))
 
     await waitFor(() =>
@@ -243,6 +251,9 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
         'make it night time with neon',
       ),
     )
+    expect(await screen.findByText('Attempt #8')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Describe the change to make to this image/)).not.toBeInTheDocument()
+    expect(refreshBudget).toHaveBeenCalledTimes(2)
   })
 
   it('disables submit until an edit instruction is entered', async () => {
@@ -473,9 +484,14 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
       is_editable: true,
       generation_count: 1,
     })
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
-      { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
-    ])
+    vi.mocked(client.listPanelGenerations)
+      .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
+      .mockResolvedValue([
+        {
+          ...SUCCEEDED_ATTEMPT,
+          candidates: [{ ...CANDIDATE, review_status: 'accepted' }],
+        },
+      ])
     vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
     vi.mocked(client.reviewCandidate).mockResolvedValue({
       ...CANDIDATE,
@@ -512,6 +528,8 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     await user.click(within(actions as HTMLElement).getByRole('button', { name: 'Accept' }))
     expect(client.reviewCandidate).toHaveBeenCalledWith(900, 'accepted')
     // Outcome is shown in place (badge flips), not via a top-of-page banner.
+    expect(await screen.findAllByText('Accepted')).toHaveLength(2)
+    expect(screen.queryByText('Waiting')).not.toBeInTheDocument()
     expect(screen.queryByText('Candidate accepted.')).not.toBeInTheDocument()
   })
 
