@@ -18,6 +18,7 @@ from app.services.base_stages import (
     BaseStageError,
     BaseStageNotFoundError,
     BaseStageNotReadyError,
+    BaseStageService,
     BaseStageValidationError,
 )
 
@@ -229,14 +230,35 @@ def _cast_member_out(conn, storage: ImageStorage, entry: dict) -> "CastMember":
         name=name,
         avatar_url=f"/api/v1/ref-images/{avatar.id}/content" if avatar else None,
         avatar_initials=_initials(name),
+        base_stage_target_id=entry.get("base_stage_target_id"),
     )
 
 
 def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
-    from app.schemas import Panel
+    from app.schemas import Panel, PanelBaseStage, PanelBaseStageTarget
 
     scenes = SceneService(conn, settings)
     latest_candidate_id = scenes.latest_attempt_candidate_id(scene.id)
+    base_stage = None
+    if scene.base_stage_id is not None:
+        stage = BaseStageService(conn, storage).get(scene.base_stage_id)
+        base_stage = PanelBaseStage(
+            id=stage.id,
+            state=stage.state,
+            description=stage.description,
+            aspect_ratio=stage.aspect_ratio,
+            style_id=stage.style_id,
+            content_url=f"/api/v1/base-stages/{stage.id}/content",
+            targets=[
+                PanelBaseStageTarget(
+                    id=target.id,
+                    position=target.position,
+                    description=target.description,
+                )
+                for target in stage.targets
+            ],
+            archived_at=stage.archived_at,
+        )
     return Panel(
         id=scene.id,
         beat_text=scene.beat_text,
@@ -246,6 +268,8 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
         aspect_ratio=scene.aspect_ratio,
         cast=[_cast_member_out(conn, storage, entry) for entry in scene.cast],
         style_id=scene.style_id,
+        base_stage_id=scene.base_stage_id,
+        base_stage=base_stage,
         model=scene.model,
         image_size=scene.image_size,
         created_at=scene.created_at,

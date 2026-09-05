@@ -39,6 +39,8 @@ const STYLE: Style = {
 }
 
 const PANEL: Panel = {
+  base_stage_id: null,
+  base_stage: null,
   id: 12,
   beat_text: 'Rain cuts across a deserted platform.',
   camera: 'low angle',

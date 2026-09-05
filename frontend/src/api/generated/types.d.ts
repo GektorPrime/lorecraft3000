@@ -810,6 +810,8 @@ export interface components {
             avatar_initials: string;
             /** Avatar Url */
             avatar_url: string | null;
+            /** Base Stage Target Id */
+            base_stage_target_id?: number | null;
             /** Character Id */
             character_id: number;
             /** Name */
@@ -821,6 +823,8 @@ export interface components {
         };
         /** CastMemberInput */
         CastMemberInput: {
+            /** Base Stage Target Id */
+            base_stage_target_id?: number | null;
             /** Character Id */
             character_id: number;
             /**
@@ -1030,6 +1034,9 @@ export interface components {
         Panel: {
             /** Aspect Ratio */
             aspect_ratio: string;
+            base_stage: components["schemas"]["PanelBaseStage"] | null;
+            /** Base Stage Id */
+            base_stage_id: number | null;
             /** Beat Text */
             beat_text: string;
             /** Camera */
@@ -1055,7 +1062,35 @@ export interface components {
             /** Mood */
             mood: string;
             /** Style Id */
-            style_id: number;
+            style_id: number | null;
+        };
+        /** PanelBaseStage */
+        PanelBaseStage: {
+            /** Archived At */
+            archived_at: string | null;
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            /** Content Url */
+            content_url: string;
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** State */
+            state: string;
+            /** Style Id */
+            style_id: number | null;
+            /** Targets */
+            targets: components["schemas"]["PanelBaseStageTarget"][];
+        };
+        /** PanelBaseStageTarget */
+        PanelBaseStageTarget: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
         };
         /** PanelInput */
         PanelInput: {
@@ -1064,25 +1099,24 @@ export interface components {
              * @default 3:2
              */
             aspect_ratio: string;
+            /** Base Stage Id */
+            base_stage_id?: number | null;
             /** Beat Text */
-            beat_text: string;
+            beat_text?: string | null;
             /** Camera */
-            camera: string;
+            camera?: string | null;
             /** Cast */
             cast: components["schemas"]["CastMemberInput"][];
             /** Framing */
-            framing: string;
+            framing?: string | null;
             /** Image Size */
             image_size: string;
             /** Model */
             model: string;
-            /**
-             * Mood
-             * @default
-             */
-            mood: string;
+            /** Mood */
+            mood?: string | null;
             /** Style Id */
-            style_id: number;
+            style_id?: number | null;
         };
         /** PanelModelInput */
         PanelModelInput: {
@@ -1093,6 +1127,8 @@ export interface components {
         PanelPreview: {
             /** Attachments */
             attachments: components["schemas"]["GenerationAttachment"][];
+            /** Base Stage Id */
+            base_stage_id?: number | null;
             /** Blocked Reason */
             blocked_reason?: string | null;
             /** Can Generate */
@@ -1111,6 +1147,8 @@ export interface components {
             remaining_after_cents: number;
             /** Scene Id */
             scene_id: number;
+            /** Source Content Url */
+            source_content_url?: string | null;
             /** Spent Today Cents */
             spent_today_cents: number;
             /** Warnings */

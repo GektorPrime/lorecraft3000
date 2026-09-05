@@ -36,6 +36,8 @@ const LOCKED_PANEL: Panel = {
   is_editable: false,
   generation_count: 1,
   latest_attempt_preview_url: '/api/v1/candidates/44/content',
+  base_stage_id: null,
+  base_stage: null,
 }
 
 const EDITABLE_PANEL: Panel = {
@@ -136,6 +138,17 @@ describe('PanelListPage — preview via tile click', () => {
     await screen.findByText('A quiet dawn over the harbor.')
     const metadata = screen.getByText(/Cast:/).closest('.resource-card__meta')
     expect(metadata?.firstElementChild).toHaveTextContent('Editable')
+  })
+
+  it('marks panels composed from a Base Stage', async () => {
+    vi.mocked(client.listPanels).mockResolvedValue([{ ...EDITABLE_PANEL, base_stage_id: 4 }])
+    render(
+      <MemoryRouter>
+        <PanelListPage />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Base Stage')).toHaveClass('badge')
   })
 })
 

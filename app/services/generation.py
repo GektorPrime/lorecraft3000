@@ -8,7 +8,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from app.assembler.core import AssemblyError, assemble_prompt
+from app.assembler.core import AssemblyError, assemble_prompt, assemble_staged_prompt
 from app.config import Settings
 from app.domain.generation import CastInput, ReferenceInput, SceneInput
 from app.providers.base import (
@@ -17,6 +17,7 @@ from app.providers.base import (
     ProviderReference,
     ProviderRequest,
 )
+from app.services.base_stages import BaseStageError, BaseStageService
 from app.services.characters import CharacterError, CharacterService
 from app.services.costs import CostLedger
 from app.services.identity import (
@@ -69,7 +70,7 @@ class GenerationPreview:
     estimated_cost_cents: int
     spent_today_cents: int
     remaining_after_cents: int
-    provider_request: ProviderRequest
+    provider_request: ProviderRequest | ProviderEditRequest
     request_capture: dict
 
 
@@ -127,26 +128,62 @@ class GenerationService:
             raise GenerationError(f"scene {scene_id} not found")
         selected_model = model or scene_row["model"] or self.settings.default_model
         selected_size = image_size or scene_row["image_size"] or self.settings.default_image_size
-        if scene_row["style_id"] is None:
+        staged = scene_row["base_stage_id"] is not None
+        if not staged and scene_row["style_id"] is None:
             raise GenerationError("scene has no style")
 
         try:
-            style = StyleService(self.conn).get(scene_row["style_id"])
             cast = self._load_cast(scene_row["cast_json"])
-            assembled = assemble_prompt(
-                model=selected_model,
-                image_size=selected_size,
-                cast=cast,
-                scene=SceneInput(
-                    beat_text=scene_row["beat_text"],
-                    camera=scene_row["camera"],
-                    framing=scene_row["framing"],
-                    mood=scene_row["mood"],
-                    aspect_ratio=scene_row["aspect_ratio"],
-                ),
-                style_contract=style.style_contract,
-            )
-        except (AssemblyError, CharacterError, RefSetError, StyleError) as exc:
+            if staged:
+                stages = BaseStageService(self.conn, self.storage)
+                stage = stages.get(scene_row["base_stage_id"])
+                source_sha256 = stages.content_sha(stage.id)
+                raw_cast = json.loads(scene_row["cast_json"])
+                target_rows = self.conn.execute(
+                    "SELECT id, description FROM base_stage_target "
+                    "WHERE base_stage_id = ?",
+                    (stage.id,),
+                ).fetchall()
+                descriptions = {int(row["id"]): row["description"] for row in target_rows}
+                target_map = {
+                    int(entry["character_id"]): descriptions[
+                        int(entry["base_stage_target_id"])
+                    ]
+                    for entry in raw_cast
+                }
+                target_ids = {
+                    int(entry["character_id"]): int(entry["base_stage_target_id"])
+                    for entry in raw_cast
+                }
+                style_contract = ""
+                if stage.style_id is not None:
+                    style_contract = StyleService(self.conn).get(stage.style_id).style_contract
+                assembled = assemble_staged_prompt(
+                    model=selected_model,
+                    image_size=selected_size,
+                    cast=cast,
+                    base_stage_description=stage.description,
+                    base_stage_sha256=source_sha256,
+                    target_map=target_map,
+                    target_ids=target_ids,
+                    style_contract=style_contract,
+                )
+            else:
+                style = StyleService(self.conn).get(scene_row["style_id"])
+                assembled = assemble_prompt(
+                    model=selected_model,
+                    image_size=selected_size,
+                    cast=cast,
+                    scene=SceneInput(
+                        beat_text=scene_row["beat_text"],
+                        camera=scene_row["camera"],
+                        framing=scene_row["framing"],
+                        mood=scene_row["mood"],
+                        aspect_ratio=scene_row["aspect_ratio"],
+                    ),
+                    style_contract=style.style_contract,
+                )
+        except (AssemblyError, BaseStageError, CharacterError, RefSetError, StyleError, KeyError, TypeError, ValueError) as exc:
             raise GenerationError(f"scene cannot be generated: {exc}") from exc
 
         provider_refs: list[ProviderReference] = []
@@ -181,14 +218,50 @@ class GenerationService:
                 }
             )
 
-        request = ProviderRequest(
-            model=selected_model,
-            prompt=assembled.text,
-            references=tuple(provider_refs),
-            aspect_ratio=scene_row["aspect_ratio"],
-            image_size=selected_size,
-            labels={"scene": str(scene_id)},
-        )
+        source_capture = None
+        if staged:
+            try:
+                source_data, source_metadata = self.storage.read(source_sha256)
+            except ImageStorageError as exc:
+                raise GenerationError(
+                    f"base stage image {stage.id} is unavailable: {exc}"
+                ) from exc
+            source_mime = _FORMAT_MIME.get(source_metadata.get("format"))
+            if source_mime is None:
+                raise GenerationError(
+                    f"unsupported stored base stage format: {source_metadata.get('format')}"
+                )
+            source_capture = {
+                "image_number": 1,
+                "kind": "base_stage",
+                "base_stage_id": stage.id,
+                "sha256": source_sha256,
+                "mime_type": source_mime,
+            }
+            request = ProviderEditRequest(
+                model=selected_model,
+                prompt=assembled.text,
+                instruction=(
+                    "Replace each mapped figure's identity from its canonical "
+                    "references while obeying every preservation constraint."
+                ),
+                source_image=source_data,
+                source_mime_type=source_mime,
+                references=tuple(provider_refs),
+                aspect_ratio=scene_row["aspect_ratio"],
+                image_size=selected_size,
+                labels={"scene": str(scene_id)},
+                source_interaction_id=None,
+            )
+        else:
+            request = ProviderRequest(
+                model=selected_model,
+                prompt=assembled.text,
+                references=tuple(provider_refs),
+                aspect_ratio=scene_row["aspect_ratio"],
+                image_size=selected_size,
+                labels={"scene": str(scene_id)},
+            )
         request_capture = {
             "schema_version": 1,
             "model": selected_model,
@@ -218,6 +291,32 @@ class GenerationService:
             "store": False,
             "scene_revision": scene_row["revision"],
         }
+        if staged:
+            request_capture.update(
+                {
+                    "operation": "base_stage_panel_generate",
+                    "kind": "base_stage_panel_generate",
+                    "base_stage": {
+                        "id": stage.id,
+                        "origin": stage.origin,
+                        "description": stage.description,
+                        "content_sha256": source_sha256,
+                        "aspect_ratio": stage.aspect_ratio,
+                        "style_id": stage.style_id,
+                    },
+                    "target_map": [
+                        {
+                            "character_id": member.character_id,
+                            "character_name": member.name,
+                            "base_stage_target_id": raw["base_stage_target_id"],
+                            "target_description": target_map[member.character_id],
+                        }
+                        for member, raw in zip(cast, raw_cast)
+                    ],
+                    "character_attachments": attachment_capture,
+                    "input_images": [source_capture, *attachment_capture],
+                }
+            )
         ledger = CostLedger(self.conn, self.settings)
         estimate = ledger.estimate(selected_model, selected_size)
         # The hard budget gate is enforced on the UTC boundary (machine
@@ -289,7 +388,10 @@ class GenerationService:
 
         result = None
         try:
-            result = provider.generate(preview.provider_request)
+            if isinstance(preview.provider_request, ProviderEditRequest):
+                result = provider.edit(preview.provider_request)
+            else:
+                result = provider.generate(preview.provider_request)
             stored = self.storage.store(
                 result.image_bytes, source_name=f"generation-{generation_id}.png"
             )
@@ -304,7 +406,9 @@ class GenerationService:
                     "aspect_ratio": preview.provider_request.aspect_ratio,
                 },
                 "assembled_prompt": preview.prompt,
-                "input_images": list(preview.attachments),
+                "input_images": list(
+                    preview.request_capture.get("input_images", preview.attachments)
+                ),
                 "slot_allocation": list(preview.attachments),
                 "prompt_hash": preview.prompt_hash,
                 "interaction_id": result.interaction_id,
@@ -325,7 +429,9 @@ class GenerationService:
                 provenance_record={
                     "prompt_hash": preview.prompt_hash,
                     "price_table_version": self.settings.price_table_version,
-                    "input_images": list(preview.attachments),
+                    "input_images": list(
+                        preview.request_capture.get("input_images", preview.attachments)
+                    ),
                 },
             )
             # The authoritative provenance record is committed to

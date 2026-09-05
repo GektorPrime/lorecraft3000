@@ -5,12 +5,21 @@ import {
   createPanel,
   duplicatePanel,
   getPanel,
+  listBaseStages,
   listCharacters,
   listStyles,
   updatePanel,
 } from '../../api/client'
 import { useOptions } from '../../api/useOptions'
-import type { CastMemberInput, Character, PanelInput, Style } from '../../api/types'
+import type {
+  BaseStage,
+  CastMemberInput,
+  Character,
+  PanelBaseStage,
+  PanelInput,
+  Style,
+} from '../../api/types'
+import { BaseStageCastMapper } from '../../components/BaseStageCastMapper'
 import { CastSelector } from '../../components/CastSelector'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { EmptyState } from '../../components/EmptyState'
@@ -34,21 +43,30 @@ const EMPTY = (defaults: { model: string; image_size: string }): PanelInput => (
   image_size: defaults.image_size,
 })
 
-const snapshot = (values: PanelInput) =>
+const snapshot = (
+  values: PanelInput,
+  useBaseStage: boolean,
+  selectedStageId: number | null,
+  stagedCast: CastMemberInput[],
+) =>
   JSON.stringify({
     beat_text: values.beat_text,
     camera: values.camera,
     framing: values.framing,
     mood: values.mood,
     aspect_ratio: values.aspect_ratio,
-    cast: values.cast.map(({ character_id, role, prominence }) => ({
+    cast: values.cast.map(({ character_id, role, prominence, base_stage_target_id }) => ({
       character_id,
       role,
       prominence,
+      base_stage_target_id,
     })),
     style_id: values.style_id,
     model: values.model,
     image_size: values.image_size,
+    useBaseStage,
+    selectedStageId,
+    stagedCast,
   })
 
 export function PanelFormPage() {
@@ -68,11 +86,17 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   )
   const [characters, setCharacters] = useState<Character[]>([])
   const [styles, setStyles] = useState<Style[]>([])
+  const [baseStages, setBaseStages] = useState<(BaseStage | PanelBaseStage)[]>([])
+  const [useBaseStage, setUseBaseStage] = useState(false)
+  const [selectedStageId, setSelectedStageId] = useState<number | null>(null)
+  const [stagedCast, setStagedCast] = useState<CastMemberInput[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [prerequisiteState, setPrerequisiteState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [prerequisiteError, setPrerequisiteError] = useState<string | null>(null)
+  const [stylesError, setStylesError] = useState<string | null>(null)
+  const [baseStagesError, setBaseStagesError] = useState<string | null>(null)
   const [prerequisiteAttempt, setPrerequisiteAttempt] = useState(0)
   const [panelState, setPanelState] = useState<'loading' | 'ready' | 'error'>(
     panelId === null ? 'ready' : 'loading',
@@ -84,7 +108,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   const [notFound, setNotFound] = useState(false)
   const [baseline, setBaseline] = useState<string | null>(null)
   const { allowNavigation, confirmationProps } = useUnsavedChanges(
-    baseline !== null && snapshot(values) !== baseline,
+    baseline !== null && snapshot(values, useBaseStage, selectedStageId, stagedCast) !== baseline,
   )
   const mounted = useRef(true)
   const mutationRequest = useRef(0)
@@ -99,28 +123,44 @@ function PanelForm({ panelId }: { panelId: number | null }) {
 
   useEffect(() => {
     let active = true
-    Promise.all([listCharacters(), listStyles()])
-      .then(([chars, styleList]) => {
+    Promise.allSettled([listCharacters(), listStyles(), listBaseStages()])
+      .then(([characterResult, styleResult, stageResult]) => {
         if (!active) return
-        setCharacters(chars)
+        if (characterResult.status === 'rejected') {
+          setPrerequisiteError(characterResult.reason instanceof ApiError
+            ? characterResult.reason.message
+            : String(characterResult.reason))
+          setPrerequisiteState('error')
+          return
+        }
+        const styleList = styleResult.status === 'fulfilled' ? styleResult.value : []
+        setCharacters(characterResult.value)
         setStyles(styleList)
-        setValues((v) =>
-          v.style_id === 0 && styleList[0] ? { ...v, style_id: styleList[0].id } : v,
-        )
+        setStylesError(styleResult.status === 'rejected'
+          ? styleResult.reason instanceof ApiError ? styleResult.reason.message : String(styleResult.reason)
+          : null)
+        setBaseStages((current) => {
+          const activeStages = stageResult.status === 'fulfilled' ? stageResult.value : []
+          const linkedStage = current.find((stage) => !('dimensions' in stage))
+          return linkedStage && !activeStages.some((stage) => stage.id === linkedStage.id)
+            ? [...activeStages, linkedStage]
+            : activeStages
+        })
+        setBaseStagesError(stageResult.status === 'rejected'
+          ? stageResult.reason instanceof ApiError ? stageResult.reason.message : String(stageResult.reason)
+          : null)
+        setValues((v) => v.style_id === 0 && styleList[0]
+          ? { ...v, style_id: styleList[0].id }
+          : v)
         if (panelId === null) {
           const hydratedValues = EMPTY({
             model: options.default_model,
             image_size: options.default_image_size,
           })
           if (styleList[0]) hydratedValues.style_id = styleList[0].id
-          setBaseline(snapshot(hydratedValues))
+          setBaseline(snapshot(hydratedValues, false, null, []))
         }
         setPrerequisiteState('ready')
-      })
-      .catch((err) => {
-        if (!active) return
-        setPrerequisiteError(err instanceof ApiError ? err.message : String(err))
-        setPrerequisiteState('error')
       })
     return () => {
       active = false
@@ -141,21 +181,43 @@ function PanelForm({ panelId }: { panelId: number | null }) {
         }
         setLocked(false)
         const hydratedValues: PanelInput = {
-          beat_text: panel.beat_text,
-          camera: panel.camera,
-          framing: panel.framing,
-          mood: panel.mood,
+          beat_text: panel.base_stage ? '' : panel.beat_text,
+          camera: panel.base_stage ? '' : panel.camera,
+          framing: panel.base_stage ? '' : panel.framing,
+          mood: panel.base_stage ? '' : panel.mood,
           aspect_ratio: panel.aspect_ratio,
-          cast: panel.cast.map((m) => ({
+          cast: panel.base_stage ? [] : panel.cast.map((m) => ({
             character_id: m.character_id,
             role: m.role,
             prominence: m.prominence,
+            base_stage_target_id: m.base_stage_target_id,
           })),
-          style_id: panel.style_id,
+          style_id: panel.style_id ?? 0,
           model: panel.model,
           image_size: panel.image_size,
         }
-        setBaseline(snapshot(hydratedValues))
+        const hydratedStagedCast = panel.base_stage
+          ? [...panel.cast].sort((a, b) => {
+              const positions = new Map(panel.base_stage!.targets.map((target) => [target.id, target.position]))
+              return (positions.get(a.base_stage_target_id ?? -1) ?? 0) - (positions.get(b.base_stage_target_id ?? -1) ?? 0)
+            }).map((member) => ({
+              character_id: member.character_id,
+              role: '',
+              prominence: member.prominence,
+              base_stage_target_id: member.base_stage_target_id,
+            }))
+          : []
+        const staged = panel.base_stage !== null
+        setUseBaseStage(staged)
+        setSelectedStageId(panel.base_stage_id)
+        setStagedCast(hydratedStagedCast)
+        const linkedStage = panel.base_stage
+        if (linkedStage) {
+          setBaseStages((current) => current.some((stage) => stage.id === linkedStage.id)
+            ? current
+            : [...current, linkedStage])
+        }
+        setBaseline(snapshot(hydratedValues, staged, panel.base_stage_id, hydratedStagedCast))
         setValues(hydratedValues)
         setPanelState('ready')
       })
@@ -200,11 +262,30 @@ function PanelForm({ panelId }: { panelId: number | null }) {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    const selectedStage = baseStages.find((stage) => stage.id === selectedStageId)
+    if (useBaseStage && (!selectedStage || stagedCast.length !== selectedStage.targets.length)) {
+      setError(selectedStage ? 'Assign a character to every Base Stage target.' : 'Select a Base Stage.')
+      return
+    }
     const request = ++mutationRequest.current
     setSubmitting(true)
     setError(null)
     try {
-      const saved = panelId === null ? await createPanel(values) : await updatePanel(panelId, values)
+      const payload: PanelInput = useBaseStage && selectedStage
+        ? {
+            base_stage_id: selectedStage.id,
+            beat_text: null,
+            camera: null,
+            framing: null,
+            mood: null,
+            aspect_ratio: selectedStage.aspect_ratio,
+            cast: stagedCast.map((member) => ({ ...member, role: '' })),
+            style_id: null,
+            model: values.model,
+            image_size: values.image_size,
+          }
+        : { ...values, base_stage_id: null }
+      const saved = panelId === null ? await createPanel(payload) : await updatePanel(panelId, payload)
       if (!mounted.current || request !== mutationRequest.current) return
       allowNavigation()
       navigate(`/panels/${saved.id}/preview`)
@@ -289,20 +370,6 @@ function PanelForm({ panelId }: { panelId: number | null }) {
     )
   }
 
-  if (styles.length === 0) {
-    return (
-      <section className="form-page">
-        <PageHeader title={heading} />
-        <EmptyState
-          icon="styles"
-          title="A style is required"
-          description="Define a visual contract before staging a panel."
-          action={<Link to="/styles/new" className="btn btn--primary">Create a style</Link>}
-        />
-      </section>
-    )
-  }
-
   if (characters.length === 0) {
     return (
       <section className="form-page">
@@ -342,6 +409,59 @@ function PanelForm({ panelId }: { panelId: number | null }) {
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {submitting && <AsyncMessage kind="loading">Saving panel…</AsyncMessage>}
       <form className="form-card" onSubmit={handleSubmit} aria-busy={submitting}>
+        <div className="field panel-mode-toggle">
+          <label>
+            <input
+              type="checkbox"
+              checked={useBaseStage}
+              onChange={(event) => {
+                setUseBaseStage(event.target.checked)
+                // A staged panel carries no style; returning to direct mode
+                // must land on a selectable one rather than the 0 placeholder.
+                if (!event.target.checked) {
+                  setValues((v) =>
+                    (v.style_id === 0 || v.style_id === null) && styles[0]
+                      ? { ...v, style_id: styles[0].id }
+                      : v,
+                  )
+                }
+                setError(null)
+              }}
+            />{' '}
+            Use a base stage
+          </label>
+          <span className="field__hint">
+            Start from a reusable source composition and map its ordered targets to characters.
+          </span>
+        </div>
+
+        {!useBaseStage && stylesError && (
+          <div>
+            <AsyncMessage kind="error">Could not load styles: {stylesError}</AsyncMessage>
+            <button
+              type="button"
+              className="btn"
+              aria-label="Retry panel prerequisites"
+              onClick={() => {
+                setPrerequisiteState('loading')
+                setPrerequisiteAttempt((attempt) => attempt + 1)
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {!useBaseStage && !stylesError && styles.length === 0 && (
+          <EmptyState
+            icon="styles"
+            title="A style is required"
+            description="Define a visual contract before staging a panel, or use a Base Stage."
+            action={<Link to="/styles/new" className="btn btn--primary">Create a style</Link>}
+            compact
+          />
+        )}
+
+        {!useBaseStage && !stylesError && styles.length > 0 && <>
         <fieldset className="form-section">
           <legend>Scene</legend>
         <div className="field">
@@ -351,7 +471,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             className="field__textarea--standard"
             required
             aria-describedby="beat_text-hint"
-            value={values.beat_text}
+            value={values.beat_text ?? ''}
             onChange={(e) => setValues((v) => ({ ...v, beat_text: e.target.value }))}
           />
           <span className="field__hint" id="beat_text-hint">
@@ -370,7 +490,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
               type="text"
               required
               aria-describedby="camera-hint"
-              value={values.camera}
+              value={values.camera ?? ''}
               onChange={(e) => setValues((v) => ({ ...v, camera: e.target.value }))}
             />
             <span className="field__hint" id="camera-hint">
@@ -386,7 +506,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
               type="text"
               required
               aria-describedby="framing-hint"
-              value={values.framing}
+              value={values.framing ?? ''}
               onChange={(e) => setValues((v) => ({ ...v, framing: e.target.value }))}
             />
             <span className="field__hint" id="framing-hint">
@@ -396,17 +516,19 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             </span>
           </div>
         </fieldset>
+        </>}
 
         <fieldset className="form-section">
           <legend>Style and output</legend>
           <div className="form-grid">
+        {!useBaseStage && !stylesError && styles.length > 0 && <>
         <div className="field">
           <label htmlFor="mood">Mood</label>
           <input
             id="mood"
             type="text"
             aria-describedby="mood-hint"
-            value={values.mood}
+            value={values.mood ?? ''}
             onChange={(e) => setValues((v) => ({ ...v, mood: e.target.value }))}
           />
           <span className="field__hint" id="mood-hint">
@@ -439,7 +561,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           <select
             id="style_id"
             aria-describedby="style_id-hint"
-            value={values.style_id}
+            value={values.style_id ?? 0}
             onChange={(e) => setValues((v) => ({ ...v, style_id: Number(e.target.value) }))}
           >
             {styles.map((style) => (
@@ -454,6 +576,23 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             chiaroscuro brushwork.
           </span>
         </div>
+        </>}
+
+        {useBaseStage && (
+          <div className="field">
+            <label htmlFor="inherited_aspect_ratio">Inherited aspect ratio</label>
+            <input
+              id="inherited_aspect_ratio"
+              type="text"
+              readOnly
+              value={baseStages.find((stage) => stage.id === selectedStageId)?.aspect_ratio ?? 'Select a Base Stage'}
+              aria-describedby="inherited_aspect_ratio-hint"
+            />
+            <span className="field__hint" id="inherited_aspect_ratio-hint">
+              The source image fixes the panel aspect ratio.
+            </span>
+          </div>
+        )}
 
         <div className="field">
           <label htmlFor="model">Model</label>
@@ -498,6 +637,50 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           </div>
         </fieldset>
 
+        {useBaseStage && (
+          <fieldset className="form-section">
+            <legend>Base Stage composition</legend>
+            {baseStagesError ? (
+              <div>
+                <AsyncMessage kind="error">Could not load Base Stages: {baseStagesError}</AsyncMessage>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setPrerequisiteState('loading')
+                    setPrerequisiteAttempt((attempt) => attempt + 1)
+                  }}
+                >
+                  Retry Base Stages
+                </button>
+              </div>
+            ) : baseStages.every((stage) => stage.state !== 'ready' || stage.targets.length === 0) ? (
+              <EmptyState
+                icon="baseStages"
+                title="No usable Base Stages"
+                description="Upload a ready Base Stage with at least one target. Stages without targets cannot map characters."
+                action={<Link to="/base-stages/upload" className="btn btn--primary">Upload base stage</Link>}
+                compact
+              />
+            ) : (
+              <BaseStageCastMapper
+                stages={baseStages}
+                characters={characters}
+                selectedStageId={selectedStageId}
+                value={stagedCast}
+                onStageChange={(stageId) => {
+                  if (stageId === selectedStageId) return
+                  setSelectedStageId(stageId)
+                  setStagedCast([])
+                  setError(null)
+                }}
+                onChange={setStagedCast}
+              />
+            )}
+          </fieldset>
+        )}
+
+        {!useBaseStage && !stylesError && styles.length > 0 && (
         <fieldset className="form-section">
           <legend>Cast</legend>
         <div className="field">
@@ -510,9 +693,14 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           />
         </div>
         </fieldset>
+        )}
 
         <div className="form-actions">
-          <button type="submit" className="btn btn--primary" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn btn--primary"
+            disabled={submitting || (!useBaseStage && (stylesError !== null || styles.length === 0))}
+          >
             Save and preview
           </button>
           <button

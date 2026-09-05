@@ -116,6 +116,7 @@ export function PanelListPage() {
                   <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
                     {panel.is_editable ? 'Editable' : 'Locked'}
                   </span>
+                  {panel.base_stage_id !== null && <span className="badge badge--draft">Base Stage</span>}
                   <span>Cast: {panel.cast.map((m) => m.name).join(', ') || 'none'}</span>
                   <span>
                     {panel.generation_count} generation attempt

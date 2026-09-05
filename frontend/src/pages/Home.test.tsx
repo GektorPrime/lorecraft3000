@@ -29,6 +29,8 @@ const OPTIONS_SUMMARY = {
 
 function panel(id: number, editable = false): Panel {
   return {
+    base_stage_id: null,
+    base_stage: null,
     id,
     beat_text: `Beat for panel ${id}`,
     camera: 'eye level',

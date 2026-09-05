@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.assembler.core import AssemblyError, assemble_prompt, capabilities_for
+from app.assembler.core import (
+    AssemblyError,
+    assemble_prompt,
+    assemble_staged_prompt,
+    capabilities_for,
+)
 from app.domain.generation import CastInput, ReferenceInput, SceneInput
 
 
@@ -49,7 +54,7 @@ def test_two_character_allocation_is_explicit_and_deterministic():
     assert [ref.character_name for ref in first.attachments] == [
         "ELIAS", "ELIAS", "MARA", "MARA"
     ]
-    assert len(first.prompt_hash) == 64
+    assert first.prompt_hash == "65d204236338161205f5d955e8a8e047df54f8e4333cb67bf7a3de436efc885a"
 
 
 def test_five_characters_fit_pro_but_not_flash():
@@ -137,3 +142,64 @@ def test_identity_face_roles_win_when_capacity_is_tight():
         style_contract="style",
     )
     assert result.attachments[0].role == "face_front"
+
+
+def test_staged_prompt_is_source_anchored_mapped_and_numbered_from_two():
+    result = assemble_staged_prompt(
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        cast=(_member(1, "ELIAS", refs=1),),
+        base_stage_description="A traveler stands beneath a stone arch.",
+        base_stage_sha256="a" * 64,
+        target_map={1: "traveler beneath the arch"},
+        target_ids={1: 101},
+        style_contract="Victorian oil painting.",
+    )
+
+    assert result.text == """REFERENCE DECLARATION
+Image 1 is the authoritative Base Stage/source composition. Use it as the exact visual and spatial foundation for the output.
+Image 2 is a canonical reference for ELIAS (ref-set v2; roles: face_front). Apply only ELIAS's facial identity, hair, build, and distinguishing traits. Do not blend ELIAS with another character.
+
+VISUAL CONTRACTS
+ELIAS: Distinctive contract for ELIAS. Avoid for ELIAS: wrong hair.
+
+BASE STAGE
+A traveler stands beneath a stone arch.
+
+TARGET MAP
+ELIAS -> traveler beneath the arch
+
+STYLE
+Victorian oil painting.
+
+PRESERVATION CONSTRAINTS
+Preserve Image 1's exact composition, pose, body position, scale, clothing, occlusion, perspective, lighting, environment, and painterly treatment. Apply facial identity, hair, and distinguishing traits from the named character references only. Do not enlarge, reposition, rotate, spotlight, or separately present any figure, and do not turn any figure toward the viewer. Keep every identity separate. No text, no speech bubbles, no captions, no lettering, no visible watermark."""
+    assert [attachment.image_number for attachment in result.attachments] == [2]
+
+
+def test_staged_prompt_hash_covers_source_mapping_text_model_size_and_attachments():
+    kwargs = {
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+        "cast": (_member(1, "ELIAS", refs=1),),
+        "base_stage_description": "A stone arch.",
+        "base_stage_sha256": "a" * 64,
+        "target_map": {1: "figure beneath arch"},
+        "target_ids": {1: 101},
+    }
+    baseline = assemble_staged_prompt(**kwargs).prompt_hash
+    variants = [
+        {**kwargs, "base_stage_sha256": "b" * 64},
+        {**kwargs, "target_map": {1: "figure beside arch"}},
+        {**kwargs, "target_ids": {1: 102}},
+        {**kwargs, "base_stage_description": "A ruined stone arch."},
+        {**kwargs, "model": "gemini-3-pro-image"},
+        {**kwargs, "image_size": "2K"},
+        {
+            **kwargs,
+            "cast": (_member(2, "MARA", refs=1),),
+            "target_map": {2: "figure beneath arch"},
+            "target_ids": {2: 101},
+        },
+    ]
+    assert all(assemble_staged_prompt(**variant).prompt_hash != baseline for variant in variants)

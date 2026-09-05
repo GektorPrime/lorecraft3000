@@ -371,6 +371,17 @@
             ],
             "title": "Avatar Url"
           },
+          "base_stage_target_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Target Id"
+          },
           "character_id": {
             "title": "Character Id",
             "type": "integer"
@@ -401,6 +412,17 @@
       },
       "CastMemberInput": {
         "properties": {
+          "base_stage_target_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Target Id"
+          },
           "character_id": {
             "title": "Character Id",
             "type": "integer"
@@ -990,6 +1012,27 @@
             "title": "Aspect Ratio",
             "type": "string"
           },
+          "base_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PanelBaseStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
+          },
           "beat_text": {
             "title": "Beat Text",
             "type": "string"
@@ -1049,8 +1092,15 @@
             "type": "string"
           },
           "style_id": {
-            "title": "Style Id",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Id"
           }
         },
         "required": [
@@ -1062,6 +1112,8 @@
           "aspect_ratio",
           "cast",
           "style_id",
+          "base_stage_id",
+          "base_stage",
           "model",
           "image_size",
           "created_at",
@@ -1072,6 +1124,94 @@
         "title": "Panel",
         "type": "object"
       },
+      "PanelBaseStage": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "style_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Id"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/PanelBaseStageTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "description",
+          "aspect_ratio",
+          "style_id",
+          "content_url",
+          "targets",
+          "archived_at"
+        ],
+        "title": "PanelBaseStage",
+        "type": "object"
+      },
+      "PanelBaseStageTarget": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "description"
+        ],
+        "title": "PanelBaseStageTarget",
+        "type": "object"
+      },
       "PanelInput": {
         "properties": {
           "aspect_ratio": {
@@ -1079,13 +1219,38 @@
             "title": "Aspect Ratio",
             "type": "string"
           },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
+          },
           "beat_text": {
-            "title": "Beat Text",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beat Text"
           },
           "camera": {
-            "title": "Camera",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera"
           },
           "cast": {
             "items": {
@@ -1095,8 +1260,15 @@
             "type": "array"
           },
           "framing": {
-            "title": "Framing",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framing"
           },
           "image_size": {
             "title": "Image Size",
@@ -1107,21 +1279,30 @@
             "type": "string"
           },
           "mood": {
-            "default": "",
-            "title": "Mood",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mood"
           },
           "style_id": {
-            "title": "Style Id",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Id"
           }
         },
         "required": [
-          "beat_text",
-          "camera",
-          "framing",
           "cast",
-          "style_id",
           "model",
           "image_size"
         ],
@@ -1149,6 +1330,17 @@
             },
             "title": "Attachments",
             "type": "array"
+          },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
           },
           "blocked_reason": {
             "anyOf": [
@@ -1192,6 +1384,17 @@
           "scene_id": {
             "title": "Scene Id",
             "type": "integer"
+          },
+          "source_content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Content Url"
           },
           "spent_today_cents": {
             "title": "Spent Today Cents",

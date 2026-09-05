@@ -55,6 +55,8 @@ const LOCKED_PANEL: Panel = {
   is_editable: false,
   generation_count: 1,
   latest_attempt_preview_url: '/api/v1/candidates/900/content',
+  base_stage_id: null,
+  base_stage: null,
 }
 
 const BLOCKED_PREVIEW: PanelPreview = {
@@ -381,7 +383,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
     renderPreview()
 
-    await screen.findByRole('heading', { name: 'Exact prompt sent to Gemini' })
+    await screen.findByRole('heading', { name: 'Exact generation prompt' })
     const prompt = document.querySelector('.prompt-preview')
     const button = screen.getByRole('button', { name: /Generate one candidate/ })
     if (!(prompt instanceof HTMLElement)) throw new Error('prompt preview was not rendered')
@@ -431,6 +433,65 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(
       note.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+  })
+
+  it('shows the Base Stage source, ordered mapping, reference numbering, and expanded privacy disclosure', async () => {
+    const stagedPanel: Panel = {
+      ...LOCKED_PANEL,
+      base_stage_id: 4,
+      cast: [
+        {
+          character_id: 1,
+          name: 'Elias',
+          avatar_url: null,
+          avatar_initials: 'EL',
+          role: '',
+          prominence: 2,
+          base_stage_target_id: 41,
+        },
+      ],
+      base_stage: {
+        id: 4,
+        description: 'Moonlit station platform',
+        content_url: '/api/v1/base-stages/4/content',
+        aspect_ratio: '3:2',
+        state: 'ready',
+        style_id: null,
+        archived_at: null,
+        targets: [{ id: 41, position: 1, description: 'traveler beside the train' }],
+      },
+    }
+    vi.mocked(client.getPanel).mockResolvedValue(stagedPanel)
+    vi.mocked(client.previewPanel).mockResolvedValue({
+      ...READY_PREVIEW,
+      base_stage_id: 4,
+      source_content_url: '/api/v1/base-stages/4/content',
+      attachments: [{
+        character_id: 1,
+        character_name: 'Elias',
+        image_number: 2,
+        ref_set_id: 8,
+        ref_set_version: 3,
+        role: 'face_front',
+      }],
+    })
+
+    renderPreview()
+
+    const sourceHeading = await screen.findByRole('heading', { name: 'Base Stage source' })
+    expect(screen.getByRole('img', { name: /Base Stage source: Moonlit station platform/ })).toHaveAttribute(
+      'src',
+      '/api/v1/base-stages/4/content',
+    )
+    expect(screen.getByText('Image 1 is the source composition')).toBeInTheDocument()
+    expect(screen.getByText('Character canonical references begin at Image 2.')).toBeInTheDocument()
+    expect(screen.getByText('traveler beside the train').closest('li')).toHaveTextContent('Elias')
+    expect(screen.getByText(/Image 2: Elias/)).toBeInTheDocument()
+    const allocation = screen.getByRole('heading', { name: 'Reference-slot allocation' })
+    expect(sourceHeading.compareDocumentPosition(allocation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText(/Base Stage image and character canonical references are uploaded/i))
+      .toHaveTextContent(/leave your computer/i)
+    expect(screen.getByRole('heading', { name: 'Exact generation prompt' })).toBeInTheDocument()
   })
 
   it('shows preserved failed generation attempts with error details', async () => {
@@ -785,7 +846,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Retry preview' }))
-    expect(await screen.findByRole('heading', { name: 'Exact prompt sent to Gemini' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Exact generation prompt' })).toBeInTheDocument()
   })
 
   it('shows panel and preview when the initial history request fails with a section retry', async () => {
@@ -794,7 +855,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     renderPreview()
 
     expect(await screen.findByText('Mara backs toward the door.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Exact prompt sent to Gemini' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Exact generation prompt' })).toBeInTheDocument()
     expect(screen.getByText(/Could not load generation history: Error: history offline/)).toHaveAttribute(
       'role',
       'alert',

@@ -34,6 +34,7 @@ class FakeProvider:
         self.requests = []
         self.error = None
         self.billed_cost_cents = None
+        self.edits = []
 
     def generate(self, request):
         self.requests.append(request)
@@ -43,6 +44,17 @@ class FakeProvider:
             make_png_bytes((30, 60, 90)),
             "api-interaction",
             {"fake": True},
+            self.billed_cost_cents,
+        )
+
+    def edit(self, request):
+        self.edits.append(request)
+        if self.error:
+            raise self.error
+        return ProviderResult(
+            make_png_bytes((30, 60, 90)),
+            "api-stage-interaction",
+            {"fake": True, "edited": True},
             self.billed_cost_cents,
         )
 
@@ -868,6 +880,114 @@ def test_panel_preview_is_no_spend_and_reports_allocation(api):
     # Preview never spends: no generation rows created.
     budget = api.client.get("/api/v1/budget").json()
     assert budget["spent_today_cents"] == 0
+
+
+def test_staged_panel_crud_preview_generate_duplicate_and_no_source_hash(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    stage_response = _upload_base_stage(
+        api,
+        description="A traveler stands under a stone arch.",
+        targets=["traveler beneath arch"],
+    )
+    stage = stage_response.json()
+    payload = {
+        "base_stage_id": stage["id"],
+        "cast": [
+            {
+                "character_id": character["id"],
+                "base_stage_target_id": stage["targets"][0]["id"],
+                "role": "this must be discarded",
+            }
+        ],
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+    }
+
+    created = api.client.post("/api/v1/panels", json=payload)
+    assert created.status_code == 201, created.text
+    panel = created.json()
+    assert panel["base_stage_id"] == stage["id"]
+    assert panel["base_stage"]["content_url"] == stage["content_url"]
+    assert panel["beat_text"] == stage["description"]
+    assert panel["camera"] == panel["framing"] == panel["mood"] == ""
+    assert panel["aspect_ratio"] == stage["aspect_ratio"]
+    assert panel["style_id"] is None
+    assert panel["cast"][0]["role"] == ""
+    assert "sha" not in json.dumps(panel).lower()
+    assert api.client.get(f"/api/v1/panels/{panel['id']}").json() == panel
+
+    updated = api.client.put(f"/api/v1/panels/{panel['id']}", json=payload)
+    assert updated.status_code == 200
+    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
+    assert preview["base_stage_id"] == stage["id"]
+    assert preview["source_content_url"] == stage["content_url"]
+    assert preview["attachments"][0]["image_number"] == 2
+    assert "content_sha256" not in json.dumps(preview)
+
+    generated = api.client.post(
+        f"/api/v1/panels/{panel['id']}/generate",
+        json={"expected_prompt_hash": preview["prompt_hash"]},
+    )
+    assert generated.status_code == 201, generated.text
+    assert generated.json()["interaction_id"] == "api-stage-interaction"
+    assert api.provider.requests == []
+    assert len(api.provider.edits) == 1
+
+    assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
+    duplicated = api.client.post(f"/api/v1/panels/{panel['id']}/duplicate")
+    assert duplicated.status_code == 201
+    assert duplicated.json()["base_stage_id"] == stage["id"]
+    assert duplicated.json()["cast"][0]["base_stage_target_id"] == stage["targets"][0]["id"]
+
+
+def test_staged_panel_validation_and_blocked_preview_include_source_fields(api):
+    first = _create_character(api, "Elias", "elias")
+    second = _create_character(api, "Mara", "mara")
+    stage = _upload_base_stage(
+        api, targets=["left figure", "right figure"]
+    ).json()
+    base = {
+        "base_stage_id": stage["id"],
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+    }
+    duplicate_target = api.client.post(
+        "/api/v1/panels",
+        json={
+            **base,
+            "cast": [
+                {"character_id": first["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+                {"character_id": second["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+            ],
+        },
+    )
+    assert duplicate_target.status_code == 422
+    assert "mapped only once" in duplicate_target.text
+
+    valid = api.client.post(
+        "/api/v1/panels",
+        json={
+            **base,
+            "cast": [
+                {"character_id": first["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+                {"character_id": second["id"], "base_stage_target_id": stage["targets"][1]["id"]},
+            ],
+        },
+    ).json()
+    blocked = api.client.get(f"/api/v1/panels/{valid['id']}/preview").json()
+    assert blocked["can_generate"] is False
+    assert blocked["base_stage_id"] == stage["id"]
+    assert blocked["source_content_url"] == stage["content_url"]
+    assert "no canonical reference set" in blocked["blocked_reason"]
+
+    assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
+    newly_selected = api.client.post("/api/v1/panels", json={**base, "cast": [
+        {"character_id": first["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+        {"character_id": second["id"], "base_stage_target_id": stage["targets"][1]["id"]},
+    ]})
+    assert newly_selected.status_code == 422
+    assert "archived" in newly_selected.text
 
 
 def test_panel_generate_rejects_prompt_changed_after_preview(api):

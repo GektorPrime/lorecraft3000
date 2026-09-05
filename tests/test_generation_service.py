@@ -6,6 +6,8 @@ import pytest
 
 from app.config import Settings
 from app.providers.base import ProviderResult
+from app.providers.base import ProviderEditRequest
+from app.services.base_stages import BaseStageService
 from app.services.characters import CharacterService
 from app.services.generation import GenerationError, GenerationService, PreviewChangedError
 from tests.conftest import FakeEmbedder
@@ -99,6 +101,32 @@ def _scene(conn, cast):
     return int(cursor.lastrowid)
 
 
+def _staged_scene(conn, storage, tmp_path, character_id):
+    stage = BaseStageService(conn, storage).upload(
+        make_png_bytes((4, 5, 6)), "A figure stands at the gate.", ["figure at gate"]
+    )
+    from app.services.scenes import SceneService
+
+    scene = SceneService(conn, _settings(tmp_path)).create(
+        beat_text=None,
+        camera=None,
+        framing=None,
+        mood=None,
+        aspect_ratio="1:1",
+        cast=[
+            {
+                "character_id": character_id,
+                "base_stage_target_id": stage.targets[0].id,
+            }
+        ],
+        style_id=None,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        base_stage_id=stage.id,
+    )
+    return stage, scene
+
+
 def test_two_character_fake_generation_captures_complete_provenance(
     conn, storage, tmp_path
 ):
@@ -152,6 +180,79 @@ def test_two_character_fake_generation_captures_complete_provenance(
     assert provenance["created_at"]
     assert len(provenance["input_images"]) == 2
     assert "SECRET" not in json.dumps(provenance)
+
+
+def test_staged_preview_and_generation_use_edit_with_source_aware_provenance(
+    conn, storage, tmp_path, monkeypatch
+):
+    character, _, ref_image = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    stage, scene = _staged_scene(conn, storage, tmp_path, character.id)
+    scoring_calls = []
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
+    monkeypatch.setattr("app.services.generation.load_gallery", lambda _conn: {})
+    monkeypatch.setattr(
+        "app.services.generation.score_generated_image",
+        lambda embedder, gallery, data, cast_ids: scoring_calls.append(cast_ids),
+    )
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+
+    preview = service.preview(scene.id)
+    assert isinstance(preview.provider_request, ProviderEditRequest)
+    assert preview.provider_request.source_image == make_png_bytes((4, 5, 6))
+    assert preview.provider_request.source_interaction_id is None
+    assert [ref.image_number for ref in preview.provider_request.references] == [2]
+    assert preview.request_capture["operation"] == "base_stage_panel_generate"
+    assert preview.request_capture["base_stage"]["id"] == stage.id
+    assert preview.request_capture["base_stage"]["content_sha256"]
+    assert [item["image_number"] for item in preview.request_capture["input_images"]] == [1, 2]
+    assert preview.request_capture["input_images"][1]["sha256"] == ref_image.sha256
+
+    outcome = service.generate(scene.id, expected_prompt_hash=preview.prompt_hash)
+    assert provider.requests == []
+    assert len(provider.edits) == 1
+    assert scoring_calls == [(character.id,)]
+    provenance = conn.execute(
+        "SELECT input_images FROM image_provenance WHERE generation_id = ?",
+        (outcome.generation_id,),
+    ).fetchone()
+    inputs = json.loads(provenance["input_images"])
+    assert [item["image_number"] for item in inputs] == [1, 2]
+    assert inputs[0]["base_stage_id"] == stage.id
+
+
+def test_staged_prompt_drift_failure_and_idempotency_use_edit_path(
+    conn, storage, tmp_path
+):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    stage, scene = _staged_scene(conn, storage, tmp_path, character.id)
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+    reviewed = service.preview(scene.id)
+    conn.execute(
+        "UPDATE base_stage SET description = 'Changed source description' WHERE id = ?",
+        (stage.id,),
+    )
+    conn.commit()
+    with pytest.raises(PreviewChangedError):
+        service.generate(scene.id, expected_prompt_hash=reviewed.prompt_hash)
+    assert provider.edits == []
+
+    first = service.generate(scene.id, idempotency_key="staged-1")
+    replay = service.generate(scene.id, idempotency_key="staged-1")
+    assert replay.replayed is True
+    assert replay.generation_id == first.generation_id
+    assert len(provider.edits) == 1
+
+    failing = FakeProvider(error=RuntimeError("edit failed"))
+    with pytest.raises(GenerationError, match="edit failed"):
+        GenerationService(conn, storage, _settings(tmp_path), failing).generate(scene.id)
+    assert failing.requests == []
+    assert len(failing.edits) == 1
 
 
 def test_generation_resolves_provider_from_selected_model(conn, storage, tmp_path):

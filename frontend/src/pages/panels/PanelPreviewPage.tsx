@@ -393,6 +393,42 @@ function PanelPreview({ panelId }: { panelId: number }) {
       {!preview && !previewError && <AsyncMessage kind="loading">Loading generation preview…</AsyncMessage>}
       {preview?.can_generate ? (
         <>
+          {panel.base_stage && (
+            <section className="panel-preview__base-stage" aria-labelledby="base-stage-source-heading">
+              <SectionHeader title="Base Stage source" className="panel-preview__section-header" />
+              <div className="panel-preview__source">
+                <ImageDialog
+                  src={preview.source_content_url ?? panel.base_stage.content_url}
+                  thumbnailAlt={`Base Stage source: ${panel.base_stage.description}`}
+                  previewAlt={`Base Stage source: ${panel.base_stage.description}, full-size preview`}
+                  triggerLabel="Preview Base Stage source image"
+                  dialogLabel="Base Stage source image preview"
+                />
+                <div>
+                  <h3 id="base-stage-source-heading">Image 1 is the source composition</h3>
+                  <p>{panel.base_stage.description}</p>
+                  <p className="field__hint">
+                    Character canonical references begin at Image 2.
+                  </p>
+                </div>
+              </div>
+              <h3>Target-to-character mapping</h3>
+              <ol className="panel-preview__mapping">
+                {[...panel.base_stage.targets]
+                  .sort((a, b) => a.position - b.position)
+                  .map((target) => {
+                    const member = panel.cast.find((item) => item.base_stage_target_id === target.id)
+                    return (
+                      <li key={target.id}>
+                        <strong>{target.description}</strong>
+                        <span>{member?.name ?? 'Unassigned'}</span>
+                        {member && <span className="field__hint">Prominence {member.prominence}</span>}
+                      </li>
+                    )
+                  })}
+              </ol>
+            </section>
+          )}
           <SectionHeader title="Reference-slot allocation" className="panel-preview__section-header" />
           <ul>
             {preview.attachments.map((a) => (
@@ -403,7 +439,9 @@ function PanelPreview({ panelId }: { panelId: number }) {
           </ul>
           <Notice tone="privacy" className="privacy-note">
             <p>
-              These reference images are uploaded to{' '}
+              {panel.base_stage
+                ? 'The Base Stage image and character canonical references are uploaded to '
+                : 'These reference images are uploaded to '}
               {panel.model.startsWith('gpt-') ? "OpenAI's API" : "Google's Gemini API"},
               together with the prompt below, to generate this panel. They leave
               your computer.
@@ -419,7 +457,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
           )}
 
           <SectionHeader
-            title="Exact prompt sent to Gemini"
+            title="Exact generation prompt"
             actions={<CopyButton value={preview.prompt} label="Copy prompt" />}
           />
           <pre className="prompt-preview">{preview.prompt}</pre>

@@ -143,6 +143,7 @@ class CastMemberInput(BaseModel):
     character_id: int
     role: str = ""
     prominence: int = Field(default=1, ge=1)
+    base_stage_target_id: int | None = None
 
 
 class CastMember(BaseModel):
@@ -152,18 +153,37 @@ class CastMember(BaseModel):
     name: str
     avatar_url: str | None
     avatar_initials: str
+    base_stage_target_id: int | None = None
+
+
+class PanelBaseStageTarget(BaseModel):
+    id: int
+    position: int
+    description: str
+
+
+class PanelBaseStage(BaseModel):
+    id: int
+    state: str
+    description: str
+    aspect_ratio: str
+    style_id: int | None
+    content_url: str
+    targets: list[PanelBaseStageTarget]
+    archived_at: str | None
 
 
 class PanelInput(BaseModel):
-    beat_text: str
-    camera: str
-    framing: str
-    mood: str = ""
+    beat_text: str | None = None
+    camera: str | None = None
+    framing: str | None = None
+    mood: str | None = None
     aspect_ratio: str = "3:2"
     cast: list[CastMemberInput]
-    style_id: int
+    style_id: int | None = None
     model: str
     image_size: str
+    base_stage_id: int | None = None
 
 
 class PanelModelInput(BaseModel):
@@ -178,7 +198,9 @@ class Panel(BaseModel):
     mood: str
     aspect_ratio: str
     cast: list[CastMember]
-    style_id: int
+    style_id: int | None
+    base_stage_id: int | None
+    base_stage: PanelBaseStage | None
     model: str
     image_size: str
     created_at: str
@@ -214,6 +236,8 @@ class PanelPreview(BaseModel):
     remaining_after_cents: int
     can_generate: bool
     blocked_reason: str | None = None
+    base_stage_id: int | None = None
+    source_content_url: str | None = None
 
 
 class GenerationCreate(BaseModel):
