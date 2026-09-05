@@ -19,6 +19,7 @@ from app.routes.api_v1._common import (
     _base_stage_out,
     _candidate_out,
     _generation_out,
+    _panel_summary_out,
     _raise_for,
     _serve_stored_image,
 )
@@ -30,6 +31,7 @@ from app.schemas import (
     Generation,
     GenerationCreate,
     GenerationSummary,
+    PanelSummary,
 )
 from app.services.base_stages import (
     BaseStageError,
@@ -38,6 +40,7 @@ from app.services.base_stages import (
 )
 from app.services.costs import CostError, CostLedger
 from app.services.generation import GenerationError, GenerationService
+from app.services.scenes import SceneService
 from app.storage import ImageStorageError
 
 router = APIRouter(prefix="/api/v1/base-stages", tags=["api-v1-base-stages"])
@@ -305,6 +308,19 @@ def generate_base_stage(
         _raise_for(exc)
     row, candidates = service.get_with_candidates(outcome.generation_id)
     return _generation_out(row, candidates)
+
+
+@router.get("/{base_stage_id}/panels", response_model=list[PanelSummary])
+def list_base_stage_panels(
+    base_stage_id: int, conn=Depends(get_conn), storage=Depends(get_storage)
+):
+    """Panels whose composition is anchored on this Base Stage."""
+    try:
+        BaseStageService(conn, storage, settings).get(base_stage_id)
+    except BaseStageError as exc:
+        _raise_for(exc)
+    scenes = SceneService(conn, settings).list_for_base_stage(base_stage_id)
+    return [_panel_summary_out(conn, scene) for scene in scenes]
 
 
 @router.post("/{base_stage_id}/publish", response_model=BaseStage)

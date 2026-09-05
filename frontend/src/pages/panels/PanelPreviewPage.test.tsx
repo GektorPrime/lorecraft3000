@@ -485,6 +485,10 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     )
     expect(screen.getByText('Image 1 is the source composition')).toBeInTheDocument()
     expect(screen.getByText('Character canonical references begin at Image 2.')).toBeInTheDocument()
+expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute(
+  'href',
+  '/base-stages/4/preview',
+)
     expect(screen.getByText('traveler beside the train').closest('li')).toHaveTextContent('Elias')
     expect(screen.getByText(/Image 2: Elias/)).toBeInTheDocument()
     const allocation = screen.getByRole('heading', { name: 'Reference-slot allocation' })
@@ -592,6 +596,45 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(await screen.findAllByText('Accepted')).toHaveLength(2)
     expect(screen.queryByText('Waiting')).not.toBeInTheDocument()
     expect(screen.queryByText('Candidate accepted.')).not.toBeInTheDocument()
+  })
+
+  it('accepts and rejects the shown candidate from the carousel controls', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...LOCKED_PANEL,
+      is_editable: true,
+      generation_count: 1,
+    })
+    vi.mocked(client.listPanelGenerations)
+      .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
+      .mockResolvedValue([
+        {
+          ...SUCCEEDED_ATTEMPT,
+          candidates: [{ ...CANDIDATE, review_status: 'accepted' }],
+        },
+      ])
+    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.reviewCandidate).mockResolvedValue({
+      ...CANDIDATE,
+      review_status: 'accepted',
+    })
+
+    renderPreview()
+
+    const carousel = await screen.findByLabelText('Generated candidate across attempts')
+    expect(
+      within(carousel).getAllByRole('button').map((button) => button.textContent?.trim()).filter(Boolean),
+    ).toEqual(['Previous', 'Next', 'Accept', 'Reject'])
+
+    await user.click(within(carousel).getByRole('button', { name: 'Accept' }))
+    expect(client.reviewCandidate).toHaveBeenCalledWith(900, 'accepted')
+    expect(await within(carousel).findByText('Accepted')).toBeInTheDocument()
+
+    // The attempt-row review controls stay available alongside the carousel's.
+    const attemptActions = document.querySelector('.attempt-row__candidate-actions')
+    expect(attemptActions).not.toBeNull()
+    expect(within(attemptActions as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim()))
+      .toEqual(['Accept', 'Reject', 'Edit this image'])
   })
 
   it('uses the newest attempt with an image in the carousel', async () => {

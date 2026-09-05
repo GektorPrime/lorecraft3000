@@ -42,6 +42,13 @@ class SceneService:
         rows = self.conn.execute("SELECT * FROM scene ORDER BY id DESC").fetchall()
         return [Scene.from_row(row) for row in rows]
 
+    def list_for_base_stage(self, base_stage_id: int) -> list[Scene]:
+        rows = self.conn.execute(
+            "SELECT * FROM scene WHERE base_stage_id = ? ORDER BY id DESC",
+            (base_stage_id,),
+        ).fetchall()
+        return [Scene.from_row(row) for row in rows]
+
     def get(self, scene_id: int) -> Scene:
         row = self.conn.execute("SELECT * FROM scene WHERE id = ?", (scene_id,)).fetchone()
         if row is None:

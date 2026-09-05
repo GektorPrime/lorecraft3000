@@ -287,6 +287,25 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
     )
 
 
+def _panel_summary_out(conn, scene) -> "PanelSummary":
+    from app.schemas import PanelSummary
+
+    scenes = SceneService(conn, settings)
+    latest_candidate_id = scenes.latest_attempt_candidate_id(scene.id)
+    return PanelSummary(
+        id=scene.id,
+        beat_text=scene.beat_text,
+        created_at=scene.created_at,
+        is_editable=scenes.is_editable(scene.id),
+        generation_count=scenes.generation_count(scene.id),
+        latest_attempt_preview_url=(
+            f"/api/v1/candidates/{latest_candidate_id}/content"
+            if latest_candidate_id is not None
+            else None
+        ),
+    )
+
+
 def _attachment_out(attachment: dict) -> "GenerationAttachment":
     from app.schemas import GenerationAttachment
 

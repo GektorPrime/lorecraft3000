@@ -116,7 +116,17 @@ export function PanelListPage() {
                   <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
                     {panel.is_editable ? 'Editable' : 'Locked'}
                   </span>
-                  {panel.base_stage_id !== null && <span className="badge badge--draft">Base Stage</span>}
+                  {panel.base_stage_id !== null && (
+                    <Link
+                      className="badge badge--draft panel-list-card__stage-link"
+                      to={`/base-stages/${panel.base_stage?.id ?? panel.base_stage_id}/preview`}
+                      title={`Open Base Stage #${panel.base_stage?.id ?? panel.base_stage_id}`}
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      Base Stage
+                    </Link>
+                  )}
                   <span>Cast: {panel.cast.map((m) => m.name).join(', ') || 'none'}</span>
                   <span>
                     {panel.generation_count} generation attempt

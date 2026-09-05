@@ -23,6 +23,7 @@ import type {
   Panel,
   PanelInput,
   PanelPreview,
+  PanelSummary,
   RefImage,
   RefSet,
   RefSetSummary,
@@ -141,6 +142,8 @@ export const previewBaseStage = (id: number) =>
   request<BaseStagePreview>(`/base-stages/${id}/preview`)
 export const listBaseStageGenerations = (id: number) =>
   request<GenerationSummary[]>(`/base-stages/${id}/generations`)
+export const listBaseStagePanels = (id: number) =>
+  request<PanelSummary[]>(`/base-stages/${id}/panels`)
 export const generateBaseStage = (id: number, expectedPromptHash: string) => {
   const controller = new AbortController()
   const t = window.setTimeout(

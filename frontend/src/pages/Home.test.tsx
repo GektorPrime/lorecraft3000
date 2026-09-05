@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Character, GalleryItem, Panel, Style } from '../api/types'
+import type { BaseStage, Character, GalleryItem, Panel, Style } from '../api/types'
 import App from '../App'
 
 const originalFetch = globalThis.fetch
@@ -97,11 +97,39 @@ const STYLES: Style[] = [
   },
 ]
 
+const BASE_STAGES: BaseStage[] = [
+  {
+    id: 41,
+    description: 'Rain-slicked station platform at night.',
+    state: 'draft',
+    content_url: null,
+    is_editable: true,
+    generation_count: 0,
+    usage_count: 0,
+    archived_at: null,
+    targets: [],
+    created_at: '2026-01-01T00:00:00Z',
+    aspect_ratio: '16:9',
+    beat_text: null,
+    camera: null,
+    dimensions: null,
+    framing: null,
+    image_size: null,
+    model: null,
+    mood: null,
+    origin: 'uploaded',
+    revision: 1,
+    selected_candidate_id: null,
+    style_id: null,
+  },
+]
+
 describe('Dashboard', () => {
   let panels: Panel[]
   let gallery: GalleryItem[]
   let characters: Character[]
   let styles: Style[]
+  let baseStages: BaseStage[]
   let galleryFails: boolean
 
   beforeEach(() => {
@@ -110,6 +138,7 @@ describe('Dashboard', () => {
     gallery = [galleryItem(3), galleryItem(2), galleryItem(1)]
     characters = CHARACTERS
     styles = STYLES
+    baseStages = BASE_STAGES
     galleryFails = false
 
     globalThis.fetch = vi.fn().mockImplementation((input: RequestInfo | URL) => {
@@ -125,6 +154,7 @@ describe('Dashboard', () => {
       }
       if (url.endsWith('/characters')) return Promise.resolve(jsonResponse(characters))
       if (url.endsWith('/styles')) return Promise.resolve(jsonResponse(styles))
+      if (url.endsWith('/base-stages')) return Promise.resolve(jsonResponse(baseStages))
       throw new Error(`Unexpected request: ${url}`)
     })
   })
@@ -162,6 +192,7 @@ describe('Dashboard', () => {
     const library = screen.getByRole('region', { name: 'Library' })
     expect(await within(library).findByRole('link', { name: '2 Characters' })).toBeInTheDocument()
     expect(within(library).getByRole('link', { name: '1 Styles' })).toBeInTheDocument()
+    expect(within(library).getByRole('link', { name: '1 Base Stages' })).toBeInTheDocument()
 
     const work = screen.getByRole('region', { name: 'Continue working' })
     expect(await within(work).findByText('Beat for panel 3')).toBeInTheDocument()
@@ -217,5 +248,6 @@ describe('Dashboard', () => {
     const library = screen.getByRole('region', { name: 'Library' })
     expect(await within(library).findByRole('link', { name: '2 Characters' })).toBeInTheDocument()
     expect(within(library).getByRole('link', { name: '1 Styles' })).toBeInTheDocument()
+    expect(within(library).getByRole('link', { name: '1 Base Stages' })).toBeInTheDocument()
   })
 })

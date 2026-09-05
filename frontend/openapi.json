@@ -1621,6 +1621,52 @@
         "title": "PanelPreview",
         "type": "object"
       },
+      "PanelSummary": {
+        "description": "Lightweight panel reference used where a full panel payload is overkill,\ne.g. \"which panels use this Base Stage\".",
+        "properties": {
+          "beat_text": {
+            "title": "Beat Text",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "generation_count": {
+            "title": "Generation Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_editable": {
+            "title": "Is Editable",
+            "type": "boolean"
+          },
+          "latest_attempt_preview_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Attempt Preview Url"
+          }
+        },
+        "required": [
+          "id",
+          "beat_text",
+          "created_at",
+          "is_editable",
+          "generation_count",
+          "latest_attempt_preview_url"
+        ],
+        "title": "PanelSummary",
+        "type": "object"
+      },
       "RefImage": {
         "properties": {
           "content_url": {
@@ -2342,6 +2388,54 @@
           }
         },
         "summary": "List Base Stage Generations",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/panels": {
+      "get": {
+        "description": "Panels whose composition is anchored on this Base Stage.",
+        "operationId": "list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PanelSummary"
+                  },
+                  "title": "Response List Base Stage Panels Api V1 Base Stages  Base Stage Id  Panels Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Base Stage Panels",
         "tags": [
           "api-v1",
           "api-v1-base-stages"

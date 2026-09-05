@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../../api/client'
-import type { BaseStage, BaseStagePreview, GenerationSummary } from '../../api/types'
+import type { BaseStage, BaseStagePreview, GenerationSummary, PanelSummary } from '../../api/types'
 import { BaseStagePreviewPage } from './BaseStagePreviewPage'
 
 const { refreshBudget } = vi.hoisted(() => ({ refreshBudget: vi.fn() }))
@@ -19,6 +19,7 @@ vi.mock('../../api/client', async () => {
     getBaseStage: vi.fn(),
     previewBaseStage: vi.fn(),
     listBaseStageGenerations: vi.fn(),
+    listBaseStagePanels: vi.fn(),
     generateBaseStage: vi.fn(),
     publishBaseStage: vi.fn(),
     duplicateBaseStage: vi.fn(),
@@ -122,6 +123,7 @@ describe('BaseStagePreviewPage', () => {
     vi.mocked(client.getBaseStage).mockReset().mockResolvedValue(DRAFT)
     vi.mocked(client.previewBaseStage).mockReset().mockResolvedValue(PREVIEW)
     vi.mocked(client.listBaseStageGenerations).mockReset().mockResolvedValue([SUCCEEDED_ATTEMPT])
+    vi.mocked(client.listBaseStagePanels).mockReset().mockResolvedValue([])
     vi.mocked(client.generateBaseStage).mockReset().mockResolvedValue({} as never)
     vi.mocked(client.publishBaseStage).mockReset().mockResolvedValue(READY_STAGE)
     vi.mocked(client.duplicateBaseStage).mockReset().mockResolvedValue({ ...DRAFT, id: 6 })
@@ -185,6 +187,30 @@ describe('BaseStagePreviewPage', () => {
     expect(await screen.findByText('Base stage #5 — Ready')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Publish as base stage image/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Generate candidate/ })).not.toBeInTheDocument()
+  })
+
+  it('links to the panels that are anchored on a ready stage', async () => {
+    const panels: PanelSummary[] = [
+      {
+        id: 88,
+        beat_text: 'Mara steps onto the platform.',
+        created_at: '2026-01-01T00:00:00Z',
+        is_editable: true,
+        generation_count: 2,
+        latest_attempt_preview_url: null,
+      },
+    ]
+    vi.mocked(client.getBaseStage).mockResolvedValue(READY_STAGE)
+    vi.mocked(client.listBaseStagePanels).mockResolvedValue(panels)
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Used by 1 panel' })).toBeInTheDocument()
+expect(screen.getByRole('link', { name: 'Panel #88' })).toHaveAttribute(
+  'href',
+  '/panels/88/preview',
+)
+    expect(screen.getByText(/2 attempts/)).toBeInTheDocument()
+    expect(client.listBaseStagePanels).toHaveBeenCalledWith(5)
   })
 
   it('returns 404 to the NotFound page for a missing base stage', async () => {

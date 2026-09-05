@@ -1403,3 +1403,43 @@ def test_panel_delete_missing_is_404(api):
 def test_character_and_style_restore_missing_is_404(api):
     assert api.client.post("/api/v1/characters/9999/restore").status_code == 404
     assert api.client.post("/api/v1/styles/9999/restore").status_code == 404
+
+
+def test_base_stage_panels_endpoint_lists_only_staged_panels(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    stage = _upload_base_stage(
+        api, description="Under an arch.", targets=["traveler beneath arch"]
+    ).json()
+
+    _create_panel(api, [character["id"]])  # unrelated direct panel
+
+    staged = api.client.post(
+        "/api/v1/panels",
+        json={
+            "base_stage_id": stage["id"],
+            "cast": [
+                {
+                    "character_id": character["id"],
+                    "base_stage_target_id": stage["targets"][0]["id"],
+                    "role": "",
+                }
+            ],
+            "model": "gemini-3.1-flash-image",
+            "image_size": "1K",
+        },
+    )
+    assert staged.status_code == 201, staged.text
+    panel = staged.json()
+
+    listed = api.client.get(f"/api/v1/base-stages/{stage['id']}/panels")
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()
+    assert [row["id"] for row in rows] == [panel["id"]]
+    assert rows[0]["beat_text"] == stage["description"]
+    assert rows[0]["is_editable"] is True
+    assert rows[0]["generation_count"] == 0
+    assert rows[0]["latest_attempt_preview_url"] is None
+    assert "cast" not in json.dumps(rows)
+
+    assert api.client.get("/api/v1/base-stages/99999/panels").status_code == 404

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useRef, useState } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Character, Panel, Style } from '../api/types'
+import type { BaseStage, Character, Panel, Style } from '../api/types'
 import * as client from '../api/client'
 import { CommandPalette } from './CommandPalette'
 
@@ -14,6 +14,7 @@ vi.mock('../api/client', async () => {
     listCharacters: vi.fn(),
     listStyles: vi.fn(),
     listPanels: vi.fn(),
+    listBaseStages: vi.fn(),
   }
 })
 
@@ -36,6 +37,31 @@ const STYLE: Style = {
   name: 'Ink noir',
   style_contract: 'Heavy blacks and dry brush lines.',
   created_at: '2026-01-01T00:00:00Z',
+}
+
+const STAGE: BaseStage = {
+  id: 9,
+  description: 'Empty rain-slicked platform at night.',
+  state: 'draft',
+  content_url: null,
+  is_editable: true,
+  generation_count: 0,
+  usage_count: 0,
+  archived_at: null,
+  targets: [],
+  created_at: '2026-01-01T00:00:00Z',
+  aspect_ratio: '16:9',
+  beat_text: null,
+  camera: null,
+  dimensions: null,
+  framing: null,
+  image_size: null,
+  model: null,
+  mood: null,
+  origin: 'uploaded',
+  revision: 1,
+  selected_candidate_id: null,
+  style_id: null,
 }
 
 const PANEL: Panel = {
@@ -91,6 +117,7 @@ describe('CommandPalette', () => {
     vi.mocked(client.listCharacters).mockReset().mockResolvedValue([CHARACTER])
     vi.mocked(client.listStyles).mockReset().mockResolvedValue([STYLE])
     vi.mocked(client.listPanels).mockReset().mockResolvedValue([PANEL])
+    vi.mocked(client.listBaseStages).mockReset().mockResolvedValue([STAGE])
   })
 
   it('opens globally on Cmd/Ctrl+K with the search field focused', async () => {
@@ -157,6 +184,38 @@ describe('CommandPalette', () => {
     expect(client.listCharacters).toHaveBeenCalledOnce()
     expect(client.listStyles).toHaveBeenCalledOnce()
     expect(client.listPanels).toHaveBeenCalledOnce()
+    expect(client.listBaseStages).toHaveBeenCalledOnce()
+  })
+
+  it('finds base stages and navigates to the stage preview', async () => {
+    const user = userEvent.setup()
+    renderPalette()
+    await user.click(screen.getByRole('button', { name: 'Commands' }))
+
+    const search = screen.getByRole('combobox', { name: 'Search commands' })
+    await user.type(search, 'rain-slicked')
+    const result = await screen.findByRole('option', { name: /Base Stage #9/ })
+    expect(result).toHaveAttribute('aria-selected', 'true')
+
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByTestId('path')).toHaveTextContent('/base-stages/9/preview')
+  })
+
+  it('offers a standalone command to create a new base stage', async () => {
+    const user = userEvent.setup()
+    renderPalette()
+
+    await user.click(screen.getByRole('button', { name: 'Commands' }))
+    const search = screen.getByRole('combobox', { name: 'Search commands' })
+    await user.type(search, 'base stage')
+    await screen.findByRole('option', { name: /New base stage/ })
+
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByTestId('path')).toHaveTextContent('/base-stages/new')
   })
 
   it('keeps successful collections searchable when one endpoint fails', async () => {

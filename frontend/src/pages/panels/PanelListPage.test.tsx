@@ -140,7 +140,7 @@ describe('PanelListPage — preview via tile click', () => {
     expect(metadata?.firstElementChild).toHaveTextContent('Editable')
   })
 
-  it('marks panels composed from a Base Stage', async () => {
+  it('marks panels composed from a Base Stage with a navigable badge', async () => {
     vi.mocked(client.listPanels).mockResolvedValue([{ ...EDITABLE_PANEL, base_stage_id: 4 }])
     render(
       <MemoryRouter>
@@ -148,7 +148,9 @@ describe('PanelListPage — preview via tile click', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByText('Base Stage')).toHaveClass('badge')
+    const badge = await screen.findByRole('link', { name: 'Base Stage' })
+    expect(badge).toHaveClass('badge')
+    expect(badge).toHaveAttribute('href', '/base-stages/4/preview')
   })
 })
 

@@ -209,6 +209,18 @@ class Panel(BaseModel):
     latest_attempt_preview_url: str | None
 
 
+class PanelSummary(BaseModel):
+    """Lightweight panel reference used where a full panel payload is overkill,
+    e.g. "which panels use this Base Stage"."""
+
+    id: int
+    beat_text: str
+    created_at: str
+    is_editable: bool
+    generation_count: int
+    latest_attempt_preview_url: str | None
+
+
 # ---------------------------------------------------------------------------
 # generation / candidates
 # ---------------------------------------------------------------------------

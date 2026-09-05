@@ -369,6 +369,8 @@ function PanelPreview({ panelId }: { panelId: number }) {
         <CandidateCarousel
           attempts={attempts}
           cast={panel.cast}
+          onReview={handleReview}
+          reviewingCandidateId={reviewingCandidateId}
         />
       )}
       <p className="panel-preview__beat">{panel.beat_text}</p>
@@ -410,6 +412,9 @@ function PanelPreview({ panelId }: { panelId: number }) {
                   <p className="field__hint">
                     Character canonical references begin at Image 2.
                   </p>
+                  <Link to={`/base-stages/${panel.base_stage.id}/preview`} className="field__hint">
+                    Open Base Stage #{panel.base_stage.id}
+                  </Link>
                 </div>
               </div>
               <h3>Target-to-character mapping</h3>

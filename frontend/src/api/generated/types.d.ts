@@ -186,6 +186,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/base-stages/{base_stage_id}/panels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Base Stage Panels
+         * @description Panels whose composition is anchored on this Base Stage.
+         */
+        get: operations["list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/base-stages/{base_stage_id}/preview": {
         parameters: {
             query?: never;
@@ -1347,6 +1367,25 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /**
+         * PanelSummary
+         * @description Lightweight panel reference used where a full panel payload is overkill,
+         *     e.g. "which panels use this Base Stage".
+         */
+        PanelSummary: {
+            /** Beat Text */
+            beat_text: string;
+            /** Created At */
+            created_at: string;
+            /** Generation Count */
+            generation_count: number;
+            /** Id */
+            id: number;
+            /** Is Editable */
+            is_editable: boolean;
+            /** Latest Attempt Preview Url */
+            latest_attempt_preview_url: string | null;
+        };
         /** RefImage */
         RefImage: {
             /** Content Url */
@@ -1782,6 +1821,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenerationSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelSummary"][];
                 };
             };
             /** @description Validation Error */

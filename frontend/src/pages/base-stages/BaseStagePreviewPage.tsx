@@ -6,10 +6,11 @@ import {
   generateBaseStage,
   getBaseStage,
   listBaseStageGenerations,
+  listBaseStagePanels,
   previewBaseStage,
   publishBaseStage,
 } from '../../api/client'
-import type { BaseStage, BaseStagePreview, GenerationSummary } from '../../api/types'
+import type { BaseStage, BaseStagePreview, GenerationSummary, PanelSummary } from '../../api/types'
 import { useBudget } from '../../api/useBudget'
 import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
@@ -50,6 +51,8 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
   const [stage, setStage] = useState<BaseStage | null>(null)
   const [preview, setPreview] = useState<BaseStagePreview | null>(null)
   const [attempts, setAttempts] = useState<GenerationSummary[] | null>(null)
+  const [usagePanels, setUsagePanels] = useState<PanelSummary[] | null>(null)
+  const [usageError, setUsageError] = useState<string | null>(null)
   const [stageError, setStageError] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [attemptsError, setAttemptsError] = useState<string | null>(null)
@@ -127,7 +130,18 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
           setAttemptsError(err instanceof ApiError ? err.message : String(err))
         },
       )
-      await Promise.all([stageRequest, previewRequest, attemptsRequest])
+      const usageRequest = listBaseStagePanels(stageId).then(
+        (panels) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          setUsagePanels(panels)
+          setUsageError(null)
+        },
+        (err: unknown) => {
+          if (!mounted.current || version !== requestVersion.current) return
+          setUsageError(err instanceof ApiError ? err.message : String(err))
+        },
+      )
+      await Promise.all([stageRequest, previewRequest, attemptsRequest, usageRequest])
       if (mounted.current && version === requestVersion.current) await refreshBudget()
     } finally {
       if (reloadInFlight.current === inFlight) reloadInFlight.current = null
@@ -264,6 +278,41 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
                     triggerLabel="Preview base stage image"
                     dialogLabel={`Base stage #${stage.id} full preview`}
                   />
+                </section>
+              )}
+
+              {stage.state === 'ready' && (
+                <section className="panel-preview__base-stage">
+                  <SectionHeader
+                    title={usagePanels
+                      ? `Used by ${usagePanels.length} panel${usagePanels.length === 1 ? '' : 's'}`
+                      : 'Used by panels'}
+                    className="panel-preview__section-header"
+                  />
+                  {usageError && (
+                    <AsyncMessage kind="error" className="field__hint">
+                      Could not load panels using this Base Stage: {usageError}
+                    </AsyncMessage>
+                  )}
+                  {usagePanels && usagePanels.length === 0 && (
+                    <p className="field__hint">No panels are currently anchored on this Base Stage.</p>
+                  )}
+                  {usagePanels && usagePanels.length > 0 && (
+                    <ul className="base-stage-usage">
+                      {usagePanels.map((panel) => (
+                        <li key={panel.id}>
+                          <Link to={`/panels/${panel.id}/preview`}>
+                            Panel #{panel.id}
+                          </Link>
+                          <span className="field__hint">
+                            {panel.beat_text} · {panel.generation_count} attempt
+                            {panel.generation_count === 1 ? '' : 's'}
+                            {panel.latest_attempt_preview_url && ' · has preview'}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               )}
 
