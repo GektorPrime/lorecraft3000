@@ -169,6 +169,11 @@ def test_two_character_fake_generation_captures_complete_provenance(
     capture = json.loads(generation["request_json"])
     assert generation["state"] == "succeeded"
     assert generation["interaction_id"] == "interaction-fake"
+    assert capture["schema_version"] == 2
+    assert capture["operation"] == "direct_panel_generate"
+    assert [item["sha256"] for item in capture["input_images"]] == [
+        elias_image.sha256, mara_image.sha256
+    ]
     assert capture["cast"][0]["ref_set_version"] == elias_set.version
     assert capture["cast"][1]["ref_set_version"] == mara_set.version
     assert [item["character_name"] for item in capture["attachments"]] == [
@@ -178,6 +183,10 @@ def test_two_character_fake_generation_captures_complete_provenance(
 
     _, sidecar = storage.read(outcome.candidate_sha256)
     provenance = sidecar["provenance"][0]
+    assert provenance["schema_version"] == 2
+    assert provenance["operation"] == "direct_panel_generate"
+    assert provenance["input_images"][0]["sha256"] == elias_image.sha256
+    assert provenance["input_images"][1]["sha256"] == mara_image.sha256
     assert provenance["generation_id"] == outcome.generation_id
     assert provenance["prompt_hash"] == outcome.prompt_hash
     assert provenance["interaction_id"] == "interaction-fake"
@@ -196,7 +205,10 @@ def test_staged_preview_and_generation_use_edit_with_source_aware_provenance(
     stage, scene = _staged_scene(conn, storage, tmp_path, character.id)
     scoring_calls = []
     monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
-    monkeypatch.setattr("app.services.generation.load_gallery", lambda _conn: {})
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: {character.id: [("sha-ref", object())]},
+    )
     monkeypatch.setattr(
         "app.services.generation.score_generated_image",
         lambda embedder, gallery, data, cast_ids: scoring_calls.append(cast_ids),
@@ -252,7 +264,10 @@ def test_base_stage_preview_is_identity_neutral_and_uses_the_generate_path(
     stage = _generated_stage(conn, storage, tmp_path)
     scored = []
     monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
-    monkeypatch.setattr("app.services.generation.load_gallery", lambda _conn: {})
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: {},
+    )
     monkeypatch.setattr(
         "app.services.generation.score_generated_image",
         lambda embedder, gallery, data, cast_ids: scored.append(cast_ids),
@@ -721,6 +736,68 @@ def test_edit_creates_child_generation_with_new_candidate(conn, storage, tmp_pat
     assert capture["source_candidate_id"] == first.candidate_id
 
 
+def test_edit_capture_and_provenance_record_source_first(
+    conn, storage, tmp_path, monkeypatch
+):
+    """An edit's capture/provenance are versioned and list source before refs."""
+    provider = FakeProvider()
+    service, first, ref_image = _generate_one(conn, storage, tmp_path, provider)
+    char_id = json.loads(
+        conn.execute(
+            "SELECT request_json FROM generation WHERE id = ?",
+            (first.generation_id,),
+        ).fetchone()[0]
+    )["cast"][0]["character_id"]
+
+    edited = service.edit_candidate(first.candidate_id, "make it night")
+
+    row = conn.execute(
+        "SELECT * FROM generation WHERE id = ?", (edited.generation_id,)
+    ).fetchone()
+    capture = json.loads(row["request_json"])
+    assert capture["schema_version"] == 2
+    assert capture["operation"] == "candidate_edit"
+    inputs = capture["input_images"]
+    assert inputs[0]["kind"] == "candidate_source"
+    assert inputs[0]["sha256"] == first.candidate_sha256
+    assert inputs[0]["source_candidate_id"] == first.candidate_id
+    assert inputs[1]["sha256"] == ref_image.sha256
+    assert inputs[1]["character_id"] == char_id
+
+    provenance = conn.execute(
+        "SELECT input_images FROM image_provenance WHERE generation_id = ?",
+        (edited.generation_id,),
+    ).fetchone()
+    prov_inputs = json.loads(provenance["input_images"])
+    assert prov_inputs[0]["sha256"] == first.candidate_sha256
+    assert prov_inputs[1]["sha256"] == ref_image.sha256
+
+    _, sidecar = storage.read(edited.candidate_sha256)
+    sidecar_provenance = sidecar["provenance"][0]
+    assert sidecar_provenance["schema_version"] == 2
+    assert sidecar_provenance["operation"] == "candidate_edit"
+    assert sidecar_provenance["input_images"][0]["sha256"] == first.candidate_sha256
+
+
+def test_edit_goes_through_shared_identity_scoring(conn, storage, tmp_path, monkeypatch):
+    """Edited candidates are identity-scored through the shared path."""
+    scored = []
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: {1: [("sha-ref", object())]},
+    )
+    monkeypatch.setattr(
+        "app.services.generation.score_generated_image",
+        lambda embedder, gallery, data, cast_ids: (scored.append(cast_ids), None)[1],
+    )
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+
+    service.edit_candidate(first.candidate_id, "make it night")
+    assert scored  # the edit path scored its candidate against captured refs
+
+
 def test_edit_requires_instruction(conn, storage, tmp_path):
     provider = FakeProvider()
     service, first, _ = _generate_one(conn, storage, tmp_path, provider)
@@ -771,7 +848,10 @@ def test_identity_scoring_populates_candidate(conn, storage, tmp_path, monkeypat
     embedder = FakeEmbedder()
     gallery = {1: [("sha", embedder.face)]}
     monkeypatch.setattr("app.services.generation.get_embedder", lambda: embedder)
-    monkeypatch.setattr("app.services.generation.load_gallery", lambda _conn: gallery)
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: gallery,
+    )
 
     provider = FakeProvider()
     service, first, _ = _generate_one(conn, storage, tmp_path, provider)

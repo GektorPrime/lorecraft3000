@@ -349,6 +349,45 @@ def test_backfill_embeds_canonical_face_refs(conn, storage, monkeypatch):
     assert second.refs_embedded == 0
 
 
+def test_backfill_embeds_referenced_retired_refs(conn, storage, tmp_path, monkeypatch):
+    """A ref retired after a generation is still embedded so it can be scored."""
+    from app.services.ref_sets import RefSetService
+
+    character = _canonical_character(conn, storage)
+    old_ref = conn.execute(
+        "SELECT sha256 FROM ref_image WHERE ref_set_id = ("
+        "SELECT id FROM ref_set WHERE character_id = ? ORDER BY id)", (character.id,)
+    ).fetchone()["sha256"]
+    # Capture the old (then-canonical) reference in a real generation.
+    _generated_candidate(conn, storage, tmp_path, character.id)
+    # Promote a newer set: the original reference is retired but now referenced.
+    refs = RefSetService(conn, storage)
+    newer = refs.create_draft(character.id)
+    refs.add_image(
+        newer.id, make_png_bytes((40, 50, 60)), "face_front", source_name="elias2.png"
+    )
+    refs.promote(newer.id)
+    retired = conn.execute(
+        "SELECT ri.sha256 FROM ref_image ri "
+        "JOIN ref_set rs ON rs.id = ri.ref_set_id "
+        "WHERE rs.character_id = ? AND rs.status = 'retired' "
+        "AND ri.role = 'face_front'",
+        (character.id,),
+    ).fetchone()["sha256"]
+    assert retired == old_ref  # the retired set is the one the candidate captured
+
+    monkeypatch.setattr("app.maintenance.get_embedder", lambda: FakeEmbedder())
+    from app.maintenance import run_identity_backfill
+
+    report = run_identity_backfill(conn, storage, scope="refs")
+    # Canonical (new) and captured-retired (old) face refs are both embedded.
+    assert report.refs_embedded == 2
+    assert report.errors == ()
+    assert conn.execute(
+        "SELECT 1 FROM face_embedding WHERE sha256 = ?", (retired,)
+    ).fetchone() is not None
+
+
 def test_backfill_ref_without_face_is_reported_not_fatal(conn, storage, monkeypatch):
     _canonical_character(conn, storage)
     monkeypatch.setattr(
@@ -373,7 +412,7 @@ def test_backfill_scores_unscored_candidates(conn, storage, tmp_path, monkeypatc
     embedder = FakeEmbedder()
     monkeypatch.setattr("app.maintenance.get_embedder", lambda: embedder)
     monkeypatch.setattr(
-        "app.maintenance.load_gallery", lambda _conn: {character.id: [("sha", embedder.face)]}
+        "app.maintenance.load_gallery_for_attachments", lambda _conn, _att: {character.id: [("sha", embedder.face)]}
     )
     from app.maintenance import run_identity_backfill
 
@@ -398,7 +437,7 @@ def test_backfill_candidate_without_face_is_skipped_not_failed(
         "app.maintenance.get_embedder", lambda: FakeEmbedder(faces=[])
     )
     monkeypatch.setattr(
-        "app.maintenance.load_gallery", lambda _conn: {character.id: []}
+        "app.maintenance.load_gallery_for_attachments", lambda _conn, _att: {character.id: []}
     )
     from app.maintenance import run_identity_backfill
 
@@ -418,7 +457,7 @@ def test_backfill_force_rescores_unscored_background_and_leaves_new_fields(
     embedder = FakeEmbedder()
     monkeypatch.setattr("app.maintenance.get_embedder", lambda: embedder)
     monkeypatch.setattr(
-        "app.maintenance.load_gallery", lambda _conn: {character.id: [("sha", embedder.face)]}
+        "app.maintenance.load_gallery_for_attachments", lambda _conn, _att: {character.id: [("sha", embedder.face)]}
     )
     from app.maintenance import run_identity_backfill
 

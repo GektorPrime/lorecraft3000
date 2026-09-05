@@ -27,7 +27,7 @@ from app.services.characters import CharacterError, CharacterService
 from app.services.costs import CostLedger
 from app.services.identity import (
     get_embedder,
-    load_gallery,
+    load_gallery_for_attachments,
     score_generated_image,
 )
 from app.services.ref_sets import RefSetError, RefSetService
@@ -60,6 +60,14 @@ class GenerationOutcome:
 
 class EditError(GenerationError):
     """Raised when a candidate edit cannot proceed."""
+
+
+# Version of the request/provenance capture format. Every generate/edit path
+# stamps this so historical captures can be interpreted reliably — readers use
+# ``schema_version`` to know whether an ``operation``/``input_images`` key is
+# guaranteed to be present, and existing records stay readable via the
+# fallbacks (``.get("input_images", attachments)``).
+SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -277,7 +285,8 @@ class GenerationService:
                 labels={"scene": str(scene_id)},
             )
         request_capture = {
-            "schema_version": 1,
+            "schema_version": SCHEMA_VERSION,
+            "operation": "direct_panel_generate",
             "model": selected_model,
             "image_size": selected_size,
             "aspect_ratio": scene_row["aspect_ratio"],
@@ -300,6 +309,7 @@ class GenerationService:
                 for member in cast
             ],
             "attachments": attachment_capture,
+            "input_images": list(attachment_capture),
             "warnings": list(assembled.warnings),
             "labels": {"scene": str(scene_id)},
             "store": False,
@@ -435,7 +445,8 @@ class GenerationService:
                 result.image_bytes, source_name=f"generation-{generation_id}.png"
             )
             provenance = {
-                "schema_version": 1,
+                "schema_version": SCHEMA_VERSION,
+                "operation": preview.request_capture.get("operation", "direct_panel_generate"),
                 "generation_id": generation_id,
                 "scene_id": scene_id,
                 "base_stage_id": preview.base_stage_id,
@@ -484,29 +495,25 @@ class GenerationService:
                 pass
             # Identity scoring is advisory and equally non-fatal: a face-check
             # failure (or missing insightface) must never fail a paid
-            # generation. The cast ids come from the same request_capture that
-            # was assembled and reviewed for this generation.
+            # generation. The cast ids and reference attachments come from the
+            # same request_capture that was assembled and reviewed for this
+            # generation. Scoring resolves the reference embeddings captured in
+            # ``input_images`` rather than the currently-canonical sets, so a
+            # generation is compared against the faces it was truly made from.
             try:
-                embedder = get_embedder()
-                if embedder is not None:
-                    cast_ids = tuple(
+                self._score_candidate(
+                    candidate_id,
+                    stored.sha256,
+                    cast_ids=tuple(
                         int(entry["character_id"])
                         for entry in preview.request_capture.get("cast", [])
                         if isinstance(entry, dict)
                         and isinstance(entry.get("character_id"), int)
-                    )
-                    if cast_ids:
-                        data, _ = self.storage.read(stored.sha256)
-                        payload = score_generated_image(
-                            embedder, load_gallery(self.conn), data, cast_ids
-                        )
-                        if payload is not None:
-                            with self.conn:
-                                self.conn.execute(
-                                    "UPDATE candidate SET identity_scores = ? "
-                                    "WHERE id = ?",
-                                    (json.dumps(payload, sort_keys=True), candidate_id),
-                                )
+                    ),
+                    attachments=preview.request_capture.get(
+                        "input_images", preview.attachments
+                    ),
+                )
             except Exception:
                 pass
         except Exception as exc:
@@ -591,7 +598,7 @@ class GenerationService:
             labels={"base_stage": str(stage.id)},
         )
         request_capture = {
-            "schema_version": 1,
+            "schema_version": SCHEMA_VERSION,
             "operation": "base_stage_generate",
             "kind": "base_stage_generate",
             "model": stage.model,
@@ -778,8 +785,19 @@ class GenerationService:
             source_interaction_id=source["interaction_id"],
         )
 
+        source_capture = {
+            "image_number": 1,
+            "kind": "candidate_source",
+            "candidate_id": candidate_id,
+            "source_candidate_id": candidate_id,
+            "generation_id": source["generation_id"],
+            "sha256": source["sha256"],
+            "mime_type": source_mime,
+        }
+
         request_capture = {
-            "schema_version": 1,
+            "schema_version": SCHEMA_VERSION,
+            "operation": "candidate_edit",
             "kind": "edit",
             "model": model,
             "image_size": image_size,
@@ -791,6 +809,7 @@ class GenerationService:
             "source_generation_id": source["generation_id"],
             "cast": capture.get("cast", []),
             "attachments": attachment_capture,
+            "input_images": [source_capture, *attachment_capture],
             "warnings": [],
             "labels": {"scene": str(scene_id)},
             "store": False,
@@ -817,8 +836,9 @@ class GenerationService:
                 result.image_bytes, source_name=f"generation-{generation_id}.png"
             )
             provenance = {
-                "schema_version": 1,
+                "schema_version": SCHEMA_VERSION,
                 "kind": "edit",
+                "operation": "candidate_edit",
                 "generation_id": generation_id,
                 "scene_id": scene_id,
                 "source_candidate_id": candidate_id,
@@ -828,7 +848,7 @@ class GenerationService:
                 "params": {"image_size": image_size, "aspect_ratio": aspect_ratio},
                 "assembled_prompt": base_prompt,
                 "edit_instruction": instruction,
-                "input_images": attachment_capture,
+                "input_images": [source_capture, *attachment_capture],
                 "prompt_hash": edit_prompt_hash,
                 "interaction_id": result.interaction_id,
                 "cost_cents": (
@@ -848,11 +868,29 @@ class GenerationService:
                 provenance_record={
                     "prompt_hash": edit_prompt_hash,
                     "price_table_version": self.settings.price_table_version,
-                    "input_images": attachment_capture,
+                    "input_images": [source_capture, *attachment_capture],
                 },
             )
             try:
                 self.storage.append_provenance(stored.sha256, provenance)
+            except Exception:
+                pass
+            # Identity scoring is advisory and equally non-fatal: a face-check
+            # failure (or missing insightface) must never fail a paid
+            # generation. The cast ids and reference attachments come from the
+            # captured source generation the edit is anchored to.
+            try:
+                self._score_candidate(
+                    candidate_new_id,
+                    stored.sha256,
+                    cast_ids=tuple(
+                        int(entry["character_id"])
+                        for entry in capture.get("cast", [])
+                        if isinstance(entry, dict)
+                        and isinstance(entry.get("character_id"), int)
+                    ),
+                    attachments=attachment_capture,
+                )
             except Exception:
                 pass
         except Exception as exc:
@@ -884,6 +922,46 @@ class GenerationService:
             ),
             warnings,
         )
+
+    def _score_candidate(
+        self,
+        candidate_id: int,
+        sha256: str,
+        *,
+        cast_ids: tuple[int, ...],
+        attachments: list[dict] | tuple[dict, ...],
+    ) -> None:
+        """Advisory identity scoring shared by every candidate path.
+
+        Used by direct panel generation, Base Stage panel generation, and
+        candidate edits so all three produce ``candidate.identity_scores``
+        through the same code path. The gallery is resolved from the reference
+        images actually captured for the request (``attachments`` carrying
+        ``character_id`` + ``sha256``) rather than the currently-canonical
+        reference sets, so a candidate is compared against the faces it was
+        really made from — including versions of a reference set that have
+        since been retired.
+
+        A missing embedder, a hash with no stored embedding, or a face-check
+        failure all leave the candidate unscored; none may fail a paid
+        generation, so this never raises.
+        """
+        if not cast_ids:
+            return
+        embedder = get_embedder()
+        if embedder is None:
+            return
+        data, _ = self.storage.read(sha256)
+        gallery = load_gallery_for_attachments(self.conn, attachments)
+        if not gallery:
+            return
+        payload = score_generated_image(embedder, gallery, data, cast_ids)
+        if payload is not None:
+            with self.conn:
+                self.conn.execute(
+                    "UPDATE candidate SET identity_scores = ? WHERE id = ?",
+                    (json.dumps(payload, sort_keys=True), candidate_id),
+                )
 
     def list_for_scene(self, scene_id: int) -> list[sqlite3.Row]:
         """All generation rows for a panel, newest first."""
