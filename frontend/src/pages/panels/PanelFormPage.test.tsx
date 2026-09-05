@@ -1,9 +1,9 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../../api/client'
-import type { Character, OptionsSummary, Panel, Style } from '../../api/types'
+import type { BaseStage, Character, OptionsSummary, Panel, Style } from '../../api/types'
 import { PanelFormPage } from './PanelFormPage'
 
 vi.mock('../../api/client', async () => {
@@ -13,6 +13,7 @@ vi.mock('../../api/client', async () => {
     createPanel: vi.fn(),
     duplicatePanel: vi.fn(),
     getPanel: vi.fn(),
+    listBaseStages: vi.fn(),
     listCharacters: vi.fn(),
     listStyles: vi.fn(),
     updatePanel: vi.fn(),
@@ -57,10 +58,43 @@ const UNREADY_CHARACTER: Character = {
   avatar_initials: 'MA',
 }
 
+const READY_MARA: Character = {
+  ...UNREADY_CHARACTER,
+  has_canonical_ref_set: true,
+}
+
 const STYLES: Style[] = [
   { id: 7, name: 'Ink', style_contract: '', created_at: '' },
   { id: 9, name: 'Oil', style_contract: '', created_at: '' },
 ]
+
+const BASE_STAGE: BaseStage = {
+  id: 4,
+  description: 'Moonlit station platform',
+  content_url: '/api/v1/base-stages/4/content',
+  dimensions: { width: 1536, height: 1024 },
+  aspect_ratio: '3:2',
+  targets: [
+    { id: 41, position: 1, description: 'traveler beside the train' },
+    { id: 42, position: 2, description: 'guard near the arch' },
+  ],
+  state: 'ready',
+  origin: 'upload',
+  revision: 1,
+  beat_text: null,
+  camera: null,
+  framing: null,
+  generation_count: 0,
+  is_editable: false,
+  mood: null,
+  style_id: null,
+  model: null,
+  image_size: null,
+  selected_candidate_id: null,
+  usage_count: 0,
+  archived_at: null,
+  created_at: '',
+}
 
 const EDITABLE_PANEL: Panel = {
   id: 12,
@@ -86,6 +120,8 @@ const EDITABLE_PANEL: Panel = {
   is_editable: true,
   generation_count: 0,
   latest_attempt_preview_url: null,
+  base_stage_id: null,
+  base_stage: null,
 }
 
 vi.mock('../../api/useOptions', () => ({
@@ -97,6 +133,7 @@ describe('PanelFormPage — field descriptions', () => {
     vi.mocked(client.getPanel).mockReset().mockResolvedValue(EDITABLE_PANEL)
     vi.mocked(client.listCharacters).mockReset().mockResolvedValue([READY_CHARACTER])
     vi.mocked(client.listStyles).mockReset().mockResolvedValue(STYLES)
+    vi.mocked(client.listBaseStages).mockReset().mockResolvedValue([])
     vi.mocked(client.createPanel).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
     vi.mocked(client.duplicatePanel).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
     vi.mocked(client.updatePanel).mockReset().mockResolvedValue(EDITABLE_PANEL)
@@ -115,6 +152,7 @@ describe('PanelFormPage — field descriptions', () => {
         { path: '/styles/new', element: <h1>New style</h1> },
         { path: '/characters/new', element: <h1>New character</h1> },
         { path: '/characters', element: <h1>Characters</h1> },
+        { path: '/base-stages/upload', element: <h1>Upload base stage</h1> },
       ],
       { initialEntries: [path] },
     )
@@ -393,6 +431,124 @@ describe('PanelFormPage — field descriptions', () => {
     expect(client.createPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({ cast: [{ character_id: 1, role: '', prominence: 1 }] }),
     )
+  })
+
+  it('supports the no-style Base Stage path with visual selection and a complete ordered payload', async () => {
+    const user = userEvent.setup()
+    vi.mocked(client.listStyles).mockResolvedValue([])
+    vi.mocked(client.listCharacters).mockResolvedValue([READY_CHARACTER, READY_MARA])
+    vi.mocked(client.listBaseStages).mockResolvedValue([BASE_STAGE])
+    renderForm()
+
+    const mode = await screen.findByRole('checkbox', { name: 'Use a base stage' })
+    expect(screen.getByText('A style is required')).toBeInTheDocument()
+    await user.click(mode)
+
+    expect(screen.queryByLabelText('Action')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Style')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Model')).toBeInTheDocument()
+    expect(screen.getByLabelText('Image size')).toBeInTheDocument()
+    const stageChoice = screen.getByRole('radio', { name: /Moonlit station platform/ })
+    await user.click(stageChoice)
+    expect(screen.getByAltText('Selected base stage: Moonlit station platform')).toHaveAttribute(
+      'src',
+      BASE_STAGE.content_url,
+    )
+    expect(screen.getByLabelText('Inherited aspect ratio')).toHaveValue('3:2')
+
+    const characterSelectors = screen.getAllByLabelText('Character')
+    expect(characterSelectors).toHaveLength(2)
+    expect(characterSelectors[0]).toBeInvalid()
+    await user.selectOptions(characterSelectors[0]!, '1')
+    expect(within(characterSelectors[1]!).getByRole('option', { name: 'Elias' })).toBeDisabled()
+    await user.selectOptions(characterSelectors[1]!, '2')
+    // The control mirrors CastSelector: an empty value falls back to 1, so the
+    // value is set directly rather than cleared and retyped (which would append).
+    fireEvent.change(
+      screen.getByLabelText('Prominence', { selector: '#base-stage-prominence-41' }),
+      { target: { value: '3' } },
+    )
+    await user.click(screen.getByRole('button', { name: 'Save and preview' }))
+
+    await waitFor(() => expect(client.createPanel).toHaveBeenCalledWith({
+      base_stage_id: 4,
+      beat_text: null,
+      camera: null,
+      framing: null,
+      mood: null,
+      aspect_ratio: '3:2',
+      cast: [
+        { character_id: 1, base_stage_target_id: 41, role: '', prominence: 3 },
+        { character_id: 2, base_stage_target_id: 42, role: '', prominence: 1 },
+      ],
+      style_id: null,
+      model: OPTIONS.default_model,
+      image_size: OPTIONS.default_image_size,
+    }))
+  })
+
+  it('preserves both drafts across mode switches and resets mappings when the stage changes', async () => {
+    const user = userEvent.setup()
+    const secondStage: BaseStage = {
+      ...BASE_STAGE,
+      id: 5,
+      description: 'Castle courtyard',
+      content_url: '/api/v1/base-stages/5/content',
+      targets: [{ id: 51, position: 1, description: 'figure at the gate' }],
+    }
+    vi.mocked(client.listCharacters).mockResolvedValue([READY_CHARACTER, READY_MARA])
+    vi.mocked(client.listBaseStages).mockResolvedValue([BASE_STAGE, secondStage])
+    renderForm()
+
+    const action = await screen.findByLabelText('Action')
+    await user.type(action, 'Elias boards the train')
+    const mode = screen.getByRole('checkbox', { name: 'Use a base stage' })
+    await user.click(mode)
+    await user.click(screen.getByRole('radio', { name: /Moonlit station platform/ }))
+    await user.selectOptions(screen.getAllByLabelText('Character')[0]!, '1')
+
+    await user.click(mode)
+    expect(screen.getByLabelText('Action')).toHaveValue('Elias boards the train')
+    await user.click(mode)
+    expect(screen.getByRole('radio', { name: /Moonlit station platform/ })).toBeChecked()
+    expect(screen.getAllByLabelText('Character')[0]).toHaveValue('1')
+
+    await user.click(screen.getByRole('radio', { name: /Castle courtyard/ }))
+    expect(screen.getAllByLabelText('Character')[0]).toHaveValue('')
+    const beforeUnload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(beforeUnload)
+    expect(beforeUnload.defaultPrevented).toBe(true)
+  })
+
+  it('hydrates an archived linked Base Stage and its target mappings on edit', async () => {
+    vi.mocked(client.listCharacters).mockResolvedValue([READY_CHARACTER, READY_MARA])
+    vi.mocked(client.listBaseStages).mockResolvedValue([])
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...EDITABLE_PANEL,
+      base_stage_id: 4,
+      style_id: null,
+      cast: [
+        { ...EDITABLE_PANEL.cast[0]!, character_id: 1, name: 'Elias', base_stage_target_id: 41 },
+        { ...EDITABLE_PANEL.cast[0]!, character_id: 2, name: 'Mara', base_stage_target_id: 42 },
+      ],
+      base_stage: {
+        id: 4,
+        description: BASE_STAGE.description,
+        content_url: BASE_STAGE.content_url!,
+        aspect_ratio: BASE_STAGE.aspect_ratio,
+        state: 'ready',
+        style_id: null,
+        archived_at: '2026-09-01T00:00:00Z',
+        targets: BASE_STAGE.targets,
+      },
+    })
+    renderForm('/panels/12/edit')
+
+    expect(await screen.findByRole('checkbox', { name: 'Use a base stage' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Moonlit station platform/ })).toBeChecked()
+    expect(screen.getAllByLabelText('Character').map((select) => (select as HTMLSelectElement).value))
+      .toEqual(['1', '2'])
+    expect(screen.queryByLabelText('Action')).not.toBeInTheDocument()
   })
 
   it('lets duplication finish without navigating after the locked page is left', async () => {

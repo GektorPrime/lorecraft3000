@@ -6,6 +6,13 @@ import pytest
 
 from app.config import Settings
 from app.providers.base import ProviderResult
+from app.providers.base import ProviderEditRequest
+from app.services.base_stages import (
+    BaseStageLockedError,
+    BaseStageNotReadyError,
+    BaseStageService,
+    BaseStageValidationError,
+)
 from app.services.characters import CharacterService
 from app.services.generation import GenerationError, GenerationService, PreviewChangedError
 from tests.conftest import FakeEmbedder
@@ -99,6 +106,32 @@ def _scene(conn, cast):
     return int(cursor.lastrowid)
 
 
+def _staged_scene(conn, storage, tmp_path, character_id):
+    stage = BaseStageService(conn, storage).upload(
+        make_png_bytes((4, 5, 6)), "A figure stands at the gate.", ["figure at gate"]
+    )
+    from app.services.scenes import SceneService
+
+    scene = SceneService(conn, _settings(tmp_path)).create(
+        beat_text=None,
+        camera=None,
+        framing=None,
+        mood=None,
+        aspect_ratio="1:1",
+        cast=[
+            {
+                "character_id": character_id,
+                "base_stage_target_id": stage.targets[0].id,
+            }
+        ],
+        style_id=None,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        base_stage_id=stage.id,
+    )
+    return stage, scene
+
+
 def test_two_character_fake_generation_captures_complete_provenance(
     conn, storage, tmp_path
 ):
@@ -136,6 +169,11 @@ def test_two_character_fake_generation_captures_complete_provenance(
     capture = json.loads(generation["request_json"])
     assert generation["state"] == "succeeded"
     assert generation["interaction_id"] == "interaction-fake"
+    assert capture["schema_version"] == 2
+    assert capture["operation"] == "direct_panel_generate"
+    assert [item["sha256"] for item in capture["input_images"]] == [
+        elias_image.sha256, mara_image.sha256
+    ]
     assert capture["cast"][0]["ref_set_version"] == elias_set.version
     assert capture["cast"][1]["ref_set_version"] == mara_set.version
     assert [item["character_name"] for item in capture["attachments"]] == [
@@ -145,6 +183,10 @@ def test_two_character_fake_generation_captures_complete_provenance(
 
     _, sidecar = storage.read(outcome.candidate_sha256)
     provenance = sidecar["provenance"][0]
+    assert provenance["schema_version"] == 2
+    assert provenance["operation"] == "direct_panel_generate"
+    assert provenance["input_images"][0]["sha256"] == elias_image.sha256
+    assert provenance["input_images"][1]["sha256"] == mara_image.sha256
     assert provenance["generation_id"] == outcome.generation_id
     assert provenance["prompt_hash"] == outcome.prompt_hash
     assert provenance["interaction_id"] == "interaction-fake"
@@ -152,6 +194,256 @@ def test_two_character_fake_generation_captures_complete_provenance(
     assert provenance["created_at"]
     assert len(provenance["input_images"]) == 2
     assert "SECRET" not in json.dumps(provenance)
+
+
+def test_staged_preview_and_generation_use_edit_with_source_aware_provenance(
+    conn, storage, tmp_path, monkeypatch
+):
+    character, _, ref_image = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    stage, scene = _staged_scene(conn, storage, tmp_path, character.id)
+    scoring_calls = []
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: {character.id: [("sha-ref", object())]},
+    )
+    monkeypatch.setattr(
+        "app.services.generation.score_generated_image",
+        lambda embedder, gallery, data, cast_ids: scoring_calls.append(cast_ids),
+    )
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+
+    preview = service.preview(scene.id)
+    assert isinstance(preview.provider_request, ProviderEditRequest)
+    assert preview.provider_request.source_image == make_png_bytes((4, 5, 6))
+    assert preview.provider_request.source_interaction_id is None
+    assert [ref.image_number for ref in preview.provider_request.references] == [2]
+    assert preview.request_capture["operation"] == "base_stage_panel_generate"
+    assert preview.request_capture["base_stage"]["id"] == stage.id
+    assert preview.request_capture["base_stage"]["content_sha256"]
+    assert [item["image_number"] for item in preview.request_capture["input_images"]] == [1, 2]
+    assert preview.request_capture["input_images"][1]["sha256"] == ref_image.sha256
+
+    outcome = service.generate(scene.id, expected_prompt_hash=preview.prompt_hash)
+    assert provider.requests == []
+    assert len(provider.edits) == 1
+    assert scoring_calls == [(character.id,)]
+    provenance = conn.execute(
+        "SELECT input_images FROM image_provenance WHERE generation_id = ?",
+        (outcome.generation_id,),
+    ).fetchone()
+    inputs = json.loads(provenance["input_images"])
+    assert [item["image_number"] for item in inputs] == [1, 2]
+    assert inputs[0]["base_stage_id"] == stage.id
+
+
+def _generated_stage(conn, storage, tmp_path, **overrides):
+    fields = {
+        "description": "Four figures haul a machine up a muddy ravine.",
+        "beat_text": "They strain against the rope as the machine slips.",
+        "camera": "twenty metres away, slightly elevated",
+        "framing": "wide environmental shot",
+        "mood": "strenuous and apprehensive",
+        "aspect_ratio": "16:9",
+        "style_id": StyleService(conn).get_default().id,
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+        "targets": ["figure above the slope", "figure beside the oak"],
+    }
+    fields.update(overrides)
+    return BaseStageService(conn, storage, _settings(tmp_path)).create_generated(**fields)
+
+
+def test_base_stage_preview_is_identity_neutral_and_uses_the_generate_path(
+    conn, storage, tmp_path, monkeypatch
+):
+    """A Base Stage carries no cast: no references, no edit, no identity scoring."""
+    stage = _generated_stage(conn, storage, tmp_path)
+    scored = []
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: {},
+    )
+    monkeypatch.setattr(
+        "app.services.generation.score_generated_image",
+        lambda embedder, gallery, data, cast_ids: scored.append(cast_ids),
+    )
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+
+    preview = service.preview_base_stage(stage.id)
+    assert preview.scene_id is None
+    assert preview.base_stage_id == stage.id
+    assert preview.provider_request.references == ()
+    assert preview.attachments == ()
+    assert preview.request_capture["operation"] == "base_stage_generate"
+    assert preview.request_capture["cast"] == []
+    assert "figure above the slope" in preview.prompt
+    assert "IDENTITY TARGETS" in preview.prompt
+
+    outcome = service.generate_base_stage(
+        stage.id, expected_prompt_hash=preview.prompt_hash
+    )
+    assert provider.edits == []
+    assert len(provider.requests) == 1
+    assert scored == []  # no cast -> never identity-scored
+
+    row = conn.execute(
+        "SELECT scene_id, base_stage_id FROM generation WHERE id = ?",
+        (outcome.generation_id,),
+    ).fetchone()
+    assert (row["scene_id"], row["base_stage_id"]) == (None, stage.id)
+
+
+def test_base_stage_generation_enforces_drift_pending_and_idempotency(
+    conn, storage, tmp_path
+):
+    stage = _generated_stage(conn, storage, tmp_path)
+    provider = FakeProvider()
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, provider)
+    stages = BaseStageService(conn, storage, settings)
+
+    reviewed = service.preview_base_stage(stage.id)
+    stages.update(
+        stage.id,
+        description="A different composition entirely.",
+        beat_text="They stand still.",
+        camera="close",
+        framing="tight",
+        mood="calm",
+        aspect_ratio="16:9",
+        style_id=StyleService(conn).get_default().id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        targets=["only figure"],
+    )
+    with pytest.raises(PreviewChangedError):
+        service.generate_base_stage(
+            stage.id, expected_prompt_hash=reviewed.prompt_hash
+        )
+    assert provider.requests == []
+
+    first = service.generate_base_stage(stage.id, idempotency_key="stage-1")
+    replay = service.generate_base_stage(stage.id, idempotency_key="stage-1")
+    assert replay.replayed is True
+    assert replay.generation_id == first.generation_id
+    assert len(provider.requests) == 1
+
+    # A successful attempt locks the composition; duplicate to change it.
+    assert stages.is_editable(stage.id) is False
+
+
+def test_publish_promotes_one_candidate_and_freezes_the_stage(
+    conn, storage, tmp_path
+):
+    stage = _generated_stage(conn, storage, tmp_path)
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, FakeProvider())
+    stages = BaseStageService(conn, storage, settings)
+
+    with pytest.raises(BaseStageNotReadyError):
+        stages.content_sha(stage.id)
+
+    outcome = service.generate_base_stage(stage.id)
+    published = stages.publish(stage.id, outcome.candidate_id)
+    assert published.state == "ready"
+    assert published.selected_candidate_id == outcome.candidate_id
+    assert (published.image_width, published.image_height) == (8, 8)
+    assert stages.content_sha(stage.id) == outcome.candidate_sha256
+
+    # Promotion is one-way: the source image any panel generates from is frozen.
+    with pytest.raises(BaseStageLockedError):
+        stages.publish(stage.id, outcome.candidate_id)
+    with pytest.raises(BaseStageLockedError):
+        stages.update(
+            stage.id,
+            description="d",
+            beat_text="b",
+            camera="c",
+            framing="f",
+            mood="",
+            aspect_ratio="16:9",
+            style_id=StyleService(conn).get_default().id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            targets=["t"],
+        )
+    with pytest.raises(GenerationError, match="already published"):
+        service.preview_base_stage(stage.id)
+
+
+def test_publish_rejects_candidates_from_another_owner(conn, storage, tmp_path):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id, "prominence": 1}])
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, FakeProvider())
+    panel_outcome = service.generate(scene_id)
+
+    stage = _generated_stage(conn, storage, tmp_path)
+    stages = BaseStageService(conn, storage, settings)
+    with pytest.raises(BaseStageValidationError, match="not a succeeded candidate"):
+        stages.publish(stage.id, panel_outcome.candidate_id)
+    assert stages.get(stage.id).state == "draft"
+
+
+def test_duplicate_copies_composition_without_attempts_or_image(
+    conn, storage, tmp_path
+):
+    stage = _generated_stage(conn, storage, tmp_path)
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, FakeProvider())
+    stages = BaseStageService(conn, storage, settings)
+    outcome = service.generate_base_stage(stage.id)
+    stages.publish(stage.id, outcome.candidate_id)
+
+    copy = stages.duplicate(stage.id)
+    assert copy.id != stage.id
+    assert copy.state == "draft"
+    assert copy.selected_candidate_id is None
+    assert copy.description == stage.description
+    assert [target.description for target in copy.targets] == [
+        target.description for target in stage.targets
+    ]
+    assert stages.is_editable(copy.id) is True
+
+
+def test_staged_prompt_drift_failure_and_idempotency_use_edit_path(
+    conn, storage, tmp_path
+):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    stage, scene = _staged_scene(conn, storage, tmp_path, character.id)
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+    reviewed = service.preview(scene.id)
+    conn.execute(
+        "UPDATE base_stage SET description = 'Changed source description' WHERE id = ?",
+        (stage.id,),
+    )
+    conn.commit()
+    with pytest.raises(PreviewChangedError):
+        service.generate(scene.id, expected_prompt_hash=reviewed.prompt_hash)
+    assert provider.edits == []
+
+    first = service.generate(scene.id, idempotency_key="staged-1")
+    replay = service.generate(scene.id, idempotency_key="staged-1")
+    assert replay.replayed is True
+    assert replay.generation_id == first.generation_id
+    assert len(provider.edits) == 1
+
+    failing = FakeProvider(error=RuntimeError("edit failed"))
+    with pytest.raises(GenerationError, match="edit failed"):
+        GenerationService(conn, storage, _settings(tmp_path), failing).generate(scene.id)
+    assert failing.requests == []
+    assert len(failing.edits) == 1
 
 
 def test_generation_resolves_provider_from_selected_model(conn, storage, tmp_path):
@@ -444,6 +736,68 @@ def test_edit_creates_child_generation_with_new_candidate(conn, storage, tmp_pat
     assert capture["source_candidate_id"] == first.candidate_id
 
 
+def test_edit_capture_and_provenance_record_source_first(
+    conn, storage, tmp_path, monkeypatch
+):
+    """An edit's capture/provenance are versioned and list source before refs."""
+    provider = FakeProvider()
+    service, first, ref_image = _generate_one(conn, storage, tmp_path, provider)
+    char_id = json.loads(
+        conn.execute(
+            "SELECT request_json FROM generation WHERE id = ?",
+            (first.generation_id,),
+        ).fetchone()[0]
+    )["cast"][0]["character_id"]
+
+    edited = service.edit_candidate(first.candidate_id, "make it night")
+
+    row = conn.execute(
+        "SELECT * FROM generation WHERE id = ?", (edited.generation_id,)
+    ).fetchone()
+    capture = json.loads(row["request_json"])
+    assert capture["schema_version"] == 2
+    assert capture["operation"] == "candidate_edit"
+    inputs = capture["input_images"]
+    assert inputs[0]["kind"] == "candidate_source"
+    assert inputs[0]["sha256"] == first.candidate_sha256
+    assert inputs[0]["source_candidate_id"] == first.candidate_id
+    assert inputs[1]["sha256"] == ref_image.sha256
+    assert inputs[1]["character_id"] == char_id
+
+    provenance = conn.execute(
+        "SELECT input_images FROM image_provenance WHERE generation_id = ?",
+        (edited.generation_id,),
+    ).fetchone()
+    prov_inputs = json.loads(provenance["input_images"])
+    assert prov_inputs[0]["sha256"] == first.candidate_sha256
+    assert prov_inputs[1]["sha256"] == ref_image.sha256
+
+    _, sidecar = storage.read(edited.candidate_sha256)
+    sidecar_provenance = sidecar["provenance"][0]
+    assert sidecar_provenance["schema_version"] == 2
+    assert sidecar_provenance["operation"] == "candidate_edit"
+    assert sidecar_provenance["input_images"][0]["sha256"] == first.candidate_sha256
+
+
+def test_edit_goes_through_shared_identity_scoring(conn, storage, tmp_path, monkeypatch):
+    """Edited candidates are identity-scored through the shared path."""
+    scored = []
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: {1: [("sha-ref", object())]},
+    )
+    monkeypatch.setattr(
+        "app.services.generation.score_generated_image",
+        lambda embedder, gallery, data, cast_ids: (scored.append(cast_ids), None)[1],
+    )
+    provider = FakeProvider()
+    service, first, _ = _generate_one(conn, storage, tmp_path, provider)
+
+    service.edit_candidate(first.candidate_id, "make it night")
+    assert scored  # the edit path scored its candidate against captured refs
+
+
 def test_edit_requires_instruction(conn, storage, tmp_path):
     provider = FakeProvider()
     service, first, _ = _generate_one(conn, storage, tmp_path, provider)
@@ -494,7 +848,10 @@ def test_identity_scoring_populates_candidate(conn, storage, tmp_path, monkeypat
     embedder = FakeEmbedder()
     gallery = {1: [("sha", embedder.face)]}
     monkeypatch.setattr("app.services.generation.get_embedder", lambda: embedder)
-    monkeypatch.setattr("app.services.generation.load_gallery", lambda _conn: gallery)
+    monkeypatch.setattr(
+        "app.services.generation.load_gallery_for_attachments",
+        lambda _conn, _att: gallery,
+    )
 
     provider = FakeProvider()
     service, first, _ = _generate_one(conn, storage, tmp_path, provider)

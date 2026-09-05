@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, generatePanel, getCharacter, listCharacters } from './client'
+import { ApiError, generatePanel, getCharacter, listCharacters, uploadBaseStage } from './client'
 
 const originalFetch = globalThis.fetch
 
@@ -83,5 +83,21 @@ describe('api client', () => {
     expect(JSON.parse(String(init?.body))).toEqual({
       expected_prompt_hash: 'reviewed-prompt-hash',
     })
+  })
+
+  it('uploads base stages with the exact multipart fields and ordered target JSON', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse({ id: 8 }, 201))
+    const file = new File(['image'], 'stage.webp', { type: 'image/webp' })
+
+    await uploadBaseStage(file, 'Rainy station platform', ['woman by the clock', 'porter'])
+
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0]
+    expect(url).toBe('/api/v1/base-stages/upload')
+    expect(init?.method).toBe('POST')
+    const form = init?.body as FormData
+    expect(form.get('image')).toBe(file)
+    expect(form.get('description')).toBe('Rainy station platform')
+    expect(form.get('targets')).toBe('["woman by the clock","porter"]')
+    expect(new Headers(init?.headers).has('Content-Type')).toBe(false)
   })
 })

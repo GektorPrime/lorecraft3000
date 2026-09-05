@@ -42,6 +42,13 @@ class SceneService:
         rows = self.conn.execute("SELECT * FROM scene ORDER BY id DESC").fetchall()
         return [Scene.from_row(row) for row in rows]
 
+    def list_for_base_stage(self, base_stage_id: int) -> list[Scene]:
+        rows = self.conn.execute(
+            "SELECT * FROM scene WHERE base_stage_id = ? ORDER BY id DESC",
+            (base_stage_id,),
+        ).fetchall()
+        return [Scene.from_row(row) for row in rows]
+
     def get(self, scene_id: int) -> Scene:
         row = self.conn.execute("SELECT * FROM scene WHERE id = ?", (scene_id,)).fetchone()
         if row is None:
@@ -80,15 +87,16 @@ class SceneService:
     def create(
         self,
         *,
-        beat_text: str,
-        camera: str,
-        framing: str,
-        mood: str,
+        beat_text: str | None,
+        camera: str | None,
+        framing: str | None,
+        mood: str | None,
         aspect_ratio: str,
         cast: list[dict],
-        style_id: int,
+        style_id: int | None,
         model: str,
         image_size: str,
+        base_stage_id: int | None = None,
     ) -> Scene:
         fields = self._validate(
             beat_text=beat_text,
@@ -100,18 +108,21 @@ class SceneService:
             style_id=style_id,
             model=model,
             image_size=image_size,
+            base_stage_id=base_stage_id,
+            existing_base_stage_id=None,
         )
         cursor = self.conn.execute(
             """
             INSERT INTO scene
                 (beat_text, camera, framing, mood, aspect_ratio, cast_json,
-                 style_id, model, image_size)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 style_id, model, image_size, base_stage_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 fields["beat_text"], fields["camera"], fields["framing"],
                 fields["mood"], fields["aspect_ratio"], json.dumps(fields["cast"]),
                 fields["style_id"], fields["model"], fields["image_size"],
+                fields["base_stage_id"],
             ),
         )
         self.conn.commit()
@@ -121,21 +132,23 @@ class SceneService:
         self,
         scene_id: int,
         *,
-        beat_text: str,
-        camera: str,
-        framing: str,
-        mood: str,
+        beat_text: str | None,
+        camera: str | None,
+        framing: str | None,
+        mood: str | None,
         aspect_ratio: str,
         cast: list[dict],
-        style_id: int,
+        style_id: int | None,
         model: str,
         image_size: str,
+        base_stage_id: int | None = None,
     ) -> Scene:
         """Update a panel unless a generation is pending or has succeeded.
 
         The backend is the enforcement point (not just the UI): even a
         request that bypasses a disabled form control is rejected here.
         """
+        current = self.get(scene_id)
         fields = self._validate(
             beat_text=beat_text,
             camera=camera,
@@ -146,13 +159,15 @@ class SceneService:
             style_id=style_id,
             model=model,
             image_size=image_size,
+            base_stage_id=base_stage_id,
+            existing_base_stage_id=current.base_stage_id,
         )
         cursor = self.conn.execute(
             """
             UPDATE scene
                SET beat_text = ?, camera = ?, framing = ?, mood = ?,
                     aspect_ratio = ?, cast_json = ?, style_id = ?, model = ?,
-                    image_size = ?, revision = revision + 1
+                     image_size = ?, base_stage_id = ?, revision = revision + 1
              WHERE id = ?
                AND NOT EXISTS (
                    SELECT 1 FROM generation
@@ -164,6 +179,7 @@ class SceneService:
                 fields["beat_text"], fields["camera"], fields["framing"],
                 fields["mood"], fields["aspect_ratio"], json.dumps(fields["cast"]),
                 fields["style_id"], fields["model"], fields["image_size"],
+                fields["base_stage_id"],
                 scene_id,
             ),
         )
@@ -217,13 +233,14 @@ class SceneService:
             """
             INSERT INTO scene
                 (beat_text, camera, framing, mood, aspect_ratio, cast_json,
-                 style_id, model, image_size)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 style_id, model, image_size, base_stage_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 source.beat_text, source.camera, source.framing, source.mood,
                 source.aspect_ratio, json.dumps(source.cast), source.style_id,
                 source.model, source.image_size,
+                source.base_stage_id,
             ),
         )
         self.conn.commit()
@@ -282,20 +299,30 @@ class SceneService:
     def _validate(
         self,
         *,
-        beat_text: str,
-        camera: str,
-        framing: str,
-        mood: str,
+        beat_text: str | None,
+        camera: str | None,
+        framing: str | None,
+        mood: str | None,
         aspect_ratio: str,
         cast: list[dict],
-        style_id: int,
+        style_id: int | None,
         model: str,
         image_size: str,
+        base_stage_id: int | None,
+        existing_base_stage_id: int | None,
     ) -> dict:
-        if not beat_text.strip():
+        staged = base_stage_id is not None
+        if not staged and (not isinstance(beat_text, str) or not beat_text.strip()):
             raise SceneError("panel action/beat is required")
-        if not camera.strip() or not framing.strip():
+        if not staged and (
+            not isinstance(camera, str)
+            or not camera.strip()
+            or not isinstance(framing, str)
+            or not framing.strip()
+        ):
             raise SceneError("camera and framing are required")
+        if not staged and not isinstance(mood, str):
+            raise SceneError("mood must be text")
         if not cast:
             raise SceneError("select at least one character")
         character_ids = [entry.get("character_id") for entry in cast]
@@ -307,10 +334,14 @@ class SceneService:
         if len(character_ids) != len(set(character_ids)):
             raise SceneError("a character may appear only once in a panel")
         normalized_cast = self._normalize_cast(cast)
-        if aspect_ratio not in ASPECT_RATIOS:
+        if not staged and aspect_ratio not in ASPECT_RATIOS:
             raise SceneError(f"unsupported aspect ratio: {aspect_ratio}")
         self._validate_model_and_size(model, image_size)
-        if self.conn.execute("SELECT 1 FROM style WHERE id = ?", (style_id,)).fetchone() is None:
+        if not staged and style_id is None:
+            raise SceneError("style is required")
+        if not staged and style_id is not None and self.conn.execute(
+            "SELECT 1 FROM style WHERE id = ?", (style_id,)
+        ).fetchone() is None:
             raise SceneError(f"style {style_id} not found")
         existing = {
             row["id"]
@@ -322,16 +353,50 @@ class SceneService:
         missing = [character_id for character_id in character_ids if character_id not in existing]
         if missing:
             raise SceneError(f"characters not found: {missing}")
+        if staged:
+            stage = self.conn.execute(
+                "SELECT * FROM base_stage WHERE id = ?", (base_stage_id,)
+            ).fetchone()
+            if stage is None:
+                raise SceneError(f"base stage {base_stage_id} not found")
+            if stage["state"] != "ready":
+                raise SceneError(f"base stage {base_stage_id} is not ready")
+            if stage["archived_at"] is not None and base_stage_id != existing_base_stage_id:
+                raise SceneError(f"base stage {base_stage_id} is archived")
+            targets = self.conn.execute(
+                "SELECT id FROM base_stage_target WHERE base_stage_id = ?",
+                (base_stage_id,),
+            ).fetchall()
+            target_ids = {int(row["id"]) for row in targets}
+            if not target_ids:
+                raise SceneError("a base stage panel requires at least one target")
+            mapped_ids = [entry.get("base_stage_target_id") for entry in normalized_cast]
+            if len(mapped_ids) != len(target_ids):
+                raise SceneError("cast count must equal base stage target count")
+            if any(not isinstance(target_id, int) or isinstance(target_id, bool) for target_id in mapped_ids):
+                raise SceneError("every cast member must map to a base stage target")
+            if len(mapped_ids) != len(set(mapped_ids)):
+                raise SceneError("a base stage target may be mapped only once")
+            if set(mapped_ids) != target_ids:
+                raise SceneError("every mapping target must belong to the selected base stage")
+            normalized_cast = [
+                {**entry, "role": ""} for entry in normalized_cast
+            ]
+            beat_text = stage["description"]
+            camera = framing = mood = ""
+            aspect_ratio = stage["aspect_ratio"]
+            style_id = stage["style_id"]
         return {
             "beat_text": beat_text.strip(),
             "camera": camera.strip(),
             "framing": framing.strip(),
-            "mood": mood.strip(),
+            "mood": (mood or "").strip(),
             "aspect_ratio": aspect_ratio,
             "cast": normalized_cast,
             "style_id": style_id,
             "model": model,
             "image_size": image_size,
+            "base_stage_id": base_stage_id,
         }
 
     def _validate_model_and_size(self, model: str, image_size: str) -> None:
@@ -370,6 +435,7 @@ class SceneService:
                     "character_id": entry["character_id"],
                     "role": role.strip(),
                     "prominence": prominence,
+                    "base_stage_target_id": entry.get("base_stage_target_id"),
                 }
             )
         return normalized

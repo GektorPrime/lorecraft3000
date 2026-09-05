@@ -72,6 +72,10 @@ class ImageStorage:
         *,
         source_name: str | None = None,
         allowed_formats: set[str] | None = None,
+        reject_animated: bool = False,
+        max_width: int | None = None,
+        max_height: int | None = None,
+        max_pixels: int | None = None,
     ) -> StoredImage:
         """Verify, hash, and store image bytes. Returns metadata.
 
@@ -80,10 +84,11 @@ class ImageStorage:
         if not data:
             raise ImageStorageError("empty image bytes")
 
-        # Verify/decode with Pillow (also gives us format + dimensions).
+        # Parse enough metadata to reject unsupported or oversized inputs before
+        # fully decoding their pixels. This makes the optional limits useful as
+        # decompression-bomb protection rather than post-decode validation.
         try:
             img = Image.open(io.BytesIO(data))
-            img.load()
         except (UnidentifiedImageError, OSError, ValueError) as exc:
             raise ImageStorageError(f"not a decodable image: {exc}") from exc
 
@@ -93,6 +98,18 @@ class ImageStorage:
             raise ImageStorageError(
                 f"decoded image format {fmt} is not allowed; use {allowed}"
             )
+        if reject_animated and getattr(img, "n_frames", 1) > 1:
+            raise ImageStorageError("animated images are not allowed")
+        if max_width is not None and img.width > max_width:
+            raise ImageStorageError(f"image width exceeds {max_width} pixels")
+        if max_height is not None and img.height > max_height:
+            raise ImageStorageError(f"image height exceeds {max_height} pixels")
+        if max_pixels is not None and img.width * img.height > max_pixels:
+            raise ImageStorageError(f"image exceeds the {max_pixels} pixel limit")
+        try:
+            img.load()
+        except (UnidentifiedImageError, OSError, ValueError) as exc:
+            raise ImageStorageError(f"not a decodable image: {exc}") from exc
         ext = _FORMAT_EXT.get(fmt)
         if ext is None:
             raise ImageStorageError(f"unsupported image format: {fmt}")
@@ -268,6 +285,21 @@ class ImageStorage:
         if hashlib.sha256(data).hexdigest() != sha256:
             raise ImageStorageError(f"stored image {sha256} failed its hash check")
         return data, metadata
+
+    def dimensions(self, sha256: str) -> tuple[int, int]:
+        """Return (width, height) of a stored image.
+
+        Sidecars deliberately carry only format/size metadata, so dimensions are
+        read back from the verified bytes rather than trusted from disk.
+        """
+        data, _ = self.read(sha256)
+        try:
+            with Image.open(io.BytesIO(data)) as img:
+                return int(img.width), int(img.height)
+        except (UnidentifiedImageError, OSError, ValueError) as exc:
+            raise ImageStorageError(
+                f"stored image {sha256} could not be measured: {exc}"
+            ) from exc
 
     def append_provenance(self, sha256: str, record: dict) -> None:
         """Append a secret-free provenance record to an image sidecar.

@@ -23,9 +23,20 @@ def _image(storage: ImageStorage, sha256: str):
     return storage.find_image(sha256)
 
 
+def _owned_generation(conn) -> int:
+    """A generation must belong to exactly one panel or base stage."""
+    style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+    scene_id = conn.execute(
+        "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+    ).lastrowid
+    conn.execute(
+        "INSERT INTO generation (scene_id, model) VALUES (?, 'test')", (scene_id,)
+    )
+    return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+
 def _insert_dangling_candidate(conn, sha256: str) -> None:
-    conn.execute("INSERT INTO generation (model) VALUES ('test')")
-    generation_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    generation_id = _owned_generation(conn)
     conn.execute(
         "INSERT INTO candidate (generation_id, sha256) VALUES (?, ?)",
         (generation_id, sha256),
@@ -94,6 +105,23 @@ def test_dangling_db_hash_is_detected(conn, storage):
     assert report.dangling_db_hashes == (ghost,)
 
 
+def test_dangling_uploaded_base_stage_hash_is_detected(conn, storage):
+    ghost = "b" * 64
+    conn.execute(
+        """
+        INSERT INTO base_stage
+            (origin, state, description, aspect_ratio, uploaded_sha256,
+             image_width, image_height)
+        VALUES ('upload', 'ready', 'Missing stage', '16:9', ?, 1600, 900)
+        """,
+        (ghost,),
+    )
+    conn.commit()
+
+    report = run_check(conn, storage)
+    assert report.dangling_db_hashes == (ghost,)
+
+
 def test_stale_temp_files_are_detected(conn, storage):
     prefix = storage.root / "ab"
     prefix.mkdir(parents=True)
@@ -140,10 +168,7 @@ def test_repair_rebuilds_malformed_sidecar_preserving_source_name(conn, storage,
 
 def test_repair_rebuilds_provenance_from_database(conn, storage, png_bytes):
     sha = _store_image(storage)
-    conn.execute(
-        "INSERT INTO generation (model) VALUES ('test')"
-    )
-    generation_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    generation_id = _owned_generation(conn)
     conn.execute(
         "INSERT INTO image_provenance (sha256, generation_id, prompt_hash, "
         "cost_cents, price_table_version, input_images) VALUES (?, ?, ?, ?, ?, ?)",
@@ -324,6 +349,45 @@ def test_backfill_embeds_canonical_face_refs(conn, storage, monkeypatch):
     assert second.refs_embedded == 0
 
 
+def test_backfill_embeds_referenced_retired_refs(conn, storage, tmp_path, monkeypatch):
+    """A ref retired after a generation is still embedded so it can be scored."""
+    from app.services.ref_sets import RefSetService
+
+    character = _canonical_character(conn, storage)
+    old_ref = conn.execute(
+        "SELECT sha256 FROM ref_image WHERE ref_set_id = ("
+        "SELECT id FROM ref_set WHERE character_id = ? ORDER BY id)", (character.id,)
+    ).fetchone()["sha256"]
+    # Capture the old (then-canonical) reference in a real generation.
+    _generated_candidate(conn, storage, tmp_path, character.id)
+    # Promote a newer set: the original reference is retired but now referenced.
+    refs = RefSetService(conn, storage)
+    newer = refs.create_draft(character.id)
+    refs.add_image(
+        newer.id, make_png_bytes((40, 50, 60)), "face_front", source_name="elias2.png"
+    )
+    refs.promote(newer.id)
+    retired = conn.execute(
+        "SELECT ri.sha256 FROM ref_image ri "
+        "JOIN ref_set rs ON rs.id = ri.ref_set_id "
+        "WHERE rs.character_id = ? AND rs.status = 'retired' "
+        "AND ri.role = 'face_front'",
+        (character.id,),
+    ).fetchone()["sha256"]
+    assert retired == old_ref  # the retired set is the one the candidate captured
+
+    monkeypatch.setattr("app.maintenance.get_embedder", lambda: FakeEmbedder())
+    from app.maintenance import run_identity_backfill
+
+    report = run_identity_backfill(conn, storage, scope="refs")
+    # Canonical (new) and captured-retired (old) face refs are both embedded.
+    assert report.refs_embedded == 2
+    assert report.errors == ()
+    assert conn.execute(
+        "SELECT 1 FROM face_embedding WHERE sha256 = ?", (retired,)
+    ).fetchone() is not None
+
+
 def test_backfill_ref_without_face_is_reported_not_fatal(conn, storage, monkeypatch):
     _canonical_character(conn, storage)
     monkeypatch.setattr(
@@ -348,7 +412,7 @@ def test_backfill_scores_unscored_candidates(conn, storage, tmp_path, monkeypatc
     embedder = FakeEmbedder()
     monkeypatch.setattr("app.maintenance.get_embedder", lambda: embedder)
     monkeypatch.setattr(
-        "app.maintenance.load_gallery", lambda _conn: {character.id: [("sha", embedder.face)]}
+        "app.maintenance.load_gallery_for_attachments", lambda _conn, _att: {character.id: [("sha", embedder.face)]}
     )
     from app.maintenance import run_identity_backfill
 
@@ -373,7 +437,7 @@ def test_backfill_candidate_without_face_is_skipped_not_failed(
         "app.maintenance.get_embedder", lambda: FakeEmbedder(faces=[])
     )
     monkeypatch.setattr(
-        "app.maintenance.load_gallery", lambda _conn: {character.id: []}
+        "app.maintenance.load_gallery_for_attachments", lambda _conn, _att: {character.id: []}
     )
     from app.maintenance import run_identity_backfill
 
@@ -393,7 +457,7 @@ def test_backfill_force_rescores_unscored_background_and_leaves_new_fields(
     embedder = FakeEmbedder()
     monkeypatch.setattr("app.maintenance.get_embedder", lambda: embedder)
     monkeypatch.setattr(
-        "app.maintenance.load_gallery", lambda _conn: {character.id: [("sha", embedder.face)]}
+        "app.maintenance.load_gallery_for_attachments", lambda _conn, _att: {character.id: [("sha", embedder.face)]}
     )
     from app.maintenance import run_identity_backfill
 

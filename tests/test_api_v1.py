@@ -11,9 +11,12 @@ JSON response body.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import io
+import json
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 import app.main as main_module
 from app.config import Settings
@@ -31,6 +34,7 @@ class FakeProvider:
         self.requests = []
         self.error = None
         self.billed_cost_cents = None
+        self.edits = []
 
     def generate(self, request):
         self.requests.append(request)
@@ -40,6 +44,17 @@ class FakeProvider:
             make_png_bytes((30, 60, 90)),
             "api-interaction",
             {"fake": True},
+            self.billed_cost_cents,
+        )
+
+    def edit(self, request):
+        self.edits.append(request)
+        if self.error:
+            raise self.error
+        return ProviderResult(
+            make_png_bytes((30, 60, 90)),
+            "api-stage-interaction",
+            {"fake": True, "edited": True},
             self.billed_cost_cents,
         )
 
@@ -144,6 +159,259 @@ def _generate_panel(api, panel_id, *, headers=None):
     )
 
 
+def _image_bytes(format: str, size=(12, 8)) -> bytes:
+    output = io.BytesIO()
+    Image.new("RGB", size, (10, 20, 30)).save(output, format=format)
+    return output.getvalue()
+
+
+def _upload_base_stage(api, *, image=None, description="Stone bridge", targets=None):
+    return api.client.post(
+        "/api/v1/base-stages/upload",
+        data={
+            "description": description,
+            "targets": json.dumps(
+                ["traveler beside the arch"] if targets is None else targets
+            ),
+        },
+        files={"image": ("stage.png", image or _image_bytes("PNG"), "image/png")},
+    )
+
+
+# ---------------------------------------------------------------------------
+# base stages
+# ---------------------------------------------------------------------------
+
+
+def test_base_stage_upload_list_get_content_archive_and_restore(api):
+    uploaded = _upload_base_stage(
+        api,
+        image=_image_bytes("PNG", (160, 90)),
+        description="  Four investigators hauling a machine uphill.  ",
+        targets=["upper figure", "lower figure"],
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    stage = uploaded.json()
+
+    assert stage["origin"] == "upload"
+    assert stage["state"] == "ready"
+    assert stage["description"] == "Four investigators hauling a machine uphill."
+    assert stage["aspect_ratio"] == "16:9"
+    assert stage["dimensions"] == {"width": 160, "height": 90}
+    assert [target["description"] for target in stage["targets"]] == [
+        "upper figure",
+        "lower figure",
+    ]
+    assert stage["content_url"] == f"/api/v1/base-stages/{stage['id']}/content"
+    assert "sha" not in json.dumps(stage).lower()
+
+    listed = api.client.get("/api/v1/base-stages")
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [stage["id"]]
+    assert api.client.get(f"/api/v1/base-stages/{stage['id']}").json() == stage
+
+    content = api.client.get(stage["content_url"])
+    assert content.status_code == 200
+    assert content.headers["content-type"] == "image/png"
+    assert content.content == _image_bytes("PNG", (160, 90))
+
+    assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
+    assert api.client.get("/api/v1/base-stages").json() == []
+    archived = api.client.get("/api/v1/base-stages/archived").json()
+    assert [item["id"] for item in archived] == [stage["id"]]
+    assert api.client.get(stage["content_url"]).status_code == 200
+
+    restored = api.client.post(f"/api/v1/base-stages/{stage['id']}/restore")
+    assert restored.status_code == 200
+    assert restored.json()["archived_at"] is None
+    assert [item["id"] for item in api.client.get("/api/v1/base-stages").json()] == [
+        stage["id"]
+    ]
+
+
+@pytest.mark.parametrize(
+    ("targets", "message"),
+    [
+        ("not json", "valid JSON"),
+        (json.dumps({"target": "left"}), "JSON array"),
+        (json.dumps(["left", " LEFT "]), "case-insensitive"),
+        (json.dumps([""]), "must not be blank"),
+    ],
+)
+def test_base_stage_upload_rejects_invalid_targets(api, targets, message):
+    response = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": targets},
+        files={"image": ("stage.png", _image_bytes("PNG"), "image/png")},
+    )
+    assert response.status_code == 422
+    assert message in response.json()["detail"]["message"]
+
+
+def test_base_stage_upload_rejects_mime_size_and_decoded_format(api):
+    wrong_mime = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": "[]"},
+        files={"image": ("stage.png", _image_bytes("PNG"), "text/plain")},
+    )
+    assert wrong_mime.status_code == 422
+
+    oversized = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": "[]"},
+        files={"image": ("stage.png", b"x" * (10 * 1024 * 1024 + 1), "image/png")},
+    )
+    assert oversized.status_code == 422
+    assert "10 MB" in oversized.json()["detail"]["message"]
+
+    unsupported = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": "[]"},
+        files={"image": ("stage.gif", _image_bytes("GIF"), "image/png")},
+    )
+    assert unsupported.status_code == 422
+    assert "format GIF" in unsupported.json()["detail"]["message"]
+
+
+def test_base_stage_missing_routes_return_404(api):
+    assert api.client.get("/api/v1/base-stages/9999").status_code == 404
+    assert api.client.get("/api/v1/base-stages/9999/content").status_code == 404
+    assert api.client.delete("/api/v1/base-stages/9999").status_code == 404
+    assert api.client.post("/api/v1/base-stages/9999/restore").status_code == 404
+    assert api.client.get("/api/v1/base-stages/9999/preview").status_code == 404
+    assert api.client.get("/api/v1/base-stages/9999/generations").status_code == 404
+    assert (
+        api.client.post(
+            "/api/v1/base-stages/9999/generate", json={"expected_prompt_hash": "x"}
+        ).status_code
+        == 404
+    )
+    assert (
+        api.client.post(
+            "/api/v1/base-stages/9999/publish", json={"candidate_id": 1}
+        ).status_code
+        == 404
+    )
+
+
+def _create_generated_stage(api, **overrides):
+    payload = {
+        "description": "Four figures haul a machine up a muddy ravine.",
+        "beat_text": "They strain against the rope as the machine slips.",
+        "camera": "twenty metres away, slightly elevated",
+        "framing": "wide environmental shot",
+        "mood": "strenuous",
+        "aspect_ratio": "16:9",
+        "style_id": _default_style_id(api),
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+        "targets": ["figure above the slope", "figure beside the oak"],
+    }
+    payload.update(overrides)
+    return api.client.post("/api/v1/base-stages/generated", json=payload)
+
+
+def test_generated_base_stage_draft_preview_generate_and_publish(api):
+    created = _create_generated_stage(api)
+    assert created.status_code == 201, created.text
+    stage = created.json()
+    stage_id = stage["id"]
+
+    # A draft is not usable yet: no image, and no panel may select it.
+    assert (stage["origin"], stage["state"]) == ("generated", "draft")
+    assert stage["content_url"] is None
+    assert stage["is_editable"] is True
+    assert api.client.get(f"/api/v1/base-stages/{stage_id}/content").status_code == 409
+
+    preview = api.client.get(f"/api/v1/base-stages/{stage_id}/preview")
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["can_generate"] is True
+    assert body["estimated_cost_cents"] > 0
+    assert "IDENTITY TARGETS" in body["prompt"]
+    assert "Figure 1: figure above the slope" in body["prompt"]
+
+    stale = api.client.post(
+        f"/api/v1/base-stages/{stage_id}/generate",
+        json={"expected_prompt_hash": "stale"},
+    )
+    assert stale.status_code == 409
+
+    generated = api.client.post(
+        f"/api/v1/base-stages/{stage_id}/generate",
+        json={"expected_prompt_hash": body["prompt_hash"]},
+    )
+    assert generated.status_code == 201, generated.text
+    attempt = generated.json()
+    assert attempt["base_stage_id"] == stage_id
+    assert attempt["scene_id"] is None
+    assert attempt["attachments"] == []  # identity-neutral: no character refs
+    candidate_id = attempt["candidates"][0]["id"]
+
+    history = api.client.get(f"/api/v1/base-stages/{stage_id}/generations").json()
+    assert [row["id"] for row in history] == [attempt["id"]]
+
+    published = api.client.post(
+        f"/api/v1/base-stages/{stage_id}/publish", json={"candidate_id": candidate_id}
+    )
+    assert published.status_code == 200, published.text
+    ready = published.json()
+    assert ready["state"] == "ready"
+    assert ready["selected_candidate_id"] == candidate_id
+    assert ready["content_url"] == f"/api/v1/base-stages/{stage_id}/content"
+    assert ready["is_editable"] is False
+    assert api.client.get(f"/api/v1/base-stages/{stage_id}/content").status_code == 200
+
+    # Promotion is one-way; a variant needs a duplicate.
+    assert (
+        api.client.post(
+            f"/api/v1/base-stages/{stage_id}/publish",
+            json={"candidate_id": candidate_id},
+        ).status_code
+        == 409
+    )
+    copy = api.client.post(f"/api/v1/base-stages/{stage_id}/duplicate")
+    assert copy.status_code == 201
+    assert copy.json()["state"] == "draft"
+    assert copy.json()["id"] != stage_id
+
+
+def test_generated_base_stage_edit_rules_and_validation(api):
+    stage_id = _create_generated_stage(api).json()["id"]
+
+    edited = api.client.put(
+        f"/api/v1/base-stages/{stage_id}",
+        json={
+            "description": "A quieter ravine.",
+            "beat_text": "They rest against the rope.",
+            "camera": "thirty metres away",
+            "framing": "wide shot",
+            "mood": "weary",
+            "aspect_ratio": "16:9",
+            "style_id": _default_style_id(api),
+            "model": "gemini-3.1-flash-image",
+            "image_size": "1K",
+            "targets": ["single figure"],
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["description"] == "A quieter ravine."
+    assert edited.json()["revision"] == 1
+
+    assert _create_generated_stage(api, targets=[]).status_code == 422
+    assert _create_generated_stage(api, style_id=9999).status_code == 422
+    assert _create_generated_stage(api, model="not-a-model").status_code == 422
+    assert _create_generated_stage(api, image_size="9K").status_code == 422
+    assert _create_generated_stage(api, aspect_ratio="7:5").status_code == 422
+
+    # Uploaded stages have no composition to edit or duplicate.
+    uploaded_id = _upload_base_stage(api).json()["id"]
+    assert api.client.post(f"/api/v1/base-stages/{uploaded_id}/duplicate").status_code == 422
+    assert api.client.get(f"/api/v1/base-stages/{uploaded_id}/preview").json()[
+        "can_generate"
+    ] is False
+
+
 # ---------------------------------------------------------------------------
 # options / budget
 # ---------------------------------------------------------------------------
@@ -182,16 +450,22 @@ def test_budget_accepts_timezone_header_and_falls_back_to_utc(api):
     conn = connect(api.db_path)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     try:
+        # Every generation must belong to exactly one panel or base stage
+        # (017_base_stage_generations), so the spend row gets a real panel.
+        style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+        scene_id = conn.execute(
+            "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+        ).lastrowid
         conn.execute(
             """
             INSERT INTO generation
                 (scene_id, model, params_json, prompt_hash, request_json,
                  cost_usd_cents, reserved_cost_usd_cents, state,
                  price_table_version, scene_revision, created_at)
-            VALUES (NULL, 'gemini-3.1-flash-image', '{}', 'hash', '{}',
+            VALUES (?, 'gemini-3.1-flash-image', '{}', 'hash', '{}',
                     33, 33, 'succeeded', 'test', 0, ?)
             """,
-            (ts,),
+            (scene_id, ts),
         )
         conn.commit()
     finally:
@@ -746,6 +1020,114 @@ def test_panel_preview_is_no_spend_and_reports_allocation(api):
     assert budget["spent_today_cents"] == 0
 
 
+def test_staged_panel_crud_preview_generate_duplicate_and_no_source_hash(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    stage_response = _upload_base_stage(
+        api,
+        description="A traveler stands under a stone arch.",
+        targets=["traveler beneath arch"],
+    )
+    stage = stage_response.json()
+    payload = {
+        "base_stage_id": stage["id"],
+        "cast": [
+            {
+                "character_id": character["id"],
+                "base_stage_target_id": stage["targets"][0]["id"],
+                "role": "this must be discarded",
+            }
+        ],
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+    }
+
+    created = api.client.post("/api/v1/panels", json=payload)
+    assert created.status_code == 201, created.text
+    panel = created.json()
+    assert panel["base_stage_id"] == stage["id"]
+    assert panel["base_stage"]["content_url"] == stage["content_url"]
+    assert panel["beat_text"] == stage["description"]
+    assert panel["camera"] == panel["framing"] == panel["mood"] == ""
+    assert panel["aspect_ratio"] == stage["aspect_ratio"]
+    assert panel["style_id"] is None
+    assert panel["cast"][0]["role"] == ""
+    assert "sha" not in json.dumps(panel).lower()
+    assert api.client.get(f"/api/v1/panels/{panel['id']}").json() == panel
+
+    updated = api.client.put(f"/api/v1/panels/{panel['id']}", json=payload)
+    assert updated.status_code == 200
+    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
+    assert preview["base_stage_id"] == stage["id"]
+    assert preview["source_content_url"] == stage["content_url"]
+    assert preview["attachments"][0]["image_number"] == 2
+    assert "content_sha256" not in json.dumps(preview)
+
+    generated = api.client.post(
+        f"/api/v1/panels/{panel['id']}/generate",
+        json={"expected_prompt_hash": preview["prompt_hash"]},
+    )
+    assert generated.status_code == 201, generated.text
+    assert generated.json()["interaction_id"] == "api-stage-interaction"
+    assert api.provider.requests == []
+    assert len(api.provider.edits) == 1
+
+    assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
+    duplicated = api.client.post(f"/api/v1/panels/{panel['id']}/duplicate")
+    assert duplicated.status_code == 201
+    assert duplicated.json()["base_stage_id"] == stage["id"]
+    assert duplicated.json()["cast"][0]["base_stage_target_id"] == stage["targets"][0]["id"]
+
+
+def test_staged_panel_validation_and_blocked_preview_include_source_fields(api):
+    first = _create_character(api, "Elias", "elias")
+    second = _create_character(api, "Mara", "mara")
+    stage = _upload_base_stage(
+        api, targets=["left figure", "right figure"]
+    ).json()
+    base = {
+        "base_stage_id": stage["id"],
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+    }
+    duplicate_target = api.client.post(
+        "/api/v1/panels",
+        json={
+            **base,
+            "cast": [
+                {"character_id": first["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+                {"character_id": second["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+            ],
+        },
+    )
+    assert duplicate_target.status_code == 422
+    assert "mapped only once" in duplicate_target.text
+
+    valid = api.client.post(
+        "/api/v1/panels",
+        json={
+            **base,
+            "cast": [
+                {"character_id": first["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+                {"character_id": second["id"], "base_stage_target_id": stage["targets"][1]["id"]},
+            ],
+        },
+    ).json()
+    blocked = api.client.get(f"/api/v1/panels/{valid['id']}/preview").json()
+    assert blocked["can_generate"] is False
+    assert blocked["base_stage_id"] == stage["id"]
+    assert blocked["source_content_url"] == stage["content_url"]
+    assert "no canonical reference set" in blocked["blocked_reason"]
+
+    assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
+    newly_selected = api.client.post("/api/v1/panels", json={**base, "cast": [
+        {"character_id": first["id"], "base_stage_target_id": stage["targets"][0]["id"]},
+        {"character_id": second["id"], "base_stage_target_id": stage["targets"][1]["id"]},
+    ]})
+    assert newly_selected.status_code == 422
+    assert "archived" in newly_selected.text
+
+
 def test_panel_generate_rejects_prompt_changed_after_preview(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
@@ -1021,3 +1403,43 @@ def test_panel_delete_missing_is_404(api):
 def test_character_and_style_restore_missing_is_404(api):
     assert api.client.post("/api/v1/characters/9999/restore").status_code == 404
     assert api.client.post("/api/v1/styles/9999/restore").status_code == 404
+
+
+def test_base_stage_panels_endpoint_lists_only_staged_panels(api):
+    character = _create_character(api)
+    _promote_canonical(api, character["id"])
+    stage = _upload_base_stage(
+        api, description="Under an arch.", targets=["traveler beneath arch"]
+    ).json()
+
+    _create_panel(api, [character["id"]])  # unrelated direct panel
+
+    staged = api.client.post(
+        "/api/v1/panels",
+        json={
+            "base_stage_id": stage["id"],
+            "cast": [
+                {
+                    "character_id": character["id"],
+                    "base_stage_target_id": stage["targets"][0]["id"],
+                    "role": "",
+                }
+            ],
+            "model": "gemini-3.1-flash-image",
+            "image_size": "1K",
+        },
+    )
+    assert staged.status_code == 201, staged.text
+    panel = staged.json()
+
+    listed = api.client.get(f"/api/v1/base-stages/{stage['id']}/panels")
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()
+    assert [row["id"] for row in rows] == [panel["id"]]
+    assert rows[0]["beat_text"] == stage["description"]
+    assert rows[0]["is_editable"] is True
+    assert rows[0]["generation_count"] == 0
+    assert rows[0]["latest_attempt_preview_url"] is None
+    assert "cast" not in json.dumps(rows)
+
+    assert api.client.get("/api/v1/base-stages/99999/panels").status_code == 404

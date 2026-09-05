@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import hashlib
+import io
 
 import pytest
+from PIL import Image
 
 from app.storage import ImageStorage, ImageStorageError
 from tests.conftest import make_png_bytes
@@ -98,6 +100,27 @@ def test_rejects_non_image_bytes(storage):
 def test_rejects_empty_bytes(storage):
     with pytest.raises(ImageStorageError):
         storage.store(b"")
+
+
+def test_optional_animation_validation_preserves_default_behavior(storage):
+    output = io.BytesIO()
+    frames = [Image.new("RGB", (8, 8), color) for color in ((1, 2, 3), (4, 5, 6))]
+    frames[0].save(output, format="GIF", save_all=True, append_images=frames[1:])
+    animated = output.getvalue()
+
+    assert storage.store(animated).format == "GIF"
+    with pytest.raises(ImageStorageError, match="animated images"):
+        storage.store(animated, reject_animated=True)
+
+
+def test_optional_dimension_and_pixel_validation(storage, png_bytes):
+    assert storage.store(png_bytes).width == 8
+    with pytest.raises(ImageStorageError, match="width exceeds 7"):
+        storage.store(png_bytes, max_width=7)
+    with pytest.raises(ImageStorageError, match="height exceeds 7"):
+        storage.store(png_bytes, max_height=7)
+    with pytest.raises(ImageStorageError, match="63 pixel limit"):
+        storage.store(png_bytes, max_pixels=63)
 
 
 def test_path_for(storage, png_bytes):

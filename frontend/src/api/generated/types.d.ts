@@ -28,6 +28,241 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/base-stages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Base Stages */
+        get: operations["list_base_stages_api_v1_base_stages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Archived Base Stages */
+        get: operations["list_archived_base_stages_api_v1_base_stages_archived_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/generated": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Generated Base Stage */
+        post: operations["create_generated_base_stage_api_v1_base_stages_generated_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Base Stage */
+        post: operations["upload_base_stage_api_v1_base_stages_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Base Stage */
+        get: operations["get_base_stage_api_v1_base_stages__base_stage_id__get"];
+        /** Update Base Stage */
+        put: operations["update_base_stage_api_v1_base_stages__base_stage_id__put"];
+        post?: never;
+        /** Archive Base Stage */
+        delete: operations["archive_base_stage_api_v1_base_stages__base_stage_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Base Stage Content */
+        get: operations["base_stage_content_api_v1_base_stages__base_stage_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Base Stage */
+        post: operations["duplicate_base_stage_api_v1_base_stages__base_stage_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Base Stage
+         * @description Spend once on a reviewed composition prompt. No identities are involved.
+         */
+        post: operations["generate_base_stage_api_v1_base_stages__base_stage_id__generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/generations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Base Stage Generations */
+        get: operations["list_base_stage_generations_api_v1_base_stages__base_stage_id__generations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/panels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Base Stage Panels
+         * @description Panels whose composition is anchored on this Base Stage.
+         */
+        get: operations["list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Base Stage
+         * @description Exact no-spend preflight for a generated draft.
+         */
+        get: operations["preview_base_stage_api_v1_base_stages__base_stage_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Base Stage
+         * @description Promote one succeeded candidate to this stage's permanent source image.
+         */
+        post: operations["publish_base_stage_api_v1_base_stages__base_stage_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base-stages/{base_stage_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Base Stage */
+        post: operations["restore_base_stage_api_v1_base_stages__base_stage_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/budget": {
         parameters: {
             query?: never;
@@ -596,6 +831,143 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BaseStage */
+        BaseStage: {
+            /** Archived At */
+            archived_at: string | null;
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            /** Beat Text */
+            beat_text: string | null;
+            /** Camera */
+            camera: string | null;
+            /** Content Url */
+            content_url: string | null;
+            /** Created At */
+            created_at: string;
+            /** Description */
+            description: string;
+            dimensions: components["schemas"]["ImageDimensions"] | null;
+            /** Framing */
+            framing: string | null;
+            /**
+             * Generation Count
+             * @default 0
+             */
+            generation_count: number;
+            /** Id */
+            id: number;
+            /** Image Size */
+            image_size: string | null;
+            /**
+             * Is Editable
+             * @default false
+             */
+            is_editable: boolean;
+            /** Model */
+            model: string | null;
+            /** Mood */
+            mood: string | null;
+            /** Origin */
+            origin: string;
+            /** Revision */
+            revision: number;
+            /** Selected Candidate Id */
+            selected_candidate_id: number | null;
+            /** State */
+            state: string;
+            /** Style Id */
+            style_id: number | null;
+            /** Targets */
+            targets: components["schemas"]["BaseStageTarget"][];
+            /** Usage Count */
+            usage_count: number;
+        };
+        /**
+         * BaseStageGeneratedInput
+         * @description Composition for a generated Base Stage draft.
+         *
+         *     Identity targets are required: they are injected into the prompt and are
+         *     what a panel later maps its cast onto.
+         */
+        BaseStageGeneratedInput: {
+            /**
+             * Aspect Ratio
+             * @default 3:2
+             */
+            aspect_ratio: string;
+            /** Beat Text */
+            beat_text: string;
+            /** Camera */
+            camera: string;
+            /** Description */
+            description: string;
+            /** Framing */
+            framing: string;
+            /** Image Size */
+            image_size: string;
+            /** Model */
+            model: string;
+            /**
+             * Mood
+             * @default
+             */
+            mood: string;
+            /** Style Id */
+            style_id: number;
+            /** Targets */
+            targets: string[];
+        };
+        /** BaseStagePreview */
+        BaseStagePreview: {
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            /** Base Stage Id */
+            base_stage_id: number;
+            /** Blocked Reason */
+            blocked_reason?: string | null;
+            /** Can Generate */
+            can_generate: boolean;
+            /** Estimated Cost Cents */
+            estimated_cost_cents: number;
+            /** Image Size */
+            image_size: string;
+            /** Model */
+            model: string;
+            /** Prompt */
+            prompt: string;
+            /** Prompt Hash */
+            prompt_hash: string;
+            /** Remaining After Cents */
+            remaining_after_cents: number;
+            /** Spent Today Cents */
+            spent_today_cents: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** BaseStagePublishIn */
+        BaseStagePublishIn: {
+            /** Candidate Id */
+            candidate_id: number;
+        };
+        /** BaseStageTarget */
+        BaseStageTarget: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
+        };
+        /** Body_upload_base_stage_api_v1_base_stages_upload_post */
+        Body_upload_base_stage_api_v1_base_stages_upload_post: {
+            /** Description */
+            description: string;
+            /** Image */
+            image: string;
+            /** Targets */
+            targets: string;
+        };
         /** Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post */
         Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post: {
             /** Image */
@@ -647,6 +1019,8 @@ export interface components {
             avatar_initials: string;
             /** Avatar Url */
             avatar_url: string | null;
+            /** Base Stage Target Id */
+            base_stage_target_id?: number | null;
             /** Character Id */
             character_id: number;
             /** Name */
@@ -658,6 +1032,8 @@ export interface components {
         };
         /** CastMemberInput */
         CastMemberInput: {
+            /** Base Stage Target Id */
+            base_stage_target_id?: number | null;
             /** Character Id */
             character_id: number;
             /**
@@ -745,6 +1121,8 @@ export interface components {
             aspect_ratio: string;
             /** Attachments */
             attachments: components["schemas"]["GenerationAttachment"][];
+            /** Base Stage Id */
+            base_stage_id?: number | null;
             /** Candidates */
             candidates: components["schemas"]["Candidate"][];
             /** Completed At */
@@ -770,7 +1148,7 @@ export interface components {
             /** Reserved Cost Usd Cents */
             reserved_cost_usd_cents: number;
             /** Scene Id */
-            scene_id: number;
+            scene_id?: number | null;
             /** State */
             state: string;
             /** Warnings */
@@ -800,6 +1178,8 @@ export interface components {
         GenerationSummary: {
             /** Actual Cost Usd Cents */
             actual_cost_usd_cents: number | null;
+            /** Base Stage Id */
+            base_stage_id?: number | null;
             /** Candidates */
             candidates: components["schemas"]["Candidate"][];
             /** Completed At */
@@ -817,7 +1197,7 @@ export interface components {
             /** Reserved Cost Usd Cents */
             reserved_cost_usd_cents: number;
             /** Scene Id */
-            scene_id: number;
+            scene_id?: number | null;
             /** State */
             state: string;
         };
@@ -825,6 +1205,13 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** ImageDimensions */
+        ImageDimensions: {
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
         };
         /**
          * OptionsSummary
@@ -860,6 +1247,9 @@ export interface components {
         Panel: {
             /** Aspect Ratio */
             aspect_ratio: string;
+            base_stage: components["schemas"]["PanelBaseStage"] | null;
+            /** Base Stage Id */
+            base_stage_id: number | null;
             /** Beat Text */
             beat_text: string;
             /** Camera */
@@ -885,7 +1275,35 @@ export interface components {
             /** Mood */
             mood: string;
             /** Style Id */
-            style_id: number;
+            style_id: number | null;
+        };
+        /** PanelBaseStage */
+        PanelBaseStage: {
+            /** Archived At */
+            archived_at: string | null;
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            /** Content Url */
+            content_url: string;
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** State */
+            state: string;
+            /** Style Id */
+            style_id: number | null;
+            /** Targets */
+            targets: components["schemas"]["PanelBaseStageTarget"][];
+        };
+        /** PanelBaseStageTarget */
+        PanelBaseStageTarget: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
         };
         /** PanelInput */
         PanelInput: {
@@ -894,25 +1312,24 @@ export interface components {
              * @default 3:2
              */
             aspect_ratio: string;
+            /** Base Stage Id */
+            base_stage_id?: number | null;
             /** Beat Text */
-            beat_text: string;
+            beat_text?: string | null;
             /** Camera */
-            camera: string;
+            camera?: string | null;
             /** Cast */
             cast: components["schemas"]["CastMemberInput"][];
             /** Framing */
-            framing: string;
+            framing?: string | null;
             /** Image Size */
             image_size: string;
             /** Model */
             model: string;
-            /**
-             * Mood
-             * @default
-             */
-            mood: string;
+            /** Mood */
+            mood?: string | null;
             /** Style Id */
-            style_id: number;
+            style_id?: number | null;
         };
         /** PanelModelInput */
         PanelModelInput: {
@@ -923,6 +1340,8 @@ export interface components {
         PanelPreview: {
             /** Attachments */
             attachments: components["schemas"]["GenerationAttachment"][];
+            /** Base Stage Id */
+            base_stage_id?: number | null;
             /** Blocked Reason */
             blocked_reason?: string | null;
             /** Can Generate */
@@ -941,10 +1360,31 @@ export interface components {
             remaining_after_cents: number;
             /** Scene Id */
             scene_id: number;
+            /** Source Content Url */
+            source_content_url?: string | null;
             /** Spent Today Cents */
             spent_today_cents: number;
             /** Warnings */
             warnings: string[];
+        };
+        /**
+         * PanelSummary
+         * @description Lightweight panel reference used where a full panel payload is overkill,
+         *     e.g. "which panels use this Base Stage".
+         */
+        PanelSummary: {
+            /** Beat Text */
+            beat_text: string;
+            /** Created At */
+            created_at: string;
+            /** Generation Count */
+            generation_count: number;
+            /** Id */
+            id: number;
+            /** Is Editable */
+            is_editable: boolean;
+            /** Latest Attempt Preview Url */
+            latest_attempt_preview_url: string | null;
         };
         /** RefImage */
         RefImage: {
@@ -1059,6 +1499,467 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+        };
+    };
+    list_base_stages_api_v1_base_stages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"][];
+                };
+            };
+        };
+    };
+    list_archived_base_stages_api_v1_base_stages_archived_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"][];
+                };
+            };
+        };
+    };
+    create_generated_base_stage_api_v1_base_stages_generated_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaseStageGeneratedInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_base_stage_api_v1_base_stages_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_base_stage_api_v1_base_stages_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_base_stage_api_v1_base_stages__base_stage_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_base_stage_api_v1_base_stages__base_stage_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaseStageGeneratedInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_base_stage_api_v1_base_stages__base_stage_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    base_stage_content_api_v1_base_stages__base_stage_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_base_stage_api_v1_base_stages__base_stage_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_base_stage_api_v1_base_stages__base_stage_id__generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Generation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_base_stage_generations_api_v1_base_stages__base_stage_id__generations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_base_stage_api_v1_base_stages__base_stage_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Timezone"?: string | null;
+            };
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStagePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_base_stage_api_v1_base_stages__base_stage_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaseStagePublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_base_stage_api_v1_base_stages__base_stage_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

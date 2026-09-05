@@ -35,6 +35,10 @@ class SceneChangedError(CostError):
     pass
 
 
+class BaseStageChangedError(CostError):
+    pass
+
+
 @dataclass(frozen=True)
 class Reservation:
     generation_id: int
@@ -110,7 +114,8 @@ class CostLedger:
     def reserve(
         self,
         *,
-        scene_id: int,
+        scene_id: int | None = None,
+        base_stage_id: int | None = None,
         model: str,
         image_size: str,
         prompt_hash: str,
@@ -118,7 +123,29 @@ class CostLedger:
         parent_generation_id: int | None = None,
         idempotency_key: str | None = None,
         scene_revision: int | None = None,
+        base_stage_revision: int | None = None,
     ) -> Reservation:
+        """Reserve budget for one attempt owned by a panel or a Base Stage.
+
+        Exactly one of ``scene_id``/``base_stage_id`` identifies the owner; the
+        database enforces the same rule (017_base_stage_generations). Every
+        owner-scoped rule below — idempotent replay, stale-preview detection,
+        and the single in-flight attempt — is applied against that owner only.
+        """
+        if (scene_id is None) == (base_stage_id is None):
+            raise CostError(
+                "a generation must belong to exactly one panel or base stage"
+            )
+        owner_column = "scene_id" if scene_id is not None else "base_stage_id"
+        owner_id = scene_id if scene_id is not None else base_stage_id
+        owner_label = "panel" if scene_id is not None else "base stage"
+        revision = scene_revision if scene_id is not None else base_stage_revision
+        revision_column = "scene_revision" if scene_id is not None else "base_stage_revision"
+        owner_table = "scene" if scene_id is not None else "base_stage"
+        changed_error = (
+            SceneChangedError if scene_id is not None else BaseStageChangedError
+        )
+
         estimate = self.estimate(model, image_size)
         normalized_key = idempotency_key.strip() if idempotency_key else None
         if normalized_key is not None and len(normalized_key) > 200:
@@ -129,11 +156,11 @@ class CostLedger:
 
             if normalized_key is not None:
                 existing = self.conn.execute(
-                    """
+                    f"""
                     SELECT * FROM generation
-                     WHERE scene_id = ? AND idempotency_key = ?
+                     WHERE {owner_column} = ? AND idempotency_key = ?
                     """,
-                    (scene_id, normalized_key),
+                    (owner_id, normalized_key),
                 ).fetchone()
                 if existing is not None:
                     params = json.loads(existing["params_json"] or "{}")
@@ -142,8 +169,8 @@ class CostLedger:
                         or existing["prompt_hash"] != prompt_hash
                         or params.get("image_size") != image_size
                         or (
-                            scene_revision is not None
-                            and existing["scene_revision"] != scene_revision
+                            revision is not None
+                            and existing[revision_column] != revision
                         )
                     ):
                         raise IdempotencyConflictError(
@@ -156,22 +183,23 @@ class CostLedger:
                         False,
                     )
 
-            if scene_revision is not None:
-                scene = self.conn.execute(
-                    "SELECT revision FROM scene WHERE id = ?", (scene_id,)
+            if revision is not None:
+                owner = self.conn.execute(
+                    f"SELECT revision FROM {owner_table} WHERE id = ?", (owner_id,)
                 ).fetchone()
-                if scene is None or int(scene["revision"]) != scene_revision:
-                    raise SceneChangedError(
-                        "panel changed after preview; preview it again before generating"
+                if owner is None or int(owner["revision"]) != revision:
+                    raise changed_error(
+                        f"{owner_label} changed after preview; "
+                        "preview it again before generating"
                     )
 
             pending = self.conn.execute(
-                "SELECT id FROM generation WHERE scene_id = ? AND state = 'pending'",
-                (scene_id,),
+                f"SELECT id FROM generation WHERE {owner_column} = ? AND state = 'pending'",
+                (owner_id,),
             ).fetchone()
             if pending is not None:
                 raise GenerationPendingError(
-                    f"panel {scene_id} already has a generation in progress"
+                    f"{owner_label} {owner_id} already has a generation in progress"
                 )
 
             spent = self.spent_today()
@@ -184,14 +212,15 @@ class CostLedger:
             cursor = self.conn.execute(
                 """
                 INSERT INTO generation
-                    (scene_id, model, params_json, prompt_hash, request_json,
-                     cost_usd_cents, reserved_cost_usd_cents,
+                    (scene_id, base_stage_id, model, params_json, prompt_hash,
+                     request_json, cost_usd_cents, reserved_cost_usd_cents,
                      parent_generation_id, state, price_table_version,
-                     idempotency_key, scene_revision)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+                     idempotency_key, scene_revision, base_stage_revision)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
                 """,
                 (
                     scene_id,
+                    base_stage_id,
                     model,
                     json.dumps(
                         {
@@ -208,15 +237,16 @@ class CostLedger:
                     self.settings.price_table_version,
                     normalized_key,
                     scene_revision or 0,
+                    base_stage_revision or 0,
                 ),
             )
             self.conn.commit()
             return Reservation(int(cursor.lastrowid), estimate, True)
         except sqlite3.IntegrityError as exc:
             self.conn.rollback()
-            if "generation.scene_id" in str(exc):
+            if f"generation.{owner_column}" in str(exc):
                 raise GenerationPendingError(
-                    f"panel {scene_id} already has a generation in progress"
+                    f"{owner_label} {owner_id} already has a generation in progress"
                 ) from exc
             raise
         except Exception:

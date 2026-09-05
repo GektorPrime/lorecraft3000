@@ -32,7 +32,15 @@ router = APIRouter(prefix="/api/v1", tags=["api-v1-panels"])
 
 
 def _cast_to_dicts(cast) -> list[dict]:
-    return [{"character_id": c.character_id, "role": c.role, "prominence": c.prominence} for c in cast]
+    return [
+        {
+            "character_id": c.character_id,
+            "role": c.role,
+            "prominence": c.prominence,
+            "base_stage_target_id": c.base_stage_target_id,
+        }
+        for c in cast
+    ]
 
 
 @router.get("/panels", response_model=list[Panel])
@@ -53,6 +61,7 @@ def create_panel(payload: PanelInput, conn=Depends(get_conn), storage=Depends(ge
             style_id=payload.style_id,
             model=payload.model,
             image_size=payload.image_size,
+            base_stage_id=payload.base_stage_id,
         )
     except SceneError as exc:
         _raise_for(exc)
@@ -82,6 +91,7 @@ def update_panel(panel_id: int, payload: PanelInput, conn=Depends(get_conn), sto
             style_id=payload.style_id,
             model=payload.model,
             image_size=payload.image_size,
+            base_stage_id=payload.base_stage_id,
         )
     except SceneError as exc:
         _raise_for(exc)
@@ -154,6 +164,12 @@ def preview_panel(
             remaining_after_cents=0,
             can_generate=False,
             blocked_reason=str(exc),
+            base_stage_id=scene.base_stage_id,
+            source_content_url=(
+                f"/api/v1/base-stages/{scene.base_stage_id}/content"
+                if scene.base_stage_id is not None
+                else None
+            ),
         )
     return PanelPreview(
         scene_id=preview.scene_id,
@@ -168,6 +184,12 @@ def preview_panel(
         remaining_after_cents=preview.remaining_after_cents,
         can_generate=True,
         blocked_reason=None,
+        base_stage_id=scene.base_stage_id,
+        source_content_url=(
+            f"/api/v1/base-stages/{scene.base_stage_id}/content"
+            if scene.base_stage_id is not None
+            else None
+        ),
     )
 
 

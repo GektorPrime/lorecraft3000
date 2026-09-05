@@ -386,6 +386,60 @@ def load_gallery(conn: sqlite3.Connection) -> dict[int, list[tuple[str, np.ndarr
     return gallery
 
 
+def load_gallery_for_attachments(
+    conn: sqlite3.Connection,
+    attachments: list[dict] | tuple[dict, ...],
+) -> dict[int, list[tuple[str, np.ndarray]]]:
+    """Load the reference embeddings that a captured request actually used.
+
+    ``attachments`` are the reference-image captures written into a
+    ``request_json`` (each carries ``character_id`` and ``sha256``). This loads
+    exactly those hashes — including images belonging to *retired* reference
+    sets, whose versions were preserved specifically so a generation can be
+    re-scored against the references it was really made from. A hash with no
+    stored embedding (e.g. a face-less ref) is simply skipped.
+
+    Returns ``{character_id: [(sha256, vector), ...]}``, mirroring
+    ``load_gallery``'s shape so ``score_generated_image`` needs no change.
+    """
+    wanted: dict[int, list[str]] = {}
+    for entry in attachments:
+        if not isinstance(entry, dict):
+            continue
+        character_id = entry.get("character_id")
+        sha256 = entry.get("sha256")
+        if not isinstance(character_id, int) or not isinstance(sha256, str):
+            continue
+        wanted.setdefault(character_id, []).append(sha256)
+    if not wanted:
+        return {}
+
+    placeholders = []
+    params: list[str] = []
+    for character_id, hashes in wanted.items():
+        for sha in hashes:
+            placeholders.append("?")
+            params.append(sha)
+    rows = conn.execute(
+        f"""
+        SELECT ri.sha256, ri.role, rs.character_id, fe.embedding
+          FROM ref_image ri
+          JOIN ref_set rs ON rs.id = ri.ref_set_id
+          JOIN face_embedding fe ON fe.sha256 = ri.sha256
+         WHERE ri.sha256 IN ({", ".join(placeholders)})
+           AND ri.role   IN (?, ?, ?)
+        """,
+        (*params, *FACE_ROLES),
+    ).fetchall()
+    gallery: dict[int, list[tuple[str, np.ndarray]]] = {}
+    for row in rows:
+        vec = decode_embedding(row["embedding"])
+        if vec is None:
+            continue
+        gallery.setdefault(row["character_id"], []).append((row["sha256"], vec))
+    return gallery
+
+
 def score_against_gallery(
     probe: np.ndarray,
     gallery: dict[int, list[tuple[str, np.ndarray]]],

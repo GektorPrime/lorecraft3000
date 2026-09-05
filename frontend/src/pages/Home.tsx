@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, getGallery, listCharacters, listPanels, listStyles } from '../api/client'
-import type { Character, GalleryItem, Panel, Style } from '../api/types'
+import { ApiError, getGallery, listBaseStages, listCharacters, listPanels, listStyles } from '../api/client'
+import type { BaseStage, Character, GalleryItem, Panel, Style } from '../api/types'
 import { useBudget } from '../api/useBudget'
 import { AsyncMessage } from '../components/AsyncMessage'
 import { EmptyState } from '../components/EmptyState'
@@ -35,6 +35,8 @@ export function Home() {
   const [characterError, setCharacterError] = useState<string | null>(null)
   const [styles, setStyles] = useState<Style[] | null>(null)
   const [styleError, setStyleError] = useState<string | null>(null)
+  const [baseStages, setBaseStages] = useState<BaseStage[] | null>(null)
+  const [baseStageError, setBaseStageError] = useState<string | null>(null)
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const mounted = useRef(true)
 
@@ -71,6 +73,14 @@ export function Home() {
       })
       .catch((error) => {
         if (mounted.current) setStyleError(message(error))
+      })
+
+    void listBaseStages()
+      .then((value) => {
+        if (mounted.current) setBaseStages(value)
+      })
+      .catch((error) => {
+        if (mounted.current) setBaseStageError(message(error))
       })
 
     return () => {
@@ -169,6 +179,17 @@ export function Home() {
                 Styles
               </span>
             </Link>
+            <Link
+              to="/base-stages"
+              className="dashboard-stat"
+              aria-label={baseStages ? `${baseStages.length} Base Stages` : 'Loading Base Stages'}
+            >
+              <Icon name="baseStages" size={18} />
+              <span>
+                <strong>{baseStages ? baseStages.length : '...'}</strong>
+                Base Stages
+              </span>
+            </Link>
           </div>
           {characterError && (
             <AsyncMessage kind="error" className="dashboard-card__message">
@@ -178,6 +199,11 @@ export function Home() {
           {styleError && (
             <AsyncMessage kind="error" className="dashboard-card__message">
               Styles unavailable: {styleError}
+            </AsyncMessage>
+          )}
+          {baseStageError && (
+            <AsyncMessage kind="error" className="dashboard-card__message">
+              Base Stages unavailable: {baseStageError}
             </AsyncMessage>
           )}
         </section>

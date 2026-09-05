@@ -143,6 +143,7 @@ class CastMemberInput(BaseModel):
     character_id: int
     role: str = ""
     prominence: int = Field(default=1, ge=1)
+    base_stage_target_id: int | None = None
 
 
 class CastMember(BaseModel):
@@ -152,18 +153,37 @@ class CastMember(BaseModel):
     name: str
     avatar_url: str | None
     avatar_initials: str
+    base_stage_target_id: int | None = None
+
+
+class PanelBaseStageTarget(BaseModel):
+    id: int
+    position: int
+    description: str
+
+
+class PanelBaseStage(BaseModel):
+    id: int
+    state: str
+    description: str
+    aspect_ratio: str
+    style_id: int | None
+    content_url: str
+    targets: list[PanelBaseStageTarget]
+    archived_at: str | None
 
 
 class PanelInput(BaseModel):
-    beat_text: str
-    camera: str
-    framing: str
-    mood: str = ""
+    beat_text: str | None = None
+    camera: str | None = None
+    framing: str | None = None
+    mood: str | None = None
     aspect_ratio: str = "3:2"
     cast: list[CastMemberInput]
-    style_id: int
+    style_id: int | None = None
     model: str
     image_size: str
+    base_stage_id: int | None = None
 
 
 class PanelModelInput(BaseModel):
@@ -178,9 +198,23 @@ class Panel(BaseModel):
     mood: str
     aspect_ratio: str
     cast: list[CastMember]
-    style_id: int
+    style_id: int | None
+    base_stage_id: int | None
+    base_stage: PanelBaseStage | None
     model: str
     image_size: str
+    created_at: str
+    is_editable: bool
+    generation_count: int
+    latest_attempt_preview_url: str | None
+
+
+class PanelSummary(BaseModel):
+    """Lightweight panel reference used where a full panel payload is overkill,
+    e.g. "which panels use this Base Stage"."""
+
+    id: int
+    beat_text: str
     created_at: str
     is_editable: bool
     generation_count: int
@@ -214,6 +248,8 @@ class PanelPreview(BaseModel):
     remaining_after_cents: int
     can_generate: bool
     blocked_reason: str | None = None
+    base_stage_id: int | None = None
+    source_content_url: str | None = None
 
 
 class GenerationCreate(BaseModel):
@@ -240,7 +276,9 @@ class CandidateEditIn(BaseModel):
 
 class Generation(BaseModel):
     id: int
-    scene_id: int
+    # Exactly one owner is set: a panel (scene_id) or a Base Stage.
+    scene_id: int | None = None
+    base_stage_id: int | None = None
     model: str
     image_size: str
     aspect_ratio: str
@@ -261,7 +299,8 @@ class Generation(BaseModel):
 
 class GenerationSummary(BaseModel):
     id: int
-    scene_id: int
+    scene_id: int | None = None
+    base_stage_id: int | None = None
     model: str
     cost_usd_cents: int
     reserved_cost_usd_cents: int
@@ -280,3 +319,82 @@ class GalleryItem(BaseModel):
     beat_text: str
     aspect_ratio: str
     created_at: str
+
+
+# ---------------------------------------------------------------------------
+# Base Stages
+# ---------------------------------------------------------------------------
+
+
+class BaseStageTarget(BaseModel):
+    id: int
+    position: int
+    description: str
+
+
+class ImageDimensions(BaseModel):
+    width: int
+    height: int
+
+
+class BaseStage(BaseModel):
+    id: int
+    origin: str
+    state: str
+    description: str
+    beat_text: str | None
+    camera: str | None
+    framing: str | None
+    mood: str | None
+    style_id: int | None
+    model: str | None
+    image_size: str | None
+    selected_candidate_id: int | None
+    aspect_ratio: str
+    dimensions: ImageDimensions | None
+    content_url: str | None
+    targets: list[BaseStageTarget]
+    usage_count: int
+    revision: int
+    created_at: str
+    archived_at: str | None
+    is_editable: bool = False
+    generation_count: int = 0
+
+
+class BaseStageGeneratedInput(BaseModel):
+    """Composition for a generated Base Stage draft.
+
+    Identity targets are required: they are injected into the prompt and are
+    what a panel later maps its cast onto.
+    """
+
+    description: str
+    beat_text: str
+    camera: str
+    framing: str
+    mood: str = ""
+    aspect_ratio: str = "3:2"
+    style_id: int
+    model: str
+    image_size: str
+    targets: list[str] = Field(min_length=1)
+
+
+class BaseStagePublishIn(BaseModel):
+    candidate_id: int
+
+
+class BaseStagePreview(BaseModel):
+    base_stage_id: int
+    model: str
+    image_size: str
+    aspect_ratio: str
+    prompt: str
+    prompt_hash: str
+    warnings: list[str]
+    estimated_cost_cents: int
+    spent_today_cents: int
+    remaining_after_cents: int
+    can_generate: bool
+    blocked_reason: str | None = None

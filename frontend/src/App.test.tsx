@@ -31,6 +31,8 @@ function resolvedAppFetch() {
     if (url.endsWith('/options/summary')) return Promise.resolve(jsonResponse(OPTIONS))
     if (url.endsWith('/characters')) return Promise.resolve(jsonResponse([]))
     if (url.endsWith('/styles')) return Promise.resolve(jsonResponse([]))
+    if (url.endsWith('/base-stages/archived')) return Promise.resolve(jsonResponse([]))
+    if (url.endsWith('/base-stages')) return Promise.resolve(jsonResponse([]))
     if (url.endsWith('/panels')) return Promise.resolve(jsonResponse([]))
     throw new Error(`Unexpected request: ${url}`)
   })
@@ -66,10 +68,20 @@ describe('App routing', () => {
     const library = screen.getByRole('list', { name: 'Library' })
     expect(within(library).getByRole('link', { name: 'Characters' })).toBeInTheDocument()
     expect(within(library).getByRole('link', { name: 'Styles' })).toBeInTheDocument()
+    expect(within(library).getByRole('link', { name: 'Base Stages' })).toBeInTheDocument()
 
     const work = screen.getByRole('list', { name: 'Work' })
     expect(within(work).getByRole('link', { name: 'Panels' })).toBeInTheDocument()
     expect(within(work).getByRole('link', { name: 'Gallery' })).toBeInTheDocument()
+  })
+
+  it('renders the base stage library route without a generated-stage action', async () => {
+    await renderApp('#/base-stages')
+
+    expect(await screen.findByRole('heading', { name: 'Base Stages' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Upload base stage' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /Generate/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Base Stages | LoreCraft3000'))
   })
 
   it('does not mark Panels active when on Stage new panel', async () => {

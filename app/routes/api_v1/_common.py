@@ -14,6 +14,14 @@ from fastapi.responses import Response
 
 from app.deps import settings
 from app.services.avatars import AvatarService
+from app.services.base_stages import (
+    BaseStageError,
+    BaseStageLockedError,
+    BaseStageNotFoundError,
+    BaseStageNotReadyError,
+    BaseStageService,
+    BaseStageValidationError,
+)
 
 # Browser timezone (IANA name) used to compute the user-local daily budget
 # boundary. Supplied by the React client; absent/invalid values fall back to
@@ -29,6 +37,7 @@ from app.services.characters import (
     VisualContractTooLongError,
 )
 from app.services.costs import (
+    BaseStageChangedError,
     BudgetExceededError,
     CostError,
     GenerationPendingError,
@@ -87,6 +96,7 @@ PANEL_IMMUTABILITY_EXPLANATION = (
 # mapper picks the intended status code (e.g. GenerationNotFoundError (404)
 # before GenerationError (422)).
 _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
+    (BaseStageNotFoundError, 404),
     (CharacterNotFoundError, 404),
     (StyleNotFoundError, 404),
     (RefSetNotFoundError, 404),
@@ -102,13 +112,17 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (GenerationPendingError, 409),
     (IdempotencyConflictError, 409),
     (SceneChangedError, 409),
+    (BaseStageChangedError, 409),
     (PreviewChangedError, 409),
+    (BaseStageNotReadyError, 409),
+    (BaseStageLockedError, 409),
     (BudgetExceededError, 402),
     (VisualContractTooLongError, 422),
     (InvalidStyleReferenceError, 422),
     (InvalidRoleError, 422),
     (ImageRejectedError, 422),
     (UnknownPriceError, 422),
+    (BaseStageValidationError, 422),
     (ImageStorageError, 404),
     (CharacterError, 422),
     (StyleError, 422),
@@ -117,6 +131,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (GenerationError, 422),
     (CandidateError, 422),
     (CostError, 422),
+    (BaseStageError, 422),
 )
 
 
@@ -219,14 +234,35 @@ def _cast_member_out(conn, storage: ImageStorage, entry: dict) -> "CastMember":
         name=name,
         avatar_url=f"/api/v1/ref-images/{avatar.id}/content" if avatar else None,
         avatar_initials=_initials(name),
+        base_stage_target_id=entry.get("base_stage_target_id"),
     )
 
 
 def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
-    from app.schemas import Panel
+    from app.schemas import Panel, PanelBaseStage, PanelBaseStageTarget
 
     scenes = SceneService(conn, settings)
     latest_candidate_id = scenes.latest_attempt_candidate_id(scene.id)
+    base_stage = None
+    if scene.base_stage_id is not None:
+        stage = BaseStageService(conn, storage).get(scene.base_stage_id)
+        base_stage = PanelBaseStage(
+            id=stage.id,
+            state=stage.state,
+            description=stage.description,
+            aspect_ratio=stage.aspect_ratio,
+            style_id=stage.style_id,
+            content_url=f"/api/v1/base-stages/{stage.id}/content",
+            targets=[
+                PanelBaseStageTarget(
+                    id=target.id,
+                    position=target.position,
+                    description=target.description,
+                )
+                for target in stage.targets
+            ],
+            archived_at=stage.archived_at,
+        )
     return Panel(
         id=scene.id,
         beat_text=scene.beat_text,
@@ -236,8 +272,29 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
         aspect_ratio=scene.aspect_ratio,
         cast=[_cast_member_out(conn, storage, entry) for entry in scene.cast],
         style_id=scene.style_id,
+        base_stage_id=scene.base_stage_id,
+        base_stage=base_stage,
         model=scene.model,
         image_size=scene.image_size,
+        created_at=scene.created_at,
+        is_editable=scenes.is_editable(scene.id),
+        generation_count=scenes.generation_count(scene.id),
+        latest_attempt_preview_url=(
+            f"/api/v1/candidates/{latest_candidate_id}/content"
+            if latest_candidate_id is not None
+            else None
+        ),
+    )
+
+
+def _panel_summary_out(conn, scene) -> "PanelSummary":
+    from app.schemas import PanelSummary
+
+    scenes = SceneService(conn, settings)
+    latest_candidate_id = scenes.latest_attempt_candidate_id(scene.id)
+    return PanelSummary(
+        id=scene.id,
+        beat_text=scene.beat_text,
         created_at=scene.created_at,
         is_editable=scenes.is_editable(scene.id),
         generation_count=scenes.generation_count(scene.id),
@@ -293,6 +350,7 @@ def _generation_out(row, candidates) -> "Generation":
     return Generation(
         id=row["id"],
         scene_id=row["scene_id"],
+        base_stage_id=row["base_stage_id"],
         model=row["model"],
         image_size=request_data.get("image_size", ""),
         aspect_ratio=request_data.get("aspect_ratio", ""),
@@ -319,3 +377,48 @@ def _serve_stored_image(sha256: str, storage: ImageStorage) -> Response:
         _raise_for(exc)
     mime = _MIME.get(metadata.get("format"), "application/octet-stream")
     return Response(data, media_type=mime)
+
+
+def _base_stage_out(
+    stage, *, is_editable: bool = False, generation_count: int = 0
+) -> "BaseStage":
+    from app.schemas import BaseStage, BaseStageTarget, ImageDimensions
+
+    dimensions = None
+    if stage.image_width is not None and stage.image_height is not None:
+        dimensions = ImageDimensions(width=stage.image_width, height=stage.image_height)
+    return BaseStage(
+        id=stage.id,
+        origin=stage.origin,
+        state=stage.state,
+        description=stage.description,
+        beat_text=stage.beat_text,
+        camera=stage.camera,
+        framing=stage.framing,
+        mood=stage.mood,
+        style_id=stage.style_id,
+        model=stage.model,
+        image_size=stage.image_size,
+        selected_candidate_id=stage.selected_candidate_id,
+        aspect_ratio=stage.aspect_ratio,
+        dimensions=dimensions,
+        content_url=(
+            f"/api/v1/base-stages/{stage.id}/content"
+            if stage.state == "ready"
+            else None
+        ),
+        targets=[
+            BaseStageTarget(
+                id=target.id,
+                position=target.position,
+                description=target.description,
+            )
+            for target in stage.targets
+        ],
+        usage_count=stage.usage_count,
+        revision=stage.revision,
+        created_at=stage.created_at,
+        archived_at=stage.archived_at,
+        is_editable=is_editable,
+        generation_count=generation_count,
+    )

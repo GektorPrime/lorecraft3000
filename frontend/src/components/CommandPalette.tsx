@@ -6,7 +6,7 @@ import {
   type RefObject,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listCharacters, listPanels, listStyles } from '../api/client'
+import { listBaseStages, listCharacters, listPanels, listStyles } from '../api/client'
 import { useTheme } from '../theme/useTheme'
 import { Icon, type IconName } from './Icon'
 
@@ -88,6 +88,15 @@ export function CommandPalette({
       icon: 'styles',
       search: searchable('new style create visual'),
       to: '/styles/new',
+    },
+    {
+      id: 'new-base-stage',
+      label: 'New base stage',
+      detail: 'Compose a reusable scene image',
+      category: 'Create',
+      icon: 'baseStages',
+      search: searchable('new base stage compose create reusable scene'),
+      to: '/base-stages/new',
     },
     {
       id: 'theme-system',
@@ -188,11 +197,19 @@ export function CommandPalette({
     if (!open || loadStarted.current) return
     loadStarted.current = true
     setLoading(true)
-    void Promise.allSettled([listCharacters(), listStyles(), listPanels()]).then(
-      ([charactersResult, stylesResult, panelsResult]) => {
+    void Promise.allSettled([
+      listCharacters(),
+      listStyles(),
+      listPanels(),
+      listBaseStages(),
+    ]).then(
+      ([charactersResult, stylesResult, panelsResult, baseStagesResult]) => {
         if (!mounted.current) return
         const commands: Command[] = []
         let failures = 0
+        const tally = (result: PromiseSettledResult<unknown>) => {
+          if (result.status === 'rejected') failures += 1
+        }
 
         if (charactersResult.status === 'fulfilled') {
           commands.push(
@@ -206,7 +223,7 @@ export function CommandPalette({
               to: `/characters/${character.id}`,
             })),
           )
-        } else failures += 1
+        } else tally(charactersResult)
 
         if (stylesResult.status === 'fulfilled') {
           commands.push(
@@ -220,7 +237,7 @@ export function CommandPalette({
               to: `/styles/${style.id}/edit`,
             })),
           )
-        } else failures += 1
+        } else tally(stylesResult)
 
         if (panelsResult.status === 'fulfilled') {
           commands.push(
@@ -234,13 +251,27 @@ export function CommandPalette({
               to: `/panels/${panel.id}/preview`,
             })),
           )
-        } else failures += 1
+        } else tally(panelsResult)
+
+        if (baseStagesResult.status === 'fulfilled') {
+          commands.push(
+            ...baseStagesResult.value.map((stage) => ({
+              id: `base-stage-${stage.id}`,
+              label: `Base Stage #${stage.id}`,
+              detail: `${stage.state}${stage.archived_at ? ' - archived' : ''} · ${stage.description}`,
+              category: 'Base Stages',
+              icon: 'baseStages' as const,
+              search: searchable(stage.id, stage.description, stage.aspect_ratio, 'base stage'),
+              to: stage.is_editable ? `/base-stages/${stage.id}/preview` : `/base-stages`,
+            })),
+          )
+        } else tally(baseStagesResult)
 
         setLibraryCommands(commands)
         setLoadWarning(
           failures === 0
             ? null
-            : failures === 3
+            : failures === 4
               ? 'Library search is temporarily unavailable.'
               : 'Some library results are temporarily unavailable.',
         )
@@ -292,7 +323,7 @@ export function CommandPalette({
             aria-autocomplete="list"
             aria-activedescendant={activeCommand ? `command-${activeCommand.id}` : undefined}
             autoComplete="off"
-            placeholder="Search characters, styles, panels and actions"
+            placeholder="Search characters, styles, base stages, panels and actions"
             onChange={(event) => {
               setQuery(event.target.value)
               setActiveIndex(0)

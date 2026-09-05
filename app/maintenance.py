@@ -20,10 +20,13 @@ extension map, with the ``provenance`` list rebuilt from the authoritative
 and clearly reports every defect it declines to fix.
 
 ``identity backfill`` embeds face-role reference images that grew into the
-library before face embedding existed, then scores every candidate that lacks
-a stored identity payload (or all of them with ``--force``). It requires the
-InsightFace model pack and leaves candidates unfetchable without a face
-untouched instead of failing the whole run.
+library before face embedding existed — the canonical set plus any references
+captured on past generations (so retired reference versions can still be scored
+against) — then scores every candidate that lacks a stored identity payload (or
+all of them with ``--force``), matching each candidate against the references
+its request actually used. It requires the InsightFace model pack and leaves
+candidates unfetchable without a face untouched instead of failing the whole
+run.
 
 ``models`` provisions the ~326MB buffalo_l model pack that face embedding
 needs: ``status`` reports whether it is installed, ``install`` fetches,
@@ -54,7 +57,7 @@ from app.services.identity import (
     MODEL_NAME,
     get_embedder,
     install_model,
-    load_gallery,
+    load_gallery_for_attachments,
     model_dir,
     model_status,
     score_generated_image,
@@ -141,13 +144,16 @@ def run_check(conn: sqlite3.Connection, storage: ImageStorage) -> ConsistencyRep
     """Scan the store and database and classify every inconsistency found.
 
     The database hashes come from every table that references stored objects
-    (``candidate``, ``ref_image``, and the authoritative ``image_provenance``).
+    (``candidate``, ``ref_image``, uploaded ``base_stage`` rows, and the
+    authoritative ``image_provenance``).
     """
     db_hashes = {
         row[0]
         for row in conn.execute(
             "SELECT DISTINCT sha256 FROM candidate "
             "UNION SELECT DISTINCT sha256 FROM ref_image "
+            "UNION SELECT uploaded_sha256 FROM base_stage "
+            "WHERE uploaded_sha256 IS NOT NULL "
             "UNION SELECT DISTINCT sha256 FROM image_provenance"
         ).fetchall()
     }
@@ -338,6 +344,7 @@ class IdentityBackfillReport:
     refs_no_face: tuple[str, ...] = ()
     candidates_scored: int = 0
     candidates_no_face: int = 0
+    candidates_no_refs: int = 0
     candidates_skipped_bad_cast: int = 0
     errors: tuple[str, ...] = ()
 
@@ -362,6 +369,44 @@ def _candidate_cast_ids(
         if ids:
             return tuple(ids)
     return ()
+
+
+def _candidate_attachments(request_json: str) -> list[dict]:
+    """Reference-image captures recorded on a candidate's request.
+
+    ``attachments`` carries ``character_id`` and ``sha256`` for every
+    canonical reference the request used, on every path (direct panel, Base
+    Stage panel, and candidate edit). These hashes let a candidate be scored
+    against the exact references it was generated from, including references
+    whose set has since been retired. Returns only dict entries.
+    """
+    if not request_json:
+        return []
+    try:
+        payload = json.loads(request_json)
+    except json.JSONDecodeError:
+        return []
+    attachments = payload.get("attachments", []) if isinstance(payload, dict) else []
+    return [entry for entry in attachments if isinstance(entry, dict)]
+
+
+def _referenced_ref_shas(conn: sqlite3.Connection) -> set[str]:
+    """sha256 of every reference image any captured request used.
+
+    Pulled from the ``attachments`` arrays of all stored ``request_json``
+    payloads. Used to embed the references a candidate was scored against even
+    after their reference set has been retired.
+    """
+    rows = conn.execute(
+        """
+        SELECT DISTINCT json_extract(j.value, '$.sha256')
+          FROM generation g
+          JOIN json_each(g.request_json, '$.attachments') j
+         WHERE g.request_json IS NOT NULL
+           AND json_valid(g.request_json) = 1
+        """
+    ).fetchall()
+    return {row[0] for row in rows if row[0] and isinstance(row[0], str)}
 
 
 def run_identity_backfill(
@@ -392,17 +437,21 @@ def run_identity_backfill(
 
     if scope in ("all", "refs"):
         placeholders = ", ".join("?" for _ in FACE_ROLES)
+        referenced = _referenced_ref_shas(conn)
         missing_refs = conn.execute(
             f"""
             SELECT ri.sha256, ri.role
               FROM ref_image ri
               JOIN ref_set rs ON rs.id = ri.ref_set_id
               LEFT JOIN face_embedding fe ON fe.sha256 = ri.sha256
-             WHERE rs.status = 'canonical'
-               AND ri.role IN ({placeholders})
+             WHERE ri.role IN ({placeholders})
                AND fe.sha256 IS NULL
+               AND (
+                     rs.status = 'canonical'
+                     OR ri.sha256 IN ({", ".join("?" for _ in referenced)})
+               )
             """,
-            FACE_ROLES,
+            (*FACE_ROLES, *sorted(referenced)),
         ).fetchall()
         for row in missing_refs:
             sha, role = row["sha256"], row["role"]
@@ -421,6 +470,7 @@ def run_identity_backfill(
 
     candidates_scored = 0
     candidates_no_face = 0
+    candidates_no_refs = 0
     candidates_skipped_bad_cast = 0
 
     if scope in ("all", "candidates"):
@@ -438,11 +488,19 @@ def run_identity_backfill(
             {where}
             """,
         ).fetchall()
-        gallery = load_gallery(conn)
         for row in rows:
             cast_ids = _candidate_cast_ids(row["request_json"], row["cast_json"])
             if not cast_ids:
                 candidates_skipped_bad_cast += 1
+                continue
+            # Score against the references captured on the request, not the
+            # currently-canonical sets: a candidate is compared with the faces
+            # it was actually generated from, regardless of later retirement.
+            gallery = load_gallery_for_attachments(
+                conn, _candidate_attachments(row["request_json"])
+            )
+            if not gallery:
+                candidates_no_refs += 1
                 continue
             try:
                 data, _ = storage.read(row["sha256"])
@@ -467,6 +525,7 @@ def run_identity_backfill(
         refs_no_face=tuple(sorted(refs_no_face)),
         candidates_scored=candidates_scored,
         candidates_no_face=candidates_no_face,
+        candidates_no_refs=candidates_no_refs,
         candidates_skipped_bad_cast=candidates_skipped_bad_cast,
         errors=tuple(sorted(errors)),
     )
@@ -480,6 +539,7 @@ def _print_identity_backfill(report: IdentityBackfillReport) -> None:
             print(f"    no face: {item}")
     print(f"  candidates scored:             {report.candidates_scored}")
     print(f"  candidates with no face:       {report.candidates_no_face}")
+    print(f"  candidates with no refs:       {report.candidates_no_refs}")
     print(f"  candidates skipped (no cast):  {report.candidates_skipped_bad_cast}")
     if report.errors:
         print(f"  errors:                        {len(report.errors)}")

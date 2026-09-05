@@ -17,6 +17,9 @@ interface CandidateCarouselProps {
   attempts: GenerationSummary[]
   /** Panel cast, used to label identity-score chips with character names. */
   cast?: CastMemberRef[]
+  /** When provided, Accept/Reject review buttons are shown for the current candidate. */
+  onReview?: (candidateId: number, verdict: 'accepted' | 'rejected') => void
+  reviewingCandidateId?: number | null
 }
 
 const REVIEW_STATUS_LABEL: Record<string, string> = {
@@ -48,11 +51,14 @@ function parseIdentityScores(value: unknown): IdentityScores | null {
 }
 
 /** Carousel that cycles through the generated images of each attempt (an
- * attempt stores exactly one candidate image). Review and edit controls live
- * on the corresponding attempt below. */
+ * attempt stores exactly one candidate image). When `onReview` is provided,
+ * Accept/Reject buttons act on the candidate currently shown; the matching
+ * review controls remain available on each attempt below. */
 export function CandidateCarousel({
   attempts,
   cast,
+  onReview,
+  reviewingCandidateId,
 }: CandidateCarouselProps) {
   const [index, setIndex] = useState(0)
   const reviewed = attempts.filter((attempt) => attempt.candidates.length > 0)
@@ -133,6 +139,30 @@ export function CandidateCarousel({
             <Icon name="chevronRight" size={16} />
           </button>
         </div>
+        {onReview && (
+          <div className="action-bar__group action-bar__group--end">
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={reviewingCandidateId !== null}
+              onClick={() => onReview(candidate.id, 'accepted')}
+            >
+              <Icon name="check" size={16} />
+              Accept
+            </button>
+            <button
+              type="button"
+              className="btn btn--danger"
+              disabled={reviewingCandidateId !== null}
+              onClick={() => onReview(candidate.id, 'rejected')}
+            >
+              Reject
+            </button>
+            {reviewingCandidateId === candidate.id && (
+              <span className="field__hint">Reviewing image…</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

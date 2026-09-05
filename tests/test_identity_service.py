@@ -244,3 +244,111 @@ def test_install_force_replaces_installed_pack(tmp_path, monkeypatch):
 
     assert model_installed()
     assert not (model_dir() / ".probe").exists()
+
+
+# ---------------------------------------------------------------------------
+# Captured-reference gallery
+# ---------------------------------------------------------------------------
+
+
+def test_load_gallery_for_attachments_resolves_captured_hashes(conn, storage):
+    """A request's captured attachments resolve to exactly its reference faces."""
+    from app.services.characters import CharacterService
+    from app.services.identity import load_gallery_for_attachments, store_embedding
+    from app.services.ref_sets import RefSetService
+    from tests.conftest import make_png_bytes
+
+    np = pytest.importorskip("numpy")
+
+    character = CharacterService(conn).create(
+        name="ELIAS", slug="elias", visual_contract="A painted face."
+    )
+    rival = CharacterService(conn).create(
+        name="MARA", slug="mara", visual_contract="A different painted face."
+    )
+    refs = RefSetService(conn, storage)
+    elias_set = refs.create_draft(character.id)
+    elias_front = refs.add_image(
+        elias_set.id, make_png_bytes((1, 2, 3)), "face_front", source_name="e.png"
+    )
+    # A non-face role must not enter the gallery even when embedded.
+    elias_full = refs.add_image(
+        elias_set.id, make_png_bytes((4, 5, 6)), "full_body", source_name="e-body.png"
+    )
+    refs.promote(elias_set.id)
+    mara_set = refs.create_draft(rival.id)
+    mara_front = refs.add_image(
+        mara_set.id, make_png_bytes((7, 8, 9)), "face_front", source_name="m.png"
+    )
+    refs.promote(mara_set.id)
+
+    # Embed only the character's own face_front — the rival and the full_body
+    # stay unembedded, exercising the "missing embedding is skipped" branch.
+    store_embedding(conn, elias_front.sha256, make_unit_vector(0.5))
+    conn.commit()
+
+    attachments = [
+        {"image_number": 1, "character_id": character.id, "sha256": elias_front.sha256},
+        {"image_number": 2, "character_id": character.id, "sha256": elias_full.sha256},
+        {"image_number": 3, "character_id": rival.id, "sha256": mara_front.sha256},
+        {"image_number": 4, "character_id": "not-an-int", "sha256": "1" * 64},
+        None,
+    ]
+
+    gallery = load_gallery_for_attachments(conn, attachments)
+
+    assert isinstance(next(iter(gallery.values()))[0][1], np.ndarray)
+    assert set(gallery) == {character.id}
+    assert [sha for sha, _ in gallery[character.id]] == [elias_front.sha256]
+
+
+def test_load_gallery_for_attachments_accepts_empty_and_agrees_on_canonical(
+    conn, storage
+):
+    """Empty attachments yield an empty gallery; the helper matches load_gallery."""
+    from app.services.identity import load_gallery, load_gallery_for_attachments
+
+    assert load_gallery_for_attachments(conn, ()) == {}
+    # A nothing-but-noise input must not send a broken IN clause to SQLite.
+    assert load_gallery_for_attachments(conn, [{}, "bogus"]) == {}
+
+
+def test_load_gallery_for_attachments_uses_retired_reference_versions(conn, storage):
+    """Retired-but-captured references still score, unlike the canonical query."""
+    pytest.importorskip("numpy")
+    from app.services.characters import CharacterService
+    from app.services.identity import load_gallery, load_gallery_for_attachments, store_embedding
+    from app.services.ref_sets import RefSetService
+    from tests.conftest import make_png_bytes
+
+    character = CharacterService(conn).create(
+        name="ELIAS", slug="elias", visual_contract="A painted face."
+    )
+    refs = RefSetService(conn, storage)
+    old_set = refs.create_draft(character.id)
+    old_front = refs.add_image(
+        old_set.id, make_png_bytes((1, 2, 3)), "face_front", source_name="e-old.png"
+    )
+    refs.promote(old_set.id)  # canonical
+    newer_set = refs.create_draft(character.id)
+    newer_front = refs.add_image(
+        newer_set.id, make_png_bytes((9, 9, 9)), "face_front", source_name="e-new.png"
+    )
+    refs.promote(newer_set.id)  # retires old_front
+    store_embedding(conn, old_front.sha256, make_unit_vector(0.4))
+    store_embedding(conn, newer_front.sha256, make_unit_vector(0.8))
+    conn.commit()
+
+    attachments = [
+        {"image_number": 1, "character_id": character.id, "sha256": old_front.sha256},
+    ]
+
+    captured = load_gallery_for_attachments(conn, attachments)
+    assert set(captured) == {character.id}
+    assert [sha for sha, _ in captured[character.id]] == [old_front.sha256]
+
+    # The canonical query exposes the *new* reference only — the retired one a
+    # captured request used is invisible to it.
+    canonical = load_gallery(conn)
+    assert [sha for sha, _ in canonical.get(character.id, [])] == [newer_front.sha256]
+    assert [sha for sha, _ in captured[character.id]] != [newer_front.sha256]

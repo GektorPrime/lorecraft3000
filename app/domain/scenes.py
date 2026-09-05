@@ -15,7 +15,8 @@ class Scene:
     mood: str
     aspect_ratio: str
     cast: list[dict]
-    style_id: int
+    style_id: int | None
+    base_stage_id: int | None
     model: str
     image_size: str
     created_at: str
@@ -31,6 +32,7 @@ class Scene:
             aspect_ratio=row["aspect_ratio"],
             cast=json.loads(row["cast_json"]),
             style_id=row["style_id"],
+            base_stage_id=row["base_stage_id"],
             model=row["model"],
             image_size=row["image_size"],
             created_at=row["created_at"],
