@@ -4,6 +4,7 @@ import pytest
 
 from app.assembler.core import (
     AssemblyError,
+    assemble_base_stage_prompt,
     assemble_prompt,
     assemble_staged_prompt,
     capabilities_for,
@@ -203,3 +204,62 @@ def test_staged_prompt_hash_covers_source_mapping_text_model_size_and_attachment
         },
     ]
     assert all(assemble_staged_prompt(**variant).prompt_hash != baseline for variant in variants)
+
+
+def _base_stage_kwargs(**overrides):
+    kwargs = {
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+        "description": "Four figures haul a machine up a ravine.",
+        "beat_text": "They strain against the rope.",
+        "camera": "twenty metres away",
+        "framing": "wide environmental shot",
+        "mood": "strenuous",
+        "targets": ("figure above the slope", "figure beside the oak"),
+        "style_contract": "Painted, not photographic.",
+    }
+    kwargs.update(overrides)
+    return kwargs
+
+
+def test_base_stage_prompt_is_identity_neutral_and_attachment_free():
+    assembled = assemble_base_stage_prompt(**_base_stage_kwargs())
+
+    # No cast exists yet, so nothing may be attached or identity-bearing.
+    assert assembled.attachments == ()
+    assert assembled.warnings == ()
+    assert "REFERENCE DECLARATION" not in assembled.text
+    assert "VISUAL CONTRACTS" not in assembled.text
+    assert "Figure 1: figure above the slope" in assembled.text
+    assert "Figure 2: figure beside the oak" in assembled.text
+    assert "exactly 2 anonymous figures" in assembled.text
+    assert "Painted, not photographic." in assembled.text
+    assert "group portrait" in assembled.text
+
+
+def test_base_stage_prompt_hash_covers_targets_model_and_size():
+    baseline = assemble_base_stage_prompt(**_base_stage_kwargs())
+    assert (
+        assemble_base_stage_prompt(**_base_stage_kwargs()).prompt_hash
+        == baseline.prompt_hash
+    )
+    for override in (
+        {"targets": ("figure above the slope", "figure by the stream")},
+        {"model": "gpt-image-2"},
+        {"image_size": "2K"},
+        {"description": "A different composition."},
+        {"style_contract": "Another style."},
+    ):
+        assert (
+            assemble_base_stage_prompt(**_base_stage_kwargs(**override)).prompt_hash
+            != baseline.prompt_hash
+        )
+
+
+def test_base_stage_prompt_rejects_unusable_input():
+    with pytest.raises(AssemblyError, match="at least one identity target"):
+        assemble_base_stage_prompt(**_base_stage_kwargs(targets=()))
+    with pytest.raises(AssemblyError, match="needs a description"):
+        assemble_base_stage_prompt(**_base_stage_kwargs(description="  "))
+    with pytest.raises(AssemblyError, match="unsupported image model"):
+        assemble_base_stage_prompt(**_base_stage_kwargs(model="not-a-model"))

@@ -286,6 +286,21 @@ class ImageStorage:
             raise ImageStorageError(f"stored image {sha256} failed its hash check")
         return data, metadata
 
+    def dimensions(self, sha256: str) -> tuple[int, int]:
+        """Return (width, height) of a stored image.
+
+        Sidecars deliberately carry only format/size metadata, so dimensions are
+        read back from the verified bytes rather than trusted from disk.
+        """
+        data, _ = self.read(sha256)
+        try:
+            with Image.open(io.BytesIO(data)) as img:
+                return int(img.width), int(img.height)
+        except (UnidentifiedImageError, OSError, ValueError) as exc:
+            raise ImageStorageError(
+                f"stored image {sha256} could not be measured: {exc}"
+            ) from exc
+
     def append_provenance(self, sha256: str, record: dict) -> None:
         """Append a secret-free provenance record to an image sidecar.
 

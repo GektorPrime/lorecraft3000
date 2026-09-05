@@ -25,7 +25,9 @@ const STAGE: BaseStage = {
   description: 'A rain-soaked station platform at night.',
   dimensions: { width: 1536, height: 1024 },
   framing: null,
+  generation_count: 1,
   image_size: null,
+  is_editable: false,
   model: null,
   mood: null,
   origin: 'upload',
@@ -68,6 +70,22 @@ describe('BaseStageListPage', () => {
     expect(screen.getByText('1 target')).toBeInTheDocument()
     expect(screen.getByText('Used 2 times')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Base stage #4/ })).not.toBeInTheDocument()
+  })
+
+  it('links draft generated stages to their preview page', async () => {
+    vi.mocked(client.listBaseStages).mockResolvedValue([
+      { ...STAGE, origin: 'generated', state: 'draft', is_editable: true, content_url: null, selected_candidate_id: null, dimensions: null },
+    ])
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: /Base stage #4/ })).toHaveAttribute(
+      'href',
+      '/base-stages/4/preview',
+    )
+    expect(screen.getByRole('link', { name: /Create generated base stage/ })).toHaveAttribute(
+      'href',
+      '/base-stages/new',
+    )
   })
 
   it('archives after explaining that stored content and links are preserved', async () => {

@@ -80,6 +80,11 @@
             ],
             "title": "Framing"
           },
+          "generation_count": {
+            "default": 0,
+            "title": "Generation Count",
+            "type": "integer"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -94,6 +99,11 @@
               }
             ],
             "title": "Image Size"
+          },
+          "is_editable": {
+            "default": false,
+            "title": "Is Editable",
+            "type": "boolean"
           },
           "model": {
             "anyOf": [
@@ -186,6 +196,159 @@
           "archived_at"
         ],
         "title": "BaseStage",
+        "type": "object"
+      },
+      "BaseStageGeneratedInput": {
+        "description": "Composition for a generated Base Stage draft.\n\nIdentity targets are required: they are injected into the prompt and are\nwhat a panel later maps its cast onto.",
+        "properties": {
+          "aspect_ratio": {
+            "default": "3:2",
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "beat_text": {
+            "title": "Beat Text",
+            "type": "string"
+          },
+          "camera": {
+            "title": "Camera",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "framing": {
+            "title": "Framing",
+            "type": "string"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "mood": {
+            "default": "",
+            "title": "Mood",
+            "type": "string"
+          },
+          "style_id": {
+            "title": "Style Id",
+            "type": "integer"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "description",
+          "beat_text",
+          "camera",
+          "framing",
+          "style_id",
+          "model",
+          "image_size",
+          "targets"
+        ],
+        "title": "BaseStageGeneratedInput",
+        "type": "object"
+      },
+      "BaseStagePreview": {
+        "properties": {
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "base_stage_id": {
+            "title": "Base Stage Id",
+            "type": "integer"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "can_generate": {
+            "title": "Can Generate",
+            "type": "boolean"
+          },
+          "estimated_cost_cents": {
+            "title": "Estimated Cost Cents",
+            "type": "integer"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "prompt_hash": {
+            "title": "Prompt Hash",
+            "type": "string"
+          },
+          "remaining_after_cents": {
+            "title": "Remaining After Cents",
+            "type": "integer"
+          },
+          "spent_today_cents": {
+            "title": "Spent Today Cents",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_stage_id",
+          "model",
+          "image_size",
+          "aspect_ratio",
+          "prompt",
+          "prompt_hash",
+          "warnings",
+          "estimated_cost_cents",
+          "spent_today_cents",
+          "remaining_after_cents",
+          "can_generate"
+        ],
+        "title": "BaseStagePreview",
+        "type": "object"
+      },
+      "BaseStagePublishIn": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "candidate_id"
+        ],
+        "title": "BaseStagePublishIn",
         "type": "object"
       },
       "BaseStageTarget": {
@@ -645,6 +808,17 @@
             "title": "Attachments",
             "type": "array"
           },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
+          },
           "candidates": {
             "items": {
               "$ref": "#/components/schemas/Candidate"
@@ -718,8 +892,15 @@
             "type": "integer"
           },
           "scene_id": {
-            "title": "Scene Id",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene Id"
           },
           "state": {
             "title": "State",
@@ -735,7 +916,6 @@
         },
         "required": [
           "id",
-          "scene_id",
           "model",
           "image_size",
           "aspect_ratio",
@@ -820,6 +1000,17 @@
             ],
             "title": "Actual Cost Usd Cents"
           },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
+          },
           "candidates": {
             "items": {
               "$ref": "#/components/schemas/Candidate"
@@ -870,8 +1061,15 @@
             "type": "integer"
           },
           "scene_id": {
-            "title": "Scene Id",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene Id"
           },
           "state": {
             "title": "State",
@@ -880,7 +1078,6 @@
         },
         "required": [
           "id",
-          "scene_id",
           "model",
           "cost_usd_cents",
           "reserved_cost_usd_cents",
@@ -1738,6 +1935,48 @@
         ]
       }
     },
+    "/api/v1/base-stages/generated": {
+      "post": {
+        "operationId": "create_generated_base_stage_api_v1_base_stages_generated_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BaseStageGeneratedInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Generated Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
     "/api/v1/base-stages/upload": {
       "post": {
         "operationId": "upload_base_stage_api_v1_base_stages_upload_post",
@@ -1855,6 +2094,57 @@
           "api-v1",
           "api-v1-base-stages"
         ]
+      },
+      "put": {
+        "operationId": "update_base_stage_api_v1_base_stages__base_stage_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BaseStageGeneratedInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
       }
     },
     "/api/v1/base-stages/{base_stage_id}/content": {
@@ -1892,6 +2182,280 @@
           }
         },
         "summary": "Base Stage Content",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/duplicate": {
+      "post": {
+        "operationId": "duplicate_base_stage_api_v1_base_stages__base_stage_id__duplicate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Duplicate Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/generate": {
+      "post": {
+        "description": "Spend once on a reviewed composition prompt. No identities are involved.",
+        "operationId": "generate_base_stage_api_v1_base_stages__base_stage_id__generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/generations": {
+      "get": {
+        "operationId": "list_base_stage_generations_api_v1_base_stages__base_stage_id__generations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationSummary"
+                  },
+                  "title": "Response List Base Stage Generations Api V1 Base Stages  Base Stage Id  Generations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Base Stage Generations",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/preview": {
+      "get": {
+        "description": "Exact no-spend preflight for a generated draft.",
+        "operationId": "preview_base_stage_api_v1_base_stages__base_stage_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Timezone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStagePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/publish": {
+      "post": {
+        "description": "Promote one succeeded candidate to this stage's permanent source image.",
+        "operationId": "publish_base_stage_api_v1_base_stages__base_stage_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BaseStagePublishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Base Stage",
         "tags": [
           "api-v1",
           "api-v1-base-stages"

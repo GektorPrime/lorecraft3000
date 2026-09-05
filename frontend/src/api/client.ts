@@ -10,6 +10,8 @@
 
 import type {
   BaseStage,
+  BaseStageGeneratedInput,
+  BaseStagePreview,
   Budget,
   Candidate,
   Character,
@@ -126,6 +128,38 @@ export const archiveBaseStage = (id: number) =>
   request<void>(`/base-stages/${id}`, { method: 'DELETE' })
 export const restoreBaseStage = (id: number) =>
   request<BaseStage>(`/base-stages/${id}/restore`, { method: 'POST' })
+
+// Generated Base Stages: a draft is composed first, generated, and only becomes
+// selectable by panels once one candidate is explicitly published.
+export const createGeneratedBaseStage = (payload: BaseStageGeneratedInput) =>
+  request<BaseStage>('/base-stages/generated', json('POST', payload))
+export const updateBaseStage = (id: number, payload: BaseStageGeneratedInput) =>
+  request<BaseStage>(`/base-stages/${id}`, json('PUT', payload))
+export const duplicateBaseStage = (id: number) =>
+  request<BaseStage>(`/base-stages/${id}/duplicate`, { method: 'POST' })
+export const previewBaseStage = (id: number) =>
+  request<BaseStagePreview>(`/base-stages/${id}/preview`)
+export const listBaseStageGenerations = (id: number) =>
+  request<GenerationSummary[]>(`/base-stages/${id}/generations`)
+export const generateBaseStage = (id: number, expectedPromptHash: string) => {
+  const controller = new AbortController()
+  const t = window.setTimeout(
+    () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+    180_000,
+  )
+  controller.signal.addEventListener('abort', () => window.clearTimeout(t), { once: true })
+  return request<Generation>(`/base-stages/${id}/generate`, {
+    method: 'POST',
+    signal: controller.signal,
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: JSON.stringify({ expected_prompt_hash: expectedPromptHash }),
+  }).finally(() => window.clearTimeout(t))
+}
+export const publishBaseStage = (id: number, candidateId: number) =>
+  request<BaseStage>(`/base-stages/${id}/publish`, json('POST', { candidate_id: candidateId }))
 
 // ---------------------------------------------------------------------------
 // characters

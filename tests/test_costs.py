@@ -8,7 +8,9 @@ import pytest
 from app.config import Settings
 from app.db import connect
 from app.services.costs import (
+    BaseStageChangedError,
     BudgetExceededError,
+    CostError,
     CostLedger,
     GenerationPendingError,
     IdempotencyConflictError,
@@ -374,3 +376,99 @@ def test_spent_today_defaults_to_utc_not_server_local(conn, tmp_path):
 
     # Counts as today regardless of the host's local timezone.
     assert ledger.spent_today() == 42
+
+
+def _base_stage(conn) -> int:
+    """A generated draft is a valid, independent generation owner."""
+    cursor = conn.execute(
+        "INSERT INTO base_stage (origin, state, description, aspect_ratio) "
+        "VALUES ('generated', 'draft', 'A ravine', '16:9')"
+    )
+    conn.commit()
+    return int(cursor.lastrowid)
+
+
+def test_reserve_requires_exactly_one_owner(conn, tmp_path):
+    ledger = CostLedger(conn, _settings(tmp_path))
+    scene_id = _scene(conn)
+    base_stage_id = _base_stage(conn)
+    for kwargs in (
+        {},
+        {"scene_id": scene_id, "base_stage_id": base_stage_id},
+    ):
+        with pytest.raises(CostError, match="exactly one panel or base stage"):
+            ledger.reserve(
+                model="gemini-3.1-flash-image",
+                image_size="1K",
+                prompt_hash="a" * 64,
+                request_json={},
+                **kwargs,
+            )
+
+
+def test_base_stage_owner_scopes_pending_idempotency_and_revision(conn, tmp_path):
+    """Owner-scoped rules must apply to base stages exactly as to panels."""
+    ledger = CostLedger(conn, _settings(tmp_path, cap=1.0))
+    base_stage_id = _base_stage(conn)
+    scene_id = _scene(conn)
+
+    reservation = ledger.reserve(
+        base_stage_id=base_stage_id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+        idempotency_key="stage-key",
+        base_stage_revision=0,
+    )
+    row = conn.execute(
+        "SELECT scene_id, base_stage_id FROM generation WHERE id = ?",
+        (reservation.generation_id,),
+    ).fetchone()
+    assert (row["scene_id"], row["base_stage_id"]) == (None, base_stage_id)
+
+    # Replay is scoped to the same owner and returns the same attempt.
+    replay = ledger.reserve(
+        base_stage_id=base_stage_id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="a" * 64,
+        request_json={},
+        idempotency_key="stage-key",
+        base_stage_revision=0,
+    )
+    assert replay.created is False
+    assert replay.generation_id == reservation.generation_id
+
+    # A pending stage attempt blocks only that stage, never a panel.
+    with pytest.raises(GenerationPendingError, match="base stage"):
+        ledger.reserve(
+            base_stage_id=base_stage_id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            prompt_hash="b" * 64,
+            request_json={},
+        )
+    assert ledger.reserve(
+        scene_id=scene_id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        prompt_hash="c" * 64,
+        request_json={},
+    ).created
+
+    # An edited composition invalidates the reviewed preview.
+    conn.execute(
+        "UPDATE base_stage SET revision = revision + 1 WHERE id = ?", (base_stage_id,)
+    )
+    conn.commit()
+    ledger.fail(reservation.generation_id, "done", charge_expected=False)
+    with pytest.raises(BaseStageChangedError, match="changed after preview"):
+        ledger.reserve(
+            base_stage_id=base_stage_id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            prompt_hash="d" * 64,
+            request_json={},
+            base_stage_revision=0,
+        )

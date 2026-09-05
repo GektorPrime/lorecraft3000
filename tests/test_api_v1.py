@@ -278,6 +278,138 @@ def test_base_stage_missing_routes_return_404(api):
     assert api.client.get("/api/v1/base-stages/9999/content").status_code == 404
     assert api.client.delete("/api/v1/base-stages/9999").status_code == 404
     assert api.client.post("/api/v1/base-stages/9999/restore").status_code == 404
+    assert api.client.get("/api/v1/base-stages/9999/preview").status_code == 404
+    assert api.client.get("/api/v1/base-stages/9999/generations").status_code == 404
+    assert (
+        api.client.post(
+            "/api/v1/base-stages/9999/generate", json={"expected_prompt_hash": "x"}
+        ).status_code
+        == 404
+    )
+    assert (
+        api.client.post(
+            "/api/v1/base-stages/9999/publish", json={"candidate_id": 1}
+        ).status_code
+        == 404
+    )
+
+
+def _create_generated_stage(api, **overrides):
+    payload = {
+        "description": "Four figures haul a machine up a muddy ravine.",
+        "beat_text": "They strain against the rope as the machine slips.",
+        "camera": "twenty metres away, slightly elevated",
+        "framing": "wide environmental shot",
+        "mood": "strenuous",
+        "aspect_ratio": "16:9",
+        "style_id": _default_style_id(api),
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+        "targets": ["figure above the slope", "figure beside the oak"],
+    }
+    payload.update(overrides)
+    return api.client.post("/api/v1/base-stages/generated", json=payload)
+
+
+def test_generated_base_stage_draft_preview_generate_and_publish(api):
+    created = _create_generated_stage(api)
+    assert created.status_code == 201, created.text
+    stage = created.json()
+    stage_id = stage["id"]
+
+    # A draft is not usable yet: no image, and no panel may select it.
+    assert (stage["origin"], stage["state"]) == ("generated", "draft")
+    assert stage["content_url"] is None
+    assert stage["is_editable"] is True
+    assert api.client.get(f"/api/v1/base-stages/{stage_id}/content").status_code == 409
+
+    preview = api.client.get(f"/api/v1/base-stages/{stage_id}/preview")
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["can_generate"] is True
+    assert body["estimated_cost_cents"] > 0
+    assert "IDENTITY TARGETS" in body["prompt"]
+    assert "Figure 1: figure above the slope" in body["prompt"]
+
+    stale = api.client.post(
+        f"/api/v1/base-stages/{stage_id}/generate",
+        json={"expected_prompt_hash": "stale"},
+    )
+    assert stale.status_code == 409
+
+    generated = api.client.post(
+        f"/api/v1/base-stages/{stage_id}/generate",
+        json={"expected_prompt_hash": body["prompt_hash"]},
+    )
+    assert generated.status_code == 201, generated.text
+    attempt = generated.json()
+    assert attempt["base_stage_id"] == stage_id
+    assert attempt["scene_id"] is None
+    assert attempt["attachments"] == []  # identity-neutral: no character refs
+    candidate_id = attempt["candidates"][0]["id"]
+
+    history = api.client.get(f"/api/v1/base-stages/{stage_id}/generations").json()
+    assert [row["id"] for row in history] == [attempt["id"]]
+
+    published = api.client.post(
+        f"/api/v1/base-stages/{stage_id}/publish", json={"candidate_id": candidate_id}
+    )
+    assert published.status_code == 200, published.text
+    ready = published.json()
+    assert ready["state"] == "ready"
+    assert ready["selected_candidate_id"] == candidate_id
+    assert ready["content_url"] == f"/api/v1/base-stages/{stage_id}/content"
+    assert ready["is_editable"] is False
+    assert api.client.get(f"/api/v1/base-stages/{stage_id}/content").status_code == 200
+
+    # Promotion is one-way; a variant needs a duplicate.
+    assert (
+        api.client.post(
+            f"/api/v1/base-stages/{stage_id}/publish",
+            json={"candidate_id": candidate_id},
+        ).status_code
+        == 409
+    )
+    copy = api.client.post(f"/api/v1/base-stages/{stage_id}/duplicate")
+    assert copy.status_code == 201
+    assert copy.json()["state"] == "draft"
+    assert copy.json()["id"] != stage_id
+
+
+def test_generated_base_stage_edit_rules_and_validation(api):
+    stage_id = _create_generated_stage(api).json()["id"]
+
+    edited = api.client.put(
+        f"/api/v1/base-stages/{stage_id}",
+        json={
+            "description": "A quieter ravine.",
+            "beat_text": "They rest against the rope.",
+            "camera": "thirty metres away",
+            "framing": "wide shot",
+            "mood": "weary",
+            "aspect_ratio": "16:9",
+            "style_id": _default_style_id(api),
+            "model": "gemini-3.1-flash-image",
+            "image_size": "1K",
+            "targets": ["single figure"],
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["description"] == "A quieter ravine."
+    assert edited.json()["revision"] == 1
+
+    assert _create_generated_stage(api, targets=[]).status_code == 422
+    assert _create_generated_stage(api, style_id=9999).status_code == 422
+    assert _create_generated_stage(api, model="not-a-model").status_code == 422
+    assert _create_generated_stage(api, image_size="9K").status_code == 422
+    assert _create_generated_stage(api, aspect_ratio="7:5").status_code == 422
+
+    # Uploaded stages have no composition to edit or duplicate.
+    uploaded_id = _upload_base_stage(api).json()["id"]
+    assert api.client.post(f"/api/v1/base-stages/{uploaded_id}/duplicate").status_code == 422
+    assert api.client.get(f"/api/v1/base-stages/{uploaded_id}/preview").json()[
+        "can_generate"
+    ] is False
 
 
 # ---------------------------------------------------------------------------
@@ -318,16 +450,22 @@ def test_budget_accepts_timezone_header_and_falls_back_to_utc(api):
     conn = connect(api.db_path)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     try:
+        # Every generation must belong to exactly one panel or base stage
+        # (017_base_stage_generations), so the spend row gets a real panel.
+        style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+        scene_id = conn.execute(
+            "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+        ).lastrowid
         conn.execute(
             """
             INSERT INTO generation
                 (scene_id, model, params_json, prompt_hash, request_json,
                  cost_usd_cents, reserved_cost_usd_cents, state,
                  price_table_version, scene_revision, created_at)
-            VALUES (NULL, 'gemini-3.1-flash-image', '{}', 'hash', '{}',
+            VALUES (?, 'gemini-3.1-flash-image', '{}', 'hash', '{}',
                     33, 33, 'succeeded', 'test', 0, ?)
             """,
-            (ts,),
+            (scene_id, ts),
         )
         conn.commit()
     finally:

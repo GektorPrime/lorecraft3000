@@ -221,6 +221,75 @@ def assemble_prompt(
     return AssembledPrompt(text, attachments, prompt_hash, tuple(warnings))
 
 
+def assemble_base_stage_prompt(
+    *,
+    model: str,
+    image_size: str,
+    description: str,
+    beat_text: str,
+    camera: str,
+    framing: str,
+    mood: str,
+    targets: tuple[str, ...],
+    style_contract: str,
+) -> AssembledPrompt:
+    """Assemble an identity-neutral, reusable composition prompt.
+
+    A Base Stage deliberately carries no cast: it is generated before any
+    identity is applied, so there are no canonical references to allocate and
+    the prompt must never name a character. Panels later apply identities to
+    this image via assemble_staged_prompt(), which anchors it as Image 1.
+
+    Targets are the ordered textual placeholders a panel maps characters onto,
+    so they are part of the composition contract and of the prompt hash.
+    """
+    capabilities_for(model)  # reject unsupported models before any spend
+    if not description.strip():
+        raise AssemblyError("a base stage needs a description")
+    if not targets:
+        raise AssemblyError("a base stage needs at least one identity target")
+
+    numbered_targets = [
+        f"Figure {position}: {target.strip()}"
+        for position, target in enumerate(targets, start=1)
+    ]
+
+    sections = ["BASE STAGE\n" + description.strip()]
+    if beat_text.strip():
+        sections.append("SCENE\n" + beat_text.strip())
+    sections.append(
+        "CAMERA\n"
+        + f"Camera: {camera.strip()}. Framing: {framing.strip()}. "
+        + f"Mood: {mood.strip()}."
+    )
+    sections.append("IDENTITY TARGETS\n" + "\n".join(numbered_targets))
+    if style_contract.strip():
+        sections.append("STYLE\n" + style_contract.strip())
+    sections.append(
+        "CONSTRAINTS\n"
+        f"Show exactly {len(targets)} anonymous figures matching the identity "
+        "targets above, each clearly distinguishable by position and action. "
+        "Render one continuous event in one continuous location with consistent "
+        "perspective, scale, directional light, atmosphere, ground contact, and "
+        "depth falloff. Do not depict any named, famous, or recognizable person, "
+        "and do not present the figures as a group portrait, a lineup, isolated "
+        "vignettes, or separately posed subjects. No text, no speech bubbles, no "
+        "captions, no lettering, no visible watermark."
+    )
+    text = "\n\n".join(sections)
+
+    hash_material = {
+        "model": model,
+        "image_size": image_size,
+        "text": text,
+        "targets": list(targets),
+    }
+    prompt_hash = hashlib.sha256(
+        json.dumps(hash_material, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return AssembledPrompt(text, (), prompt_hash, ())
+
+
 def assemble_staged_prompt(
     *,
     model: str,

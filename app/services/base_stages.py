@@ -1,10 +1,12 @@
-"""Upload-first Base Stage library service."""
+"""Base Stage library service: uploaded artwork and generated compositions."""
 
 from __future__ import annotations
 
 import sqlite3
 from fractions import Fraction
 
+from app.assembler.core import AssemblyError, capabilities_for
+from app.config import Settings
 from app.domain.models import BaseStage, BaseStageTarget
 from app.models import ASPECT_RATIOS
 from app.storage import ImageStorage, ImageStorageError
@@ -33,10 +35,20 @@ class BaseStageNotReadyError(BaseStageError):
     """Raised when content is requested before a stage is ready."""
 
 
+class BaseStageLockedError(BaseStageError):
+    """Raised when an immutable or in-flight Base Stage is modified."""
+
+
 class BaseStageService:
-    def __init__(self, conn: sqlite3.Connection, storage: ImageStorage) -> None:
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        storage: ImageStorage,
+        settings: Settings | None = None,
+    ) -> None:
         self.conn = conn
         self.storage = storage
+        self.settings = settings
 
     def list(self) -> list[BaseStage]:
         return self._list_where("bs.archived_at IS NULL")
@@ -105,6 +117,212 @@ class BaseStageService:
             raise BaseStageError(f"could not save base stage: {exc}") from exc
         return self.get(base_stage_id)
 
+    def create_generated(
+        self,
+        *,
+        description: str,
+        beat_text: str,
+        camera: str,
+        framing: str,
+        mood: str,
+        aspect_ratio: str,
+        style_id: int,
+        model: str,
+        image_size: str,
+        targets: list[str],
+    ) -> BaseStage:
+        """Create a generated Base Stage draft; it is not usable until published."""
+        fields = self._validate_generated(
+            description=description,
+            beat_text=beat_text,
+            camera=camera,
+            framing=framing,
+            mood=mood,
+            aspect_ratio=aspect_ratio,
+            style_id=style_id,
+            model=model,
+            image_size=image_size,
+            targets=targets,
+        )
+        try:
+            with self.conn:
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO base_stage
+                        (origin, state, description, beat_text, camera, framing,
+                         mood, aspect_ratio, style_id, model, image_size)
+                    VALUES ('generated', 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fields["description"],
+                        fields["beat_text"],
+                        fields["camera"],
+                        fields["framing"],
+                        fields["mood"],
+                        fields["aspect_ratio"],
+                        fields["style_id"],
+                        fields["model"],
+                        fields["image_size"],
+                    ),
+                )
+                base_stage_id = int(cursor.lastrowid)
+                self._replace_targets(base_stage_id, fields["targets"])
+        except sqlite3.Error as exc:
+            raise BaseStageError(f"could not save base stage: {exc}") from exc
+        return self.get(base_stage_id)
+
+    def update(
+        self,
+        base_stage_id: int,
+        *,
+        description: str,
+        beat_text: str,
+        camera: str,
+        framing: str,
+        mood: str,
+        aspect_ratio: str,
+        style_id: int,
+        model: str,
+        image_size: str,
+        targets: list[str],
+    ) -> BaseStage:
+        """Edit a generated draft, bumping its revision so previews cannot drift.
+
+        Mirrors panel immutability: a pending or successful attempt locks the
+        composition, and a published stage is permanently immutable because
+        panels already reference its image. Duplicate to make a variant.
+        """
+        stage = self.get(base_stage_id)
+        self._require_editable(stage)
+        fields = self._validate_generated(
+            description=description,
+            beat_text=beat_text,
+            camera=camera,
+            framing=framing,
+            mood=mood,
+            aspect_ratio=aspect_ratio,
+            style_id=style_id,
+            model=model,
+            image_size=image_size,
+            targets=targets,
+        )
+        try:
+            with self.conn:
+                self.conn.execute(
+                    """
+                    UPDATE base_stage
+                       SET description = ?, beat_text = ?, camera = ?, framing = ?,
+                           mood = ?, aspect_ratio = ?, style_id = ?, model = ?,
+                           image_size = ?, revision = revision + 1
+                     WHERE id = ?
+                    """,
+                    (
+                        fields["description"],
+                        fields["beat_text"],
+                        fields["camera"],
+                        fields["framing"],
+                        fields["mood"],
+                        fields["aspect_ratio"],
+                        fields["style_id"],
+                        fields["model"],
+                        fields["image_size"],
+                        base_stage_id,
+                    ),
+                )
+                self.conn.execute(
+                    "DELETE FROM base_stage_target WHERE base_stage_id = ?",
+                    (base_stage_id,),
+                )
+                self._replace_targets(base_stage_id, fields["targets"])
+        except sqlite3.Error as exc:
+            raise BaseStageError(f"could not update base stage: {exc}") from exc
+        return self.get(base_stage_id)
+
+    def duplicate(self, base_stage_id: int) -> BaseStage:
+        """Copy a generated stage's composition into a fresh, unattempted draft."""
+        stage = self.get(base_stage_id)
+        if stage.origin != "generated":
+            raise BaseStageValidationError(
+                "only generated base stages can be duplicated"
+            )
+        return self.create_generated(
+            description=stage.description,
+            beat_text=stage.beat_text or "",
+            camera=stage.camera or "",
+            framing=stage.framing or "",
+            mood=stage.mood or "",
+            aspect_ratio=stage.aspect_ratio,
+            style_id=stage.style_id,
+            model=stage.model,
+            image_size=stage.image_size,
+            targets=[target.description for target in stage.targets],
+        )
+
+    def publish(self, base_stage_id: int, candidate_id: int) -> BaseStage:
+        """Promote one succeeded candidate to be this stage's permanent image.
+
+        Promotion is explicit and one-way: once ready the source image is
+        immutable, so any number of panels can reference it without a later
+        edit silently changing what they generate from.
+        """
+        stage = self.get(base_stage_id)
+        if stage.origin != "generated":
+            raise BaseStageValidationError(
+                "only generated base stages can be published"
+            )
+        if stage.state == "ready":
+            raise BaseStageLockedError(
+                f"base stage {base_stage_id} is already published; "
+                "duplicate it to build a variant"
+            )
+        row = self.conn.execute(
+            """
+            SELECT c.sha256 AS sha256
+              FROM candidate AS c
+              JOIN generation AS g ON g.id = c.generation_id
+             WHERE c.id = ? AND g.base_stage_id = ? AND g.state = 'succeeded'
+            """,
+            (candidate_id, base_stage_id),
+        ).fetchone()
+        if row is None:
+            raise BaseStageValidationError(
+                f"candidate {candidate_id} is not a succeeded candidate "
+                f"of base stage {base_stage_id}"
+            )
+        try:
+            width, height = self.storage.dimensions(str(row["sha256"]))
+        except ImageStorageError as exc:
+            raise BaseStageError(f"candidate image is unavailable: {exc}") from exc
+        try:
+            with self.conn:
+                self.conn.execute(
+                    """
+                    UPDATE base_stage
+                       SET state = 'ready', selected_candidate_id = ?,
+                           image_width = ?, image_height = ?
+                     WHERE id = ? AND state = 'draft'
+                    """,
+                    (candidate_id, width, height, base_stage_id),
+                )
+        except sqlite3.Error as exc:
+            raise BaseStageError(f"could not publish base stage: {exc}") from exc
+        return self.get(base_stage_id)
+
+    def locking_generation_count(self, base_stage_id: int) -> int:
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS n FROM generation "
+            "WHERE base_stage_id = ? AND state IN ('pending', 'succeeded')",
+            (base_stage_id,),
+        ).fetchone()
+        return int(row["n"])
+
+    def is_editable(self, base_stage_id: int) -> bool:
+        """Failed attempts stay editable; pending, successful, or ready lock."""
+        stage = self.get(base_stage_id)
+        if stage.origin != "generated" or stage.state != "draft":
+            return False
+        return self.locking_generation_count(base_stage_id) == 0
+
     def archive(self, base_stage_id: int) -> BaseStage:
         stage = self.get(base_stage_id)
         if stage.archived_at is None:
@@ -138,6 +356,105 @@ class BaseStageService:
             if row is not None:
                 return str(row["sha256"])
         raise BaseStageNotReadyError(f"base stage {base_stage_id} has no content")
+
+    def _require_editable(self, stage: BaseStage) -> None:
+        if stage.origin != "generated":
+            raise BaseStageValidationError(
+                "only generated base stages can be edited"
+            )
+        if stage.state != "draft":
+            raise BaseStageLockedError(
+                f"base stage {stage.id} is published and immutable; "
+                "duplicate it to build a variant"
+            )
+        if self.locking_generation_count(stage.id):
+            raise BaseStageLockedError(
+                f"base stage {stage.id} has a pending or successful generation; "
+                "duplicate it to change the composition"
+            )
+
+    def _replace_targets(self, base_stage_id: int, targets: list[str]) -> None:
+        self.conn.executemany(
+            "INSERT INTO base_stage_target "
+            "(base_stage_id, position, description) VALUES (?, ?, ?)",
+            [
+                (base_stage_id, position, target)
+                for position, target in enumerate(targets)
+            ],
+        )
+
+    def _validate_generated(
+        self,
+        *,
+        description: str,
+        beat_text: str,
+        camera: str,
+        framing: str,
+        mood: str,
+        aspect_ratio: str,
+        style_id: int,
+        model: str,
+        image_size: str,
+        targets: list[str],
+    ) -> dict:
+        clean_targets = self._validate_targets(targets)
+        if not clean_targets:
+            raise BaseStageValidationError(
+                "a generated base stage needs at least one identity target"
+            )
+        for name, value in (("camera", camera), ("framing", framing)):
+            if not isinstance(value, str) or not value.strip():
+                raise BaseStageValidationError(f"{name} is required")
+        if not isinstance(beat_text, str) or not beat_text.strip():
+            raise BaseStageValidationError("action/beat is required")
+        if not isinstance(mood, str):
+            raise BaseStageValidationError("mood must be text")
+        if aspect_ratio not in ASPECT_RATIOS:
+            raise BaseStageValidationError(
+                f"unsupported aspect ratio: {aspect_ratio}"
+            )
+        if (
+            self.conn.execute(
+                "SELECT 1 FROM style WHERE id = ?", (style_id,)
+            ).fetchone()
+            is None
+        ):
+            raise BaseStageValidationError(f"style {style_id} not found")
+        self._validate_model_and_size(model, image_size)
+        for label, value in (
+            ("action/beat", beat_text),
+            ("camera", camera),
+            ("framing", framing),
+            ("mood", mood),
+        ):
+            if len(value.strip()) > MAX_DESCRIPTION_LENGTH:
+                raise BaseStageValidationError(
+                    f"{label} must be at most {MAX_DESCRIPTION_LENGTH} characters"
+                )
+        return {
+            "description": self._validate_description(description),
+            "beat_text": beat_text.strip(),
+            "camera": camera.strip(),
+            "framing": framing.strip(),
+            "mood": mood.strip(),
+            "aspect_ratio": aspect_ratio,
+            "style_id": style_id,
+            "model": model,
+            "image_size": image_size,
+            "targets": clean_targets,
+        }
+
+    def _validate_model_and_size(self, model: str, image_size: str) -> None:
+        try:
+            capabilities_for(model)
+        except AssemblyError as exc:
+            raise BaseStageValidationError(str(exc)) from exc
+        if self.settings is None:
+            return
+        if image_size not in self.settings.model_prices_cents.get(model, {}):
+            raise BaseStageValidationError(
+                f"unsupported image size {image_size} for {model}"
+            )
 
     def _list_where(self, where: str) -> list[BaseStage]:
         rows = self.conn.execute(

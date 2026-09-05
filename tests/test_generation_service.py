@@ -7,7 +7,12 @@ import pytest
 from app.config import Settings
 from app.providers.base import ProviderResult
 from app.providers.base import ProviderEditRequest
-from app.services.base_stages import BaseStageService
+from app.services.base_stages import (
+    BaseStageLockedError,
+    BaseStageNotReadyError,
+    BaseStageService,
+    BaseStageValidationError,
+)
 from app.services.characters import CharacterService
 from app.services.generation import GenerationError, GenerationService, PreviewChangedError
 from tests.conftest import FakeEmbedder
@@ -221,6 +226,177 @@ def test_staged_preview_and_generation_use_edit_with_source_aware_provenance(
     inputs = json.loads(provenance["input_images"])
     assert [item["image_number"] for item in inputs] == [1, 2]
     assert inputs[0]["base_stage_id"] == stage.id
+
+
+def _generated_stage(conn, storage, tmp_path, **overrides):
+    fields = {
+        "description": "Four figures haul a machine up a muddy ravine.",
+        "beat_text": "They strain against the rope as the machine slips.",
+        "camera": "twenty metres away, slightly elevated",
+        "framing": "wide environmental shot",
+        "mood": "strenuous and apprehensive",
+        "aspect_ratio": "16:9",
+        "style_id": StyleService(conn).get_default().id,
+        "model": "gemini-3.1-flash-image",
+        "image_size": "1K",
+        "targets": ["figure above the slope", "figure beside the oak"],
+    }
+    fields.update(overrides)
+    return BaseStageService(conn, storage, _settings(tmp_path)).create_generated(**fields)
+
+
+def test_base_stage_preview_is_identity_neutral_and_uses_the_generate_path(
+    conn, storage, tmp_path, monkeypatch
+):
+    """A Base Stage carries no cast: no references, no edit, no identity scoring."""
+    stage = _generated_stage(conn, storage, tmp_path)
+    scored = []
+    monkeypatch.setattr("app.services.generation.get_embedder", lambda: object())
+    monkeypatch.setattr("app.services.generation.load_gallery", lambda _conn: {})
+    monkeypatch.setattr(
+        "app.services.generation.score_generated_image",
+        lambda embedder, gallery, data, cast_ids: scored.append(cast_ids),
+    )
+    provider = FakeProvider()
+    service = GenerationService(conn, storage, _settings(tmp_path), provider)
+
+    preview = service.preview_base_stage(stage.id)
+    assert preview.scene_id is None
+    assert preview.base_stage_id == stage.id
+    assert preview.provider_request.references == ()
+    assert preview.attachments == ()
+    assert preview.request_capture["operation"] == "base_stage_generate"
+    assert preview.request_capture["cast"] == []
+    assert "figure above the slope" in preview.prompt
+    assert "IDENTITY TARGETS" in preview.prompt
+
+    outcome = service.generate_base_stage(
+        stage.id, expected_prompt_hash=preview.prompt_hash
+    )
+    assert provider.edits == []
+    assert len(provider.requests) == 1
+    assert scored == []  # no cast -> never identity-scored
+
+    row = conn.execute(
+        "SELECT scene_id, base_stage_id FROM generation WHERE id = ?",
+        (outcome.generation_id,),
+    ).fetchone()
+    assert (row["scene_id"], row["base_stage_id"]) == (None, stage.id)
+
+
+def test_base_stage_generation_enforces_drift_pending_and_idempotency(
+    conn, storage, tmp_path
+):
+    stage = _generated_stage(conn, storage, tmp_path)
+    provider = FakeProvider()
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, provider)
+    stages = BaseStageService(conn, storage, settings)
+
+    reviewed = service.preview_base_stage(stage.id)
+    stages.update(
+        stage.id,
+        description="A different composition entirely.",
+        beat_text="They stand still.",
+        camera="close",
+        framing="tight",
+        mood="calm",
+        aspect_ratio="16:9",
+        style_id=StyleService(conn).get_default().id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        targets=["only figure"],
+    )
+    with pytest.raises(PreviewChangedError):
+        service.generate_base_stage(
+            stage.id, expected_prompt_hash=reviewed.prompt_hash
+        )
+    assert provider.requests == []
+
+    first = service.generate_base_stage(stage.id, idempotency_key="stage-1")
+    replay = service.generate_base_stage(stage.id, idempotency_key="stage-1")
+    assert replay.replayed is True
+    assert replay.generation_id == first.generation_id
+    assert len(provider.requests) == 1
+
+    # A successful attempt locks the composition; duplicate to change it.
+    assert stages.is_editable(stage.id) is False
+
+
+def test_publish_promotes_one_candidate_and_freezes_the_stage(
+    conn, storage, tmp_path
+):
+    stage = _generated_stage(conn, storage, tmp_path)
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, FakeProvider())
+    stages = BaseStageService(conn, storage, settings)
+
+    with pytest.raises(BaseStageNotReadyError):
+        stages.content_sha(stage.id)
+
+    outcome = service.generate_base_stage(stage.id)
+    published = stages.publish(stage.id, outcome.candidate_id)
+    assert published.state == "ready"
+    assert published.selected_candidate_id == outcome.candidate_id
+    assert (published.image_width, published.image_height) == (8, 8)
+    assert stages.content_sha(stage.id) == outcome.candidate_sha256
+
+    # Promotion is one-way: the source image any panel generates from is frozen.
+    with pytest.raises(BaseStageLockedError):
+        stages.publish(stage.id, outcome.candidate_id)
+    with pytest.raises(BaseStageLockedError):
+        stages.update(
+            stage.id,
+            description="d",
+            beat_text="b",
+            camera="c",
+            framing="f",
+            mood="",
+            aspect_ratio="16:9",
+            style_id=StyleService(conn).get_default().id,
+            model="gemini-3.1-flash-image",
+            image_size="1K",
+            targets=["t"],
+        )
+    with pytest.raises(GenerationError, match="already published"):
+        service.preview_base_stage(stage.id)
+
+
+def test_publish_rejects_candidates_from_another_owner(conn, storage, tmp_path):
+    character, _, _ = _character_with_canon(
+        conn, storage, "ELIAS", "elias", (100, 20, 20)
+    )
+    scene_id = _scene(conn, [{"character_id": character.id, "prominence": 1}])
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, FakeProvider())
+    panel_outcome = service.generate(scene_id)
+
+    stage = _generated_stage(conn, storage, tmp_path)
+    stages = BaseStageService(conn, storage, settings)
+    with pytest.raises(BaseStageValidationError, match="not a succeeded candidate"):
+        stages.publish(stage.id, panel_outcome.candidate_id)
+    assert stages.get(stage.id).state == "draft"
+
+
+def test_duplicate_copies_composition_without_attempts_or_image(
+    conn, storage, tmp_path
+):
+    stage = _generated_stage(conn, storage, tmp_path)
+    settings = _settings(tmp_path)
+    service = GenerationService(conn, storage, settings, FakeProvider())
+    stages = BaseStageService(conn, storage, settings)
+    outcome = service.generate_base_stage(stage.id)
+    stages.publish(stage.id, outcome.candidate_id)
+
+    copy = stages.duplicate(stage.id)
+    assert copy.id != stage.id
+    assert copy.state == "draft"
+    assert copy.selected_candidate_id is None
+    assert copy.description == stage.description
+    assert [target.description for target in copy.targets] == [
+        target.description for target in stage.targets
+    ]
+    assert stages.is_editable(copy.id) is True
 
 
 def test_staged_prompt_drift_failure_and_idempotency_use_edit_path(

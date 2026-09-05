@@ -264,7 +264,9 @@ class CandidateEditIn(BaseModel):
 
 class Generation(BaseModel):
     id: int
-    scene_id: int
+    # Exactly one owner is set: a panel (scene_id) or a Base Stage.
+    scene_id: int | None = None
+    base_stage_id: int | None = None
     model: str
     image_size: str
     aspect_ratio: str
@@ -285,7 +287,8 @@ class Generation(BaseModel):
 
 class GenerationSummary(BaseModel):
     id: int
-    scene_id: int
+    scene_id: int | None = None
+    base_stage_id: int | None = None
     model: str
     cost_usd_cents: int
     reserved_cost_usd_cents: int
@@ -343,3 +346,43 @@ class BaseStage(BaseModel):
     revision: int
     created_at: str
     archived_at: str | None
+    is_editable: bool = False
+    generation_count: int = 0
+
+
+class BaseStageGeneratedInput(BaseModel):
+    """Composition for a generated Base Stage draft.
+
+    Identity targets are required: they are injected into the prompt and are
+    what a panel later maps its cast onto.
+    """
+
+    description: str
+    beat_text: str
+    camera: str
+    framing: str
+    mood: str = ""
+    aspect_ratio: str = "3:2"
+    style_id: int
+    model: str
+    image_size: str
+    targets: list[str] = Field(min_length=1)
+
+
+class BaseStagePublishIn(BaseModel):
+    candidate_id: int
+
+
+class BaseStagePreview(BaseModel):
+    base_stage_id: int
+    model: str
+    image_size: str
+    aspect_ratio: str
+    prompt: str
+    prompt_hash: str
+    warnings: list[str]
+    estimated_cost_cents: int
+    spent_today_cents: int
+    remaining_after_cents: int
+    can_generate: bool
+    blocked_reason: str | None = None

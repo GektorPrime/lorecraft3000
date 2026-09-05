@@ -8,7 +8,12 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from app.assembler.core import AssemblyError, assemble_prompt, assemble_staged_prompt
+from app.assembler.core import (
+    AssemblyError,
+    assemble_base_stage_prompt,
+    assemble_prompt,
+    assemble_staged_prompt,
+)
 from app.config import Settings
 from app.domain.generation import CastInput, ReferenceInput, SceneInput
 from app.providers.base import (
@@ -59,7 +64,14 @@ class EditError(GenerationError):
 
 @dataclass(frozen=True)
 class GenerationPreview:
-    scene_id: int
+    """A no-spend preflight for one attempt owned by a panel or a Base Stage.
+
+    Exactly one of ``scene_id``/``base_stage_id`` is set; the matching revision
+    is what the ledger checks so a composition edited after preview cannot be
+    generated from a stale prompt.
+    """
+
+    scene_id: int | None
     scene_revision: int
     model: str
     image_size: str
@@ -72,6 +84,8 @@ class GenerationPreview:
     remaining_after_cents: int
     provider_request: ProviderRequest | ProviderEditRequest
     request_capture: dict
+    base_stage_id: int | None = None
+    base_stage_revision: int = 0
 
 
 _FORMAT_MIME = {
@@ -362,6 +376,27 @@ class GenerationService:
         preview = self.preview(
             scene_id, model=model, image_size=image_size, check_budget=False
         )
+        return self._execute(
+            preview,
+            parent_generation_id=parent_generation_id,
+            idempotency_key=idempotency_key,
+            expected_prompt_hash=expected_prompt_hash,
+        )
+
+    def _execute(
+        self,
+        preview: GenerationPreview,
+        *,
+        parent_generation_id: int | None = None,
+        idempotency_key: str | None = None,
+        expected_prompt_hash: str | None = None,
+    ) -> GenerationOutcome:
+        """Run one reviewed preview as a single paid attempt.
+
+        Shared by panel and Base Stage generation so both owners get identical
+        drift protection, reservation, provenance, and failure accounting.
+        """
+        scene_id = preview.scene_id
         provider = self._provider_for(preview.model)
         if (
             expected_prompt_hash is not None
@@ -373,13 +408,17 @@ class GenerationService:
         ledger = CostLedger(self.conn, self.settings)
         reservation = ledger.reserve(
             scene_id=scene_id,
+            base_stage_id=preview.base_stage_id,
             model=preview.model,
             image_size=preview.image_size,
             prompt_hash=preview.prompt_hash,
             request_json=preview.request_capture,
             parent_generation_id=parent_generation_id,
             idempotency_key=idempotency_key,
-            scene_revision=preview.scene_revision,
+            scene_revision=preview.scene_revision if scene_id is not None else None,
+            base_stage_revision=(
+                preview.base_stage_revision if preview.base_stage_id is not None else None
+            ),
         )
         generation_id, estimate = reservation
 
@@ -399,6 +438,7 @@ class GenerationService:
                 "schema_version": 1,
                 "generation_id": generation_id,
                 "scene_id": scene_id,
+                "base_stage_id": preview.base_stage_id,
                 "cast": preview.request_capture["cast"],
                 "model": preview.model,
                 "params": {
@@ -497,6 +537,139 @@ class GenerationService:
                 else estimate
             ),
             warnings,
+        )
+
+    def preview_base_stage(
+        self,
+        base_stage_id: int,
+        *,
+        check_budget: bool = True,
+        tz_name: str | None = None,
+    ) -> GenerationPreview:
+        """Exact no-spend preflight for an identity-neutral Base Stage draft.
+
+        A Base Stage has no cast, so no canonical references are attached and
+        the request goes through the plain text-to-image path. Identities are
+        applied later, when a panel uses the published image as its source.
+        """
+        stages = BaseStageService(self.conn, self.storage, self.settings)
+        stage = stages.get(base_stage_id)
+        if stage.origin != "generated":
+            raise GenerationError(
+                f"base stage {base_stage_id} was uploaded and is not generated"
+            )
+        if stage.state != "draft":
+            raise GenerationError(
+                f"base stage {base_stage_id} is already published"
+            )
+        if stage.model is None or stage.image_size is None or stage.style_id is None:
+            raise GenerationError(
+                f"base stage {base_stage_id} is missing generation settings"
+            )
+        try:
+            style = StyleService(self.conn).get(stage.style_id)
+            assembled = assemble_base_stage_prompt(
+                model=stage.model,
+                image_size=stage.image_size,
+                description=stage.description,
+                beat_text=stage.beat_text or "",
+                camera=stage.camera or "",
+                framing=stage.framing or "",
+                mood=stage.mood or "",
+                targets=tuple(target.description for target in stage.targets),
+                style_contract=style.style_contract,
+            )
+        except (AssemblyError, StyleError, ValueError) as exc:
+            raise GenerationError(f"base stage cannot be generated: {exc}") from exc
+
+        request = ProviderRequest(
+            model=stage.model,
+            prompt=assembled.text,
+            references=(),
+            aspect_ratio=stage.aspect_ratio,
+            image_size=stage.image_size,
+            labels={"base_stage": str(stage.id)},
+        )
+        request_capture = {
+            "schema_version": 1,
+            "operation": "base_stage_generate",
+            "kind": "base_stage_generate",
+            "model": stage.model,
+            "image_size": stage.image_size,
+            "aspect_ratio": stage.aspect_ratio,
+            "response_format": {
+                "type": "image",
+                "aspect_ratio": stage.aspect_ratio,
+                "image_size": stage.image_size,
+            },
+            "prompt": assembled.text,
+            "prompt_hash": assembled.prompt_hash,
+            # No cast: identity is applied later by a panel, so nothing here is
+            # identity-bearing and the candidate is never identity-scored.
+            "cast": [],
+            "attachments": [],
+            "input_images": [],
+            "base_stage": {
+                "id": stage.id,
+                "origin": stage.origin,
+                "description": stage.description,
+                "aspect_ratio": stage.aspect_ratio,
+                "style_id": stage.style_id,
+                "targets": [
+                    {"id": target.id, "position": target.position,
+                     "description": target.description}
+                    for target in stage.targets
+                ],
+            },
+            "warnings": list(assembled.warnings),
+            "labels": {"base_stage": str(stage.id)},
+            "store": False,
+            "base_stage_revision": stage.revision,
+        }
+
+        ledger = CostLedger(self.conn, self.settings)
+        estimate = ledger.estimate(stage.model, stage.image_size)
+        spent = ledger.spent_today()
+        spent_display = ledger.spent_today(tz_name)
+        remaining = self.settings.daily_spend_cap_cents - spent - estimate
+        if check_budget and remaining < 0:
+            from app.services.costs import BudgetExceededError
+
+            raise BudgetExceededError(
+                f"daily budget would be exceeded: {spent} cents spent/reserved, "
+                f"{estimate} cents requested, "
+                f"{self.settings.daily_spend_cap_cents} cents allowed"
+            )
+        return GenerationPreview(
+            scene_id=None,
+            scene_revision=0,
+            base_stage_id=stage.id,
+            base_stage_revision=stage.revision,
+            model=stage.model,
+            image_size=stage.image_size,
+            prompt=assembled.text,
+            prompt_hash=assembled.prompt_hash,
+            attachments=(),
+            warnings=assembled.warnings,
+            estimated_cost_cents=estimate,
+            spent_today_cents=spent_display,
+            remaining_after_cents=remaining,
+            provider_request=request,
+            request_capture=request_capture,
+        )
+
+    def generate_base_stage(
+        self,
+        base_stage_id: int,
+        *,
+        idempotency_key: str | None = None,
+        expected_prompt_hash: str | None = None,
+    ) -> GenerationOutcome:
+        preview = self.preview_base_stage(base_stage_id, check_budget=False)
+        return self._execute(
+            preview,
+            idempotency_key=idempotency_key,
+            expected_prompt_hash=expected_prompt_hash,
         )
 
     def edit_candidate(
@@ -738,6 +911,30 @@ class GenerationService:
             ids,
         ).fetchall()
         grouped: dict[int, list[sqlite3.Row]] = {generation_id: [] for generation_id in ids}
+        for candidate in candidate_rows:
+            grouped.setdefault(candidate["generation_id"], []).append(candidate)
+        return [(row, grouped[row["id"]]) for row in rows]
+
+    def list_for_base_stage_with_candidates(
+        self, base_stage_id: int
+    ) -> list[tuple[sqlite3.Row, list[sqlite3.Row]]]:
+        """Every attempt for a Base Stage, newest first, with its candidates."""
+        rows = self.conn.execute(
+            "SELECT * FROM generation WHERE base_stage_id = ? ORDER BY id DESC",
+            (base_stage_id,),
+        ).fetchall()
+        if not rows:
+            return []
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in ids)
+        candidate_rows = self.conn.execute(
+            f"SELECT * FROM candidate WHERE generation_id IN ({placeholders}) "
+            "ORDER BY generation_id, idx",
+            ids,
+        ).fetchall()
+        grouped: dict[int, list[sqlite3.Row]] = {
+            generation_id: [] for generation_id in ids
+        }
         for candidate in candidate_rows:
             grouped.setdefault(candidate["generation_id"], []).append(candidate)
         return [(row, grouped[row["id"]]) for row in rows]

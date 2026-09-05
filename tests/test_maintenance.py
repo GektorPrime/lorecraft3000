@@ -23,9 +23,20 @@ def _image(storage: ImageStorage, sha256: str):
     return storage.find_image(sha256)
 
 
+def _owned_generation(conn) -> int:
+    """A generation must belong to exactly one panel or base stage."""
+    style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+    scene_id = conn.execute(
+        "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+    ).lastrowid
+    conn.execute(
+        "INSERT INTO generation (scene_id, model) VALUES (?, 'test')", (scene_id,)
+    )
+    return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+
 def _insert_dangling_candidate(conn, sha256: str) -> None:
-    conn.execute("INSERT INTO generation (model) VALUES ('test')")
-    generation_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    generation_id = _owned_generation(conn)
     conn.execute(
         "INSERT INTO candidate (generation_id, sha256) VALUES (?, ?)",
         (generation_id, sha256),
@@ -157,10 +168,7 @@ def test_repair_rebuilds_malformed_sidecar_preserving_source_name(conn, storage,
 
 def test_repair_rebuilds_provenance_from_database(conn, storage, png_bytes):
     sha = _store_image(storage)
-    conn.execute(
-        "INSERT INTO generation (model) VALUES ('test')"
-    )
-    generation_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    generation_id = _owned_generation(conn)
     conn.execute(
         "INSERT INTO image_provenance (sha256, generation_id, prompt_hash, "
         "cost_cents, price_table_version, input_images) VALUES (?, ?, ?, ?, ?, ?)",

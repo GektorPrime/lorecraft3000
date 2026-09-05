@@ -84,6 +84,8 @@ const BASE_STAGE: BaseStage = {
   beat_text: null,
   camera: null,
   framing: null,
+  generation_count: 0,
+  is_editable: false,
   mood: null,
   style_id: null,
   model: null,

@@ -233,6 +233,7 @@ def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
         "014_candidate_identity",
         "015_preserve_retired_ref_sets",
         "016_base_stages",
+        "017_base_stage_generations",
     ]
     conn = connect(db)
     try:
@@ -467,6 +468,7 @@ def test_011_repairs_legacy_generation_missing_scene_revision(tmp_path):
         "014_candidate_identity",
         "015_preserve_retired_ref_sets",
         "016_base_stages",
+        "017_base_stage_generations",
     ]
     assert run_migrations(db) == []  # and healing is idempotent
 
@@ -748,3 +750,70 @@ def test_base_stage_checks_and_target_cascade(conn):
     assert conn.execute(
         "SELECT COUNT(*) FROM base_stage_target WHERE base_stage_id = ?", (stage_id,)
     ).fetchone()[0] == 0
+
+
+def test_generation_ownership_is_exclusive_immutable_and_scoped(conn):
+    """Every generation belongs to exactly one panel or base stage, forever."""
+    generation_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(generation)")
+    }
+    assert {"scene_id", "base_stage_id", "base_stage_revision"} <= generation_columns
+
+    indexes = {row["name"] for row in conn.execute("PRAGMA index_list(generation)")}
+    assert {
+        "idx_generation_one_pending_per_base_stage",
+        "idx_generation_base_stage_idempotency",
+        "idx_generation_base_stage_id",
+    } <= indexes
+    assert any(
+        row["table"] == "base_stage" and row["from"] == "base_stage_id"
+        for row in conn.execute("PRAGMA foreign_key_list(generation)")
+    )
+
+    style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
+    scene_id = conn.execute(
+        "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
+    ).lastrowid
+    stage_id = conn.execute(
+        "INSERT INTO base_stage (origin, state, description, aspect_ratio) "
+        "VALUES ('generated', 'draft', 'a ravine', '16:9')"
+    ).lastrowid
+    conn.commit()  # rollbacks below must not undo the owners themselves
+
+    for owners in ((None, None), (scene_id, stage_id)):
+        with pytest.raises(sqlite3.IntegrityError, match="exactly one"):
+            conn.execute(
+                "INSERT INTO generation (scene_id, base_stage_id, model) "
+                "VALUES (?, ?, 'm')",
+                owners,
+            )
+        conn.rollback()
+
+    generation_id = conn.execute(
+        "INSERT INTO generation (base_stage_id, model, state) "
+        "VALUES (?, 'm', 'pending')",
+        (stage_id,),
+    ).lastrowid
+    conn.commit()
+
+    # One in-flight attempt per stage, and ownership can never be reassigned.
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO generation (base_stage_id, model, state) "
+            "VALUES (?, 'm', 'pending')",
+            (stage_id,),
+        )
+    conn.rollback()
+    with pytest.raises(sqlite3.IntegrityError, match="ownership is immutable"):
+        conn.execute(
+            "UPDATE generation SET scene_id = ?, base_stage_id = NULL WHERE id = ?",
+            (scene_id, generation_id),
+        )
+    conn.rollback()
+
+    # A pending stage attempt never blocks a panel attempt.
+    conn.execute(
+        "INSERT INTO generation (scene_id, model, state) VALUES (?, 'm', 'pending')",
+        (scene_id,),
+    )
+    conn.rollback()

@@ -41,7 +41,11 @@ function BaseStageCard({ stage, archived, busy, onArchive, onRestore }: {
       )}
       <div className="resource-card__body">
         <div className="resource-card__header">
-          <h2 className="resource-card__title">Base stage #{stage.id}</h2>
+          <h2 className="resource-card__title">
+            {stage.is_editable
+              ? <Link to={`/base-stages/${stage.id}/preview`}>Base stage #{stage.id}</Link>
+              : `Base stage #${stage.id}`}
+          </h2>
           <span className="base-stage-card__badges">
             <span className="badge badge--draft">{stage.origin === 'upload' ? 'Upload' : stage.origin}</span>
             <span className="badge badge--canonical">{stage.state === 'ready' ? 'Ready' : stage.state}</span>
@@ -132,16 +136,19 @@ export function BaseStageListPage() {
       <PageHeader
         title="Base Stages"
         description="Reusable scene images that can anchor future panel compositions."
-        actions={<Link to="/base-stages/upload" className="btn btn--primary"><Icon name="plus" size={16} />Upload base stage</Link>}
+        actions={<Link to="/base-stages/upload" className="btn">Upload base stage<Icon name="plus" size={16} /></Link>}
       />
+      <p>
+        <Link to="/base-stages/new" className="btn btn--primary"><Icon name="sparkles" size={16} />Create generated base stage</Link>
+      </p>
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {!stages && !error && <AsyncMessage kind="loading">Loading base stages…</AsyncMessage>}
       {stages?.length === 0 && (
         <EmptyState
           icon="baseStages"
           title="No base stages yet"
-          description="Upload a scene image to start your reusable stage library."
-          action={<Link to="/base-stages/upload" className="btn btn--primary"><Icon name="plus" size={16} />Upload base stage</Link>}
+          description="Upload a scene image or create a generated composition to start your reusable stage library."
+          action={<Link to="/base-stages/new" className="btn btn--primary"><Icon name="sparkles" size={16} />Create generated base stage</Link>}
         />
       )}
       {stages && stages.length > 0 && (

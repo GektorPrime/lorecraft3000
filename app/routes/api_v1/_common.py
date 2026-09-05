@@ -16,6 +16,7 @@ from app.deps import settings
 from app.services.avatars import AvatarService
 from app.services.base_stages import (
     BaseStageError,
+    BaseStageLockedError,
     BaseStageNotFoundError,
     BaseStageNotReadyError,
     BaseStageService,
@@ -36,6 +37,7 @@ from app.services.characters import (
     VisualContractTooLongError,
 )
 from app.services.costs import (
+    BaseStageChangedError,
     BudgetExceededError,
     CostError,
     GenerationPendingError,
@@ -110,8 +112,10 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (GenerationPendingError, 409),
     (IdempotencyConflictError, 409),
     (SceneChangedError, 409),
+    (BaseStageChangedError, 409),
     (PreviewChangedError, 409),
     (BaseStageNotReadyError, 409),
+    (BaseStageLockedError, 409),
     (BudgetExceededError, 402),
     (VisualContractTooLongError, 422),
     (InvalidStyleReferenceError, 422),
@@ -327,6 +331,7 @@ def _generation_out(row, candidates) -> "Generation":
     return Generation(
         id=row["id"],
         scene_id=row["scene_id"],
+        base_stage_id=row["base_stage_id"],
         model=row["model"],
         image_size=request_data.get("image_size", ""),
         aspect_ratio=request_data.get("aspect_ratio", ""),
@@ -355,7 +360,9 @@ def _serve_stored_image(sha256: str, storage: ImageStorage) -> Response:
     return Response(data, media_type=mime)
 
 
-def _base_stage_out(stage) -> "BaseStage":
+def _base_stage_out(
+    stage, *, is_editable: bool = False, generation_count: int = 0
+) -> "BaseStage":
     from app.schemas import BaseStage, BaseStageTarget, ImageDimensions
 
     dimensions = None
@@ -393,4 +400,6 @@ def _base_stage_out(stage) -> "BaseStage":
         revision=stage.revision,
         created_at=stage.created_at,
         archived_at=stage.archived_at,
+        is_editable=is_editable,
+        generation_count=generation_count,
     )
