@@ -14,7 +14,7 @@ interface NavItem {
 
 /**
  * Navigation grouped by workflow rather than alphabetically: you define a
- * Library (characters, styles), use it to stage Work (panels), and the
+ * Library (characters, styles, base stages), use it to stage Work (panels), and the
  * accepted results collect in the Gallery. The previous flat bar ordered
  * these arbitrarily.
  */
@@ -25,6 +25,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     items: [
       { to: '/characters', label: 'Characters', icon: 'characters' },
       { to: '/styles', label: 'Styles', icon: 'styles' },
+      { to: '/base-stages', label: 'Base Stages', icon: 'baseStages' },
     ],
   },
   {

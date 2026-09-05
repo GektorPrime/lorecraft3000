@@ -37,6 +37,8 @@ def test_fresh_init_creates_all_tables(tmp_path):
         "generation",
         "candidate",
         "image_provenance",
+        "base_stage",
+        "base_stage_target",
         "schema_migrations",
     }
     assert expected <= tables
@@ -230,6 +232,7 @@ def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
         "013_face_embedding",
         "014_candidate_identity",
         "015_preserve_retired_ref_sets",
+        "016_base_stages",
     ]
     conn = connect(db)
     try:
@@ -463,6 +466,7 @@ def test_011_repairs_legacy_generation_missing_scene_revision(tmp_path):
         "013_face_embedding",
         "014_candidate_identity",
         "015_preserve_retired_ref_sets",
+        "016_base_stages",
     ]
     assert run_migrations(db) == []  # and healing is idempotent
 
@@ -636,3 +640,111 @@ def test_phase1_reconciliation_returns_legacy_empty_canon_to_draft(tmp_path):
         assert "exceeded" in generation["warning_text"]
     finally:
         conn.close()
+
+
+def test_base_stage_schema_columns_indexes_and_foreign_keys(conn):
+    stage_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(base_stage)")
+    }
+    target_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(base_stage_target)")
+    }
+    scene_columns = {row["name"] for row in conn.execute("PRAGMA table_info(scene)")}
+    assert {
+        "origin",
+        "state",
+        "description",
+        "beat_text",
+        "camera",
+        "framing",
+        "mood",
+        "aspect_ratio",
+        "style_id",
+        "model",
+        "image_size",
+        "uploaded_sha256",
+        "selected_candidate_id",
+        "image_width",
+        "image_height",
+        "revision",
+        "created_at",
+        "archived_at",
+    } <= stage_columns
+    assert {"id", "base_stage_id", "position", "description"} <= target_columns
+    assert "base_stage_id" in scene_columns
+
+    scene_indexes = {
+        row["name"] for row in conn.execute("PRAGMA index_list(scene)")
+    }
+    target_indexes = {
+        row["name"] for row in conn.execute("PRAGMA index_list(base_stage_target)")
+    }
+    assert "idx_scene_base_stage_id" in scene_indexes
+    assert "sqlite_autoindex_base_stage_target_1" in target_indexes
+
+    target_fks = conn.execute("PRAGMA foreign_key_list(base_stage_target)").fetchall()
+    assert any(
+        row["table"] == "base_stage"
+        and row["from"] == "base_stage_id"
+        and row["on_delete"] == "CASCADE"
+        for row in target_fks
+    )
+    scene_fks = conn.execute("PRAGMA foreign_key_list(scene)").fetchall()
+    assert any(
+        row["table"] == "base_stage" and row["from"] == "base_stage_id"
+        for row in scene_fks
+    )
+
+
+def test_base_stage_checks_and_target_cascade(conn):
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO base_stage "
+            "(origin, state, description, aspect_ratio) "
+            "VALUES ('upload', 'draft', 'bad', '1:1')"
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO base_stage "
+            "(origin, state, description, aspect_ratio, uploaded_sha256, "
+            "image_width, image_height) "
+            "VALUES ('generated', 'ready', 'bad', '1:1', NULL, 8, 8)"
+        )
+    conn.rollback()
+
+    stage_id = conn.execute(
+        "INSERT INTO base_stage "
+        "(origin, state, description, aspect_ratio, uploaded_sha256, "
+        "image_width, image_height) "
+        "VALUES ('upload', 'ready', 'room', '1:1', ?, 8, 8)",
+        ("a" * 64,),
+    ).lastrowid
+    conn.execute(
+        "INSERT INTO base_stage_target (base_stage_id, position, description) "
+        "VALUES (?, 0, 'person')",
+        (stage_id,),
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO base_stage_target (base_stage_id, position, description) "
+            "VALUES (?, 0, 'duplicate position')",
+            (stage_id,),
+        )
+    conn.rollback()
+
+    stage_id = conn.execute(
+        "INSERT INTO base_stage "
+        "(origin, state, description, aspect_ratio, uploaded_sha256, "
+        "image_width, image_height) "
+        "VALUES ('upload', 'ready', 'room', '1:1', ?, 8, 8)",
+        ("b" * 64,),
+    ).lastrowid
+    conn.execute(
+        "INSERT INTO base_stage_target (base_stage_id, position, description) "
+        "VALUES (?, 0, 'person')",
+        (stage_id,),
+    )
+    conn.execute("DELETE FROM base_stage WHERE id = ?", (stage_id,))
+    assert conn.execute(
+        "SELECT COUNT(*) FROM base_stage_target WHERE base_stage_id = ?", (stage_id,)
+    ).fetchone()[0] == 0

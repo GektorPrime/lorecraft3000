@@ -703,6 +703,76 @@
 /* Panel preview                                                             */
 /* ------------------------------------------------------------------------ */
 
+.base-stage-card__preview {
+  width: 8rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.base-stage-card__preview .image-dialog__trigger-image {
+  width: 8rem;
+  height: 6rem;
+  object-fit: cover;
+}
+
+.base-stage-card__badges {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.base-stage-upload__preview {
+  margin: 0 0 var(--space-5);
+}
+
+.base-stage-upload__preview img {
+  display: block;
+  width: min(100%, 30rem);
+  max-height: 22rem;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+  background: var(--media-bg);
+}
+
+.base-stage-upload__preview figcaption {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.base-stage-upload__target-hint {
+  display: block;
+  margin: 0 0 var(--space-4);
+}
+
+.base-stage-upload__target {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.base-stage-upload__target .field {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .base-stage-card__preview,
+  .base-stage-card__preview .image-dialog__trigger-image {
+    width: 100%;
+  }
+
+  .base-stage-card__preview .image-dialog__trigger-image {
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .base-stage-upload__target {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .panel-list-card__preview {
   width: 8rem;
   height: 6rem;

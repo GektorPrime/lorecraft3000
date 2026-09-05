@@ -19,11 +19,20 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.routes.api_v1 import characters, generations, options, panels, ref_sets, styles
+from app.routes.api_v1 import (
+    base_stages,
+    characters,
+    generations,
+    options,
+    panels,
+    ref_sets,
+    styles,
+)
 
 router = APIRouter(tags=["api-v1"])
 
 router.include_router(options.router)
+router.include_router(base_stages.router)
 router.include_router(characters.router)
 router.include_router(styles.router)
 router.include_router(ref_sets.router)

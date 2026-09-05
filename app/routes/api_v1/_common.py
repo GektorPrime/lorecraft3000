@@ -14,6 +14,12 @@ from fastapi.responses import Response
 
 from app.deps import settings
 from app.services.avatars import AvatarService
+from app.services.base_stages import (
+    BaseStageError,
+    BaseStageNotFoundError,
+    BaseStageNotReadyError,
+    BaseStageValidationError,
+)
 
 # Browser timezone (IANA name) used to compute the user-local daily budget
 # boundary. Supplied by the React client; absent/invalid values fall back to
@@ -87,6 +93,7 @@ PANEL_IMMUTABILITY_EXPLANATION = (
 # mapper picks the intended status code (e.g. GenerationNotFoundError (404)
 # before GenerationError (422)).
 _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
+    (BaseStageNotFoundError, 404),
     (CharacterNotFoundError, 404),
     (StyleNotFoundError, 404),
     (RefSetNotFoundError, 404),
@@ -103,12 +110,14 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (IdempotencyConflictError, 409),
     (SceneChangedError, 409),
     (PreviewChangedError, 409),
+    (BaseStageNotReadyError, 409),
     (BudgetExceededError, 402),
     (VisualContractTooLongError, 422),
     (InvalidStyleReferenceError, 422),
     (InvalidRoleError, 422),
     (ImageRejectedError, 422),
     (UnknownPriceError, 422),
+    (BaseStageValidationError, 422),
     (ImageStorageError, 404),
     (CharacterError, 422),
     (StyleError, 422),
@@ -117,6 +126,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (GenerationError, 422),
     (CandidateError, 422),
     (CostError, 422),
+    (BaseStageError, 422),
 )
 
 
@@ -319,3 +329,44 @@ def _serve_stored_image(sha256: str, storage: ImageStorage) -> Response:
         _raise_for(exc)
     mime = _MIME.get(metadata.get("format"), "application/octet-stream")
     return Response(data, media_type=mime)
+
+
+def _base_stage_out(stage) -> "BaseStage":
+    from app.schemas import BaseStage, BaseStageTarget, ImageDimensions
+
+    dimensions = None
+    if stage.image_width is not None and stage.image_height is not None:
+        dimensions = ImageDimensions(width=stage.image_width, height=stage.image_height)
+    return BaseStage(
+        id=stage.id,
+        origin=stage.origin,
+        state=stage.state,
+        description=stage.description,
+        beat_text=stage.beat_text,
+        camera=stage.camera,
+        framing=stage.framing,
+        mood=stage.mood,
+        style_id=stage.style_id,
+        model=stage.model,
+        image_size=stage.image_size,
+        selected_candidate_id=stage.selected_candidate_id,
+        aspect_ratio=stage.aspect_ratio,
+        dimensions=dimensions,
+        content_url=(
+            f"/api/v1/base-stages/{stage.id}/content"
+            if stage.state == "ready"
+            else None
+        ),
+        targets=[
+            BaseStageTarget(
+                id=target.id,
+                position=target.position,
+                description=target.description,
+            )
+            for target in stage.targets
+        ],
+        usage_count=stage.usage_count,
+        revision=stage.revision,
+        created_at=stage.created_at,
+        archived_at=stage.archived_at,
+    )

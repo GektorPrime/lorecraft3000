@@ -102,3 +102,36 @@ class RefSetSummary:
 
     ref_set: RefSet
     image_count: int
+
+
+@dataclass(frozen=True)
+class BaseStageTarget:
+    id: int
+    base_stage_id: int
+    position: int
+    description: str
+
+
+@dataclass(frozen=True)
+class BaseStage:
+    id: int
+    origin: str
+    state: str
+    description: str
+    beat_text: str | None
+    camera: str | None
+    framing: str | None
+    mood: str | None
+    aspect_ratio: str
+    style_id: int | None
+    model: str | None
+    image_size: str | None
+    uploaded_sha256: str | None
+    selected_candidate_id: int | None
+    image_width: int | None
+    image_height: int | None
+    revision: int
+    created_at: str
+    archived_at: str | None
+    targets: tuple[BaseStageTarget, ...]
+    usage_count: int

@@ -12,6 +12,8 @@ import { OptionsProvider } from './api/OptionsProvider'
 import { AppShell } from './components/AppShell'
 import { Home } from './pages/Home'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { BaseStageListPage } from './pages/base-stages/BaseStageListPage'
+import { BaseStageUploadPage } from './pages/base-stages/BaseStageUploadPage'
 import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
@@ -135,6 +137,16 @@ const appRoutes: RouteObject[] = [
             loader: requireRouteId,
             element: <StyleFormPage />,
             handle: { title: 'Edit Style' } satisfies RouteHandle,
+          },
+          {
+            path: 'base-stages',
+            element: <BaseStageListPage />,
+            handle: { title: 'Base Stages' } satisfies RouteHandle,
+          },
+          {
+            path: 'base-stages/upload',
+            element: <BaseStageUploadPage />,
+            handle: { title: 'Upload Base Stage' } satisfies RouteHandle,
           },
           {
             path: 'gallery',

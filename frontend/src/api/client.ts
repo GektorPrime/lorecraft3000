@@ -9,6 +9,7 @@
  */
 
 import type {
+  BaseStage,
   Budget,
   Candidate,
   Character,
@@ -106,6 +107,25 @@ function json(method: string, body: unknown): RequestInit {
 
 export const getOptionsSummary = () => request<OptionsSummary>('/options/summary')
 export const getBudget = () => request<Budget>('/budget')
+
+// ---------------------------------------------------------------------------
+// base stages
+// ---------------------------------------------------------------------------
+
+export const listBaseStages = () => request<BaseStage[]>('/base-stages')
+export const listArchivedBaseStages = () => request<BaseStage[]>('/base-stages/archived')
+export const getBaseStage = (id: number) => request<BaseStage>(`/base-stages/${id}`)
+export const uploadBaseStage = (file: File, description: string, targets: string[]) => {
+  const form = new FormData()
+  form.append('image', file)
+  form.append('description', description)
+  form.append('targets', JSON.stringify(targets))
+  return request<BaseStage>('/base-stages/upload', { method: 'POST', body: form })
+}
+export const archiveBaseStage = (id: number) =>
+  request<void>(`/base-stages/${id}`, { method: 'DELETE' })
+export const restoreBaseStage = (id: number) =>
+  request<BaseStage>(`/base-stages/${id}/restore`, { method: 'POST' })
 
 // ---------------------------------------------------------------------------
 // characters

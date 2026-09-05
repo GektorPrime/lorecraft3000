@@ -1,6 +1,240 @@
 {
   "components": {
     "schemas": {
+      "BaseStage": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "beat_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beat Text"
+          },
+          "camera": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera"
+          },
+          "content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Url"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "dimensions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageDimensions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "framing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framing"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "image_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Size"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "mood": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mood"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "selected_candidate_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Candidate Id"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "style_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Id"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/BaseStageTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "usage_count": {
+            "title": "Usage Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "state",
+          "description",
+          "beat_text",
+          "camera",
+          "framing",
+          "mood",
+          "style_id",
+          "model",
+          "image_size",
+          "selected_candidate_id",
+          "aspect_ratio",
+          "dimensions",
+          "content_url",
+          "targets",
+          "usage_count",
+          "revision",
+          "created_at",
+          "archived_at"
+        ],
+        "title": "BaseStage",
+        "type": "object"
+      },
+      "BaseStageTarget": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "description"
+        ],
+        "title": "BaseStageTarget",
+        "type": "object"
+      },
+      "Body_upload_base_stage_api_v1_base_stages_upload_post": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "image": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Image",
+            "type": "string"
+          },
+          "targets": {
+            "title": "Targets",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "targets",
+          "image"
+        ],
+        "title": "Body_upload_base_stage_api_v1_base_stages_upload_post",
+        "type": "object"
+      },
       "Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post": {
         "properties": {
           "image": {
@@ -651,6 +885,24 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ImageDimensions": {
+        "properties": {
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ],
+        "title": "ImageDimensions",
+        "type": "object"
+      },
       "OptionsSummary": {
         "description": "Static configuration + live budget for driving frontend forms.",
         "properties": {
@@ -1229,6 +1481,261 @@
           }
         },
         "summary": "Home"
+      }
+    },
+    "/api/v1/base-stages": {
+      "get": {
+        "operationId": "list_base_stages_api_v1_base_stages_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BaseStage"
+                  },
+                  "title": "Response List Base Stages Api V1 Base Stages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Base Stages",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/archived": {
+      "get": {
+        "operationId": "list_archived_base_stages_api_v1_base_stages_archived_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BaseStage"
+                  },
+                  "title": "Response List Archived Base Stages Api V1 Base Stages Archived Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Archived Base Stages",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/upload": {
+      "post": {
+        "operationId": "upload_base_stage_api_v1_base_stages_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_base_stage_api_v1_base_stages_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}": {
+      "delete": {
+        "operationId": "archive_base_stage_api_v1_base_stages__base_stage_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      },
+      "get": {
+        "operationId": "get_base_stage_api_v1_base_stages__base_stage_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/content": {
+      "get": {
+        "operationId": "base_stage_content_api_v1_base_stages__base_stage_id__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Base Stage Content",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
+    "/api/v1/base-stages/{base_stage_id}/restore": {
+      "post": {
+        "operationId": "restore_base_stage_api_v1_base_stages__base_stage_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseStage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Base Stage",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
       }
     },
     "/api/v1/budget": {

@@ -280,3 +280,42 @@ class GalleryItem(BaseModel):
     beat_text: str
     aspect_ratio: str
     created_at: str
+
+
+# ---------------------------------------------------------------------------
+# Base Stages
+# ---------------------------------------------------------------------------
+
+
+class BaseStageTarget(BaseModel):
+    id: int
+    position: int
+    description: str
+
+
+class ImageDimensions(BaseModel):
+    width: int
+    height: int
+
+
+class BaseStage(BaseModel):
+    id: int
+    origin: str
+    state: str
+    description: str
+    beat_text: str | None
+    camera: str | None
+    framing: str | None
+    mood: str | None
+    style_id: int | None
+    model: str | None
+    image_size: str | None
+    selected_candidate_id: int | None
+    aspect_ratio: str
+    dimensions: ImageDimensions | None
+    content_url: str | None
+    targets: list[BaseStageTarget]
+    usage_count: int
+    revision: int
+    created_at: str
+    archived_at: str | None

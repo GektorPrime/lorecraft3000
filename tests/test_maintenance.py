@@ -94,6 +94,23 @@ def test_dangling_db_hash_is_detected(conn, storage):
     assert report.dangling_db_hashes == (ghost,)
 
 
+def test_dangling_uploaded_base_stage_hash_is_detected(conn, storage):
+    ghost = "b" * 64
+    conn.execute(
+        """
+        INSERT INTO base_stage
+            (origin, state, description, aspect_ratio, uploaded_sha256,
+             image_width, image_height)
+        VALUES ('upload', 'ready', 'Missing stage', '16:9', ?, 1600, 900)
+        """,
+        (ghost,),
+    )
+    conn.commit()
+
+    report = run_check(conn, storage)
+    assert report.dangling_db_hashes == (ghost,)
+
+
 def test_stale_temp_files_are_detected(conn, storage):
     prefix = storage.root / "ab"
     prefix.mkdir(parents=True)

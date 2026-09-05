@@ -11,9 +11,12 @@ JSON response body.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import io
+import json
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 import app.main as main_module
 from app.config import Settings
@@ -142,6 +145,127 @@ def _generate_panel(api, panel_id, *, headers=None):
         json={"expected_prompt_hash": preview["prompt_hash"]},
         headers=headers,
     )
+
+
+def _image_bytes(format: str, size=(12, 8)) -> bytes:
+    output = io.BytesIO()
+    Image.new("RGB", size, (10, 20, 30)).save(output, format=format)
+    return output.getvalue()
+
+
+def _upload_base_stage(api, *, image=None, description="Stone bridge", targets=None):
+    return api.client.post(
+        "/api/v1/base-stages/upload",
+        data={
+            "description": description,
+            "targets": json.dumps(
+                ["traveler beside the arch"] if targets is None else targets
+            ),
+        },
+        files={"image": ("stage.png", image or _image_bytes("PNG"), "image/png")},
+    )
+
+
+# ---------------------------------------------------------------------------
+# base stages
+# ---------------------------------------------------------------------------
+
+
+def test_base_stage_upload_list_get_content_archive_and_restore(api):
+    uploaded = _upload_base_stage(
+        api,
+        image=_image_bytes("PNG", (160, 90)),
+        description="  Four investigators hauling a machine uphill.  ",
+        targets=["upper figure", "lower figure"],
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    stage = uploaded.json()
+
+    assert stage["origin"] == "upload"
+    assert stage["state"] == "ready"
+    assert stage["description"] == "Four investigators hauling a machine uphill."
+    assert stage["aspect_ratio"] == "16:9"
+    assert stage["dimensions"] == {"width": 160, "height": 90}
+    assert [target["description"] for target in stage["targets"]] == [
+        "upper figure",
+        "lower figure",
+    ]
+    assert stage["content_url"] == f"/api/v1/base-stages/{stage['id']}/content"
+    assert "sha" not in json.dumps(stage).lower()
+
+    listed = api.client.get("/api/v1/base-stages")
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [stage["id"]]
+    assert api.client.get(f"/api/v1/base-stages/{stage['id']}").json() == stage
+
+    content = api.client.get(stage["content_url"])
+    assert content.status_code == 200
+    assert content.headers["content-type"] == "image/png"
+    assert content.content == _image_bytes("PNG", (160, 90))
+
+    assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
+    assert api.client.get("/api/v1/base-stages").json() == []
+    archived = api.client.get("/api/v1/base-stages/archived").json()
+    assert [item["id"] for item in archived] == [stage["id"]]
+    assert api.client.get(stage["content_url"]).status_code == 200
+
+    restored = api.client.post(f"/api/v1/base-stages/{stage['id']}/restore")
+    assert restored.status_code == 200
+    assert restored.json()["archived_at"] is None
+    assert [item["id"] for item in api.client.get("/api/v1/base-stages").json()] == [
+        stage["id"]
+    ]
+
+
+@pytest.mark.parametrize(
+    ("targets", "message"),
+    [
+        ("not json", "valid JSON"),
+        (json.dumps({"target": "left"}), "JSON array"),
+        (json.dumps(["left", " LEFT "]), "case-insensitive"),
+        (json.dumps([""]), "must not be blank"),
+    ],
+)
+def test_base_stage_upload_rejects_invalid_targets(api, targets, message):
+    response = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": targets},
+        files={"image": ("stage.png", _image_bytes("PNG"), "image/png")},
+    )
+    assert response.status_code == 422
+    assert message in response.json()["detail"]["message"]
+
+
+def test_base_stage_upload_rejects_mime_size_and_decoded_format(api):
+    wrong_mime = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": "[]"},
+        files={"image": ("stage.png", _image_bytes("PNG"), "text/plain")},
+    )
+    assert wrong_mime.status_code == 422
+
+    oversized = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": "[]"},
+        files={"image": ("stage.png", b"x" * (10 * 1024 * 1024 + 1), "image/png")},
+    )
+    assert oversized.status_code == 422
+    assert "10 MB" in oversized.json()["detail"]["message"]
+
+    unsupported = api.client.post(
+        "/api/v1/base-stages/upload",
+        data={"description": "A clearing", "targets": "[]"},
+        files={"image": ("stage.gif", _image_bytes("GIF"), "image/png")},
+    )
+    assert unsupported.status_code == 422
+    assert "format GIF" in unsupported.json()["detail"]["message"]
+
+
+def test_base_stage_missing_routes_return_404(api):
+    assert api.client.get("/api/v1/base-stages/9999").status_code == 404
+    assert api.client.get("/api/v1/base-stages/9999/content").status_code == 404
+    assert api.client.delete("/api/v1/base-stages/9999").status_code == 404
+    assert api.client.post("/api/v1/base-stages/9999/restore").status_code == 404
 
 
 # ---------------------------------------------------------------------------
