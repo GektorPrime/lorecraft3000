@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -84,6 +84,11 @@ const READY_STAGE: BaseStage = {
   dimensions: { width: 1536, height: 1024 },
 }
 
+const LOCKED_DRAFT: BaseStage = {
+  ...DRAFT,
+  is_editable: false,
+}
+
 const SUCCEEDED_ATTEMPT: GenerationSummary = {
   id: 100,
   scene_id: null,
@@ -135,13 +140,23 @@ describe('BaseStagePreviewPage', () => {
   })
 
   it('shows the identity-neutral prompt, targets, and publish action for a generated candidate', async () => {
-    vi.mocked(client.getBaseStage).mockResolvedValueOnce(DRAFT).mockResolvedValueOnce(READY_STAGE)
+    // A tunnel/cache may briefly return the pre-publish draft during refresh;
+    // the publish response remains authoritative for the transition.
+    vi.mocked(client.getBaseStage).mockResolvedValue(DRAFT)
     renderPage()
 
     expect(await screen.findByText(/Four figures haul a machine up a muddy ravine/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit composition' })).toHaveAttribute(
+      'href',
+      '/base-stages/5/edit',
+    )
     // Targets come from the stage, not the prompt.
     expect(await screen.findByText('figure above the slope')).toBeInTheDocument()
     expect(screen.getByText('figure beside the oak')).toBeInTheDocument()
+    const targets = screen.getByRole('list', { name: 'Identity targets' })
+    expect(within(targets).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(targets).getByText('Target 1')).toBeInTheDocument()
+    expect(within(targets).getByText('Target 2')).toBeInTheDocument()
     // Identity-neutral: no character references are loaded into the prompt.
     expect(screen.getByText(/no character identities are included at this stage/i)).toBeInTheDocument()
 
@@ -150,6 +165,7 @@ describe('BaseStagePreviewPage', () => {
     await waitFor(() => expect(client.publishBaseStage).toHaveBeenCalledWith(5, 900))
     expect(await screen.findByText(/Base stage #5 — Ready/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Publish as base stage image/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Duplicate' })).toBeInTheDocument()
   })
 
   it('generates a candidate with the assembled prompt hash', async () => {
@@ -161,8 +177,19 @@ describe('BaseStagePreviewPage', () => {
     expect(refreshBudget).toHaveBeenCalled()
   })
 
-  it('duplicates an editable draft into a fresh draft at a new preview page', async () => {
+  it('offers edit instead of duplicate while a draft remains editable', async () => {
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Edit composition' })).toHaveAttribute(
+      'href',
+      '/base-stages/5/edit',
+    )
+    expect(screen.queryByRole('button', { name: 'Duplicate' })).not.toBeInTheDocument()
+  })
+
+  it('duplicates a locked generated draft into a fresh draft at a new preview page', async () => {
     const user = userEvent.setup()
+    vi.mocked(client.getBaseStage).mockResolvedValue(LOCKED_DRAFT)
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Duplicate' }))
@@ -185,8 +212,10 @@ describe('BaseStagePreviewPage', () => {
     renderPage()
 
     expect(await screen.findByText('Base stage #5 — Ready')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit composition' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Publish as base stage image/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Generate candidate/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Duplicate' })).toBeInTheDocument()
   })
 
   it('links to the panels that are anchored on a ready stage', async () => {

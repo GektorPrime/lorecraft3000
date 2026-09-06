@@ -70,8 +70,8 @@ function BaseStageCard({ stage, archived, busy, onOpen, onArchive, onRestore }: 
       </div>
       <div className="resource-card__actions">
         <span className="base-stage-card__badges">
-          <span className="badge badge--draft">{stage.origin === 'upload' ? 'Upload' : stage.origin}</span>
-          <span className="badge badge--canonical">{stage.state === 'ready' ? 'Ready' : stage.state}</span>
+          <span className="badge badge--draft">{stage.origin === 'upload' ? 'Upload' : 'Generated'}</span>
+          <span className="badge badge--canonical">{stage.state === 'ready' ? 'Ready' : 'Draft'}</span>
         </span>
         {archived ? (
           <button type="button" className="btn" disabled={busy} onClick={onRestore}>

@@ -156,6 +156,12 @@ const appRoutes: RouteObject[] = [
             handle: { title: 'New Generated Base Stage' } satisfies RouteHandle,
           },
           {
+            path: 'base-stages/:id/edit',
+            loader: requireRouteId,
+            element: <BaseStageNewPage />,
+            handle: { title: 'Edit Base Stage' } satisfies RouteHandle,
+          },
+          {
             path: 'base-stages/:id/preview',
             loader: requireRouteId,
             element: <BaseStagePreviewPage />,

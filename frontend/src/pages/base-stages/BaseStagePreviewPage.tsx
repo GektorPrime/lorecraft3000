@@ -205,9 +205,10 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
     setPublishing(true)
     setActionMessage(null)
     try {
-      await publishBaseStage(stageId, candidateId)
+      const publishedStage = await publishBaseStage(stageId, candidateId)
       if (!mounted.current) return
       await reload()
+      if (mounted.current) setStage(publishedStage)
     } catch (err) {
       if (!mounted.current) return
       setActionMessage(`Could not publish: ${err instanceof ApiError ? err.message : String(err)}`)
@@ -318,11 +319,19 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
 
               {stage.targets.length > 0 && (
                 <section className="panel-preview__base-stage">
-                  <SectionHeader title="Identity targets" className="panel-preview__section-header" />
-                  <ol className="panel-preview__mapping">
-                    {[...stage.targets].sort((a, b) => a.position - b.position).map((target) => (
+                  <SectionHeader
+                    title="Identity targets"
+                    description="Ordered figure placeholders that can be mapped to characters when staging a panel."
+                    className="panel-preview__section-header"
+                  />
+                  <ol className="base-stage-target-list" aria-label="Identity targets">
+                    {[...stage.targets].sort((a, b) => a.position - b.position).map((target, index) => (
                       <li key={target.id}>
-                        <strong>{target.description}</strong>
+                        <span className="base-stage-target-list__number" aria-hidden="true">{index + 1}</span>
+                        <div>
+                          <span className="base-stage-target-list__label">Target {index + 1}</span>
+                          <p>{target.description}</p>
+                        </div>
                       </li>
                     ))}
                   </ol>
@@ -437,16 +446,20 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
 
         <aside className="panel-preview__sidebar" aria-label="Base stage actions">
           <div className="action-bar panel-preview__actions">
-            {stage.is_editable && (
+            {(stage.is_editable || stage.origin === 'generated') && (
               <div className="action-bar__group action-bar__group--start">
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={duplicating}
-                  onClick={() => void handleDuplicate()}
-                >
-                  {duplicating ? 'Duplicating…' : 'Duplicate'}
-                </button>
+                {stage.is_editable ? (
+                  <Link to={`/base-stages/${stage.id}/edit`} className="btn">Edit composition</Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={duplicating}
+                    onClick={() => void handleDuplicate()}
+                  >
+                    {duplicating ? 'Duplicating…' : 'Duplicate'}
+                  </button>
+                )}
               </div>
             )}
             {preview?.can_generate && (
