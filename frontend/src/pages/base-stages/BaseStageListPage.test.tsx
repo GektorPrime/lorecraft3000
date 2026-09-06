@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../../api/client'
 import type { BaseStage } from '../../api/types'
@@ -40,7 +40,17 @@ const STAGE: BaseStage = {
 }
 
 function renderPage() {
-  render(<MemoryRouter><BaseStageListPage /></MemoryRouter>)
+  function Location() {
+    return <span data-testid="location">{useLocation().pathname}</span>
+  }
+
+  render(
+    <MemoryRouter initialEntries={['/base-stages']}>
+      <Routes>
+        <Route path="*" element={<><BaseStageListPage /><Location /></>} />
+      </Routes>
+    </MemoryRouter>,
+  )
 }
 
 describe('BaseStageListPage', () => {
@@ -61,27 +71,32 @@ describe('BaseStageListPage', () => {
     expect(await screen.findByRole('heading', { name: 'No base stages yet' })).toBeInTheDocument()
   })
 
-  it('renders preview and metadata without turning the card into a dead link', async () => {
+  it('opens ready uploaded stages from the card while keeping image preview independent', async () => {
+    const user = userEvent.setup()
     vi.mocked(client.listBaseStages).mockResolvedValue([STAGE])
     renderPage()
 
-    expect(await screen.findByRole('button', { name: 'Preview base stage #4' })).toBeInTheDocument()
+    const imagePreview = await screen.findByRole('button', { name: 'Preview base stage #4' })
+    const stageCard = screen.getByRole('button', { name: 'Open base stage #4 preview' })
     expect(screen.getByText('1536 × 1024')).toBeInTheDocument()
     expect(screen.getByText('1 target')).toBeInTheDocument()
     expect(screen.getByText('Used 2 times')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Base stage #4/ })).not.toBeInTheDocument()
+    await user.click(imagePreview)
+    expect(screen.getByTestId('location')).toHaveTextContent('/base-stages')
+    await user.keyboard('{Escape}')
+    await user.click(stageCard)
+    expect(screen.getByTestId('location')).toHaveTextContent('/base-stages/4/preview')
   })
 
-  it('links draft generated stages to their preview page', async () => {
+  it('opens draft generated stages from the card', async () => {
+    const user = userEvent.setup()
     vi.mocked(client.listBaseStages).mockResolvedValue([
       { ...STAGE, origin: 'generated', state: 'draft', is_editable: true, content_url: null, selected_candidate_id: null, dimensions: null },
     ])
     renderPage()
 
-    expect(await screen.findByRole('link', { name: /Base stage #4/ })).toHaveAttribute(
-      'href',
-      '/base-stages/4/preview',
-    )
+    await user.click(await screen.findByRole('button', { name: 'Open base stage #4 preview' }))
+    expect(screen.getByTestId('location')).toHaveTextContent('/base-stages/4/preview')
     expect(screen.getByRole('link', { name: /Create generated base stage/ })).toHaveAttribute(
       'href',
       '/base-stages/new',

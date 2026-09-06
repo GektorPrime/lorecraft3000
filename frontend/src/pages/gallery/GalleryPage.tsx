@@ -41,7 +41,7 @@ export function GalleryPage() {
 
   return (
     <section aria-busy={items === null && error === null || undefined}>
-      <PageHeader title="Gallery" description="All accepted generated images, newest first." />
+      <PageHeader title="Gallery" description="All accepted generated images." />
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {!items && !error && <AsyncMessage kind="loading">Loading gallery…</AsyncMessage>}
       {items && items.length === 0 && (

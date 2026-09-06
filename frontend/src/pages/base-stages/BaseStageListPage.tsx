@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ApiError,
   archiveBaseStage,
@@ -19,17 +19,34 @@ function errorMessage(error: unknown) {
   return error instanceof ApiError ? error.message : String(error)
 }
 
-function BaseStageCard({ stage, archived, busy, onArchive, onRestore }: {
+function BaseStageCard({ stage, archived, busy, onOpen, onArchive, onRestore }: {
   stage: BaseStage
   archived?: boolean
   busy: boolean
+  onOpen?: () => void
   onArchive?: () => void
   onRestore?: () => void
 }) {
   return (
-    <article className={`resource-card base-stage-card${archived ? ' resource-card--archived' : ''}`}>
+    <article
+      className={`resource-card base-stage-card${archived ? ' resource-card--archived' : ' resource-card--clickable'}`}
+      role={archived ? undefined : 'button'}
+      tabIndex={archived ? undefined : 0}
+      aria-label={archived ? undefined : `Open base stage #${stage.id} preview`}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (!archived && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          onOpen?.()
+        }
+      }}
+    >
       {stage.content_url && (
-        <div className="base-stage-card__preview">
+        <div
+          className="base-stage-card__preview"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
           <ImageDialog
             src={stage.content_url}
             thumbnailAlt=""
@@ -41,15 +58,7 @@ function BaseStageCard({ stage, archived, busy, onArchive, onRestore }: {
       )}
       <div className="resource-card__body">
         <div className="resource-card__header">
-          <h2 className="resource-card__title">
-            {stage.is_editable
-              ? <Link to={`/base-stages/${stage.id}/preview`}>Base stage #{stage.id}</Link>
-              : `Base stage #${stage.id}`}
-          </h2>
-          <span className="base-stage-card__badges">
-            <span className="badge badge--draft">{stage.origin === 'upload' ? 'Upload' : stage.origin}</span>
-            <span className="badge badge--canonical">{stage.state === 'ready' ? 'Ready' : stage.state}</span>
-          </span>
+          <h2 className="resource-card__title">Base stage #{stage.id}</h2>
         </div>
         <p className="resource-card__summary text-clamp" title={stage.description}>{stage.description}</p>
         <p className="resource-card__meta">
@@ -60,12 +69,25 @@ function BaseStageCard({ stage, archived, busy, onArchive, onRestore }: {
         </p>
       </div>
       <div className="resource-card__actions">
+        <span className="base-stage-card__badges">
+          <span className="badge badge--draft">{stage.origin === 'upload' ? 'Upload' : stage.origin}</span>
+          <span className="badge badge--canonical">{stage.state === 'ready' ? 'Ready' : stage.state}</span>
+        </span>
         {archived ? (
           <button type="button" className="btn" disabled={busy} onClick={onRestore}>
             {busy ? 'Restoring…' : 'Restore'}
           </button>
         ) : (
-          <button type="button" className="btn btn--danger" disabled={busy} onClick={onArchive}>
+          <button
+            type="button"
+            className="btn btn--danger"
+            disabled={busy}
+            onClick={(event) => {
+              event.stopPropagation()
+              onArchive?.()
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
             <Icon name="trash" size={15} />
             {busy ? 'Deleting…' : 'Delete'}
           </button>
@@ -76,6 +98,7 @@ function BaseStageCard({ stage, archived, busy, onArchive, onRestore }: {
 }
 
 export function BaseStageListPage() {
+  const navigate = useNavigate()
   const [stages, setStages] = useState<BaseStage[] | null>(null)
   const [archived, setArchived] = useState<BaseStage[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -136,11 +159,19 @@ export function BaseStageListPage() {
       <PageHeader
         title="Base Stages"
         description="Reusable scene images that can anchor future panel compositions."
-        actions={<Link to="/base-stages/upload" className="btn">Upload base stage<Icon name="plus" size={16} /></Link>}
+        actions={(
+          <>
+            <Link to="/base-stages/new" className="btn">
+              <Icon name="sparkles" size={16} />
+              Create generated base stage
+            </Link>
+            <Link to="/base-stages/upload" className="btn btn--primary">
+              <Icon name="plus" size={16} />
+              Upload base stage
+            </Link>
+          </>
+        )}
       />
-      <p>
-        <Link to="/base-stages/new" className="btn btn--primary"><Icon name="sparkles" size={16} />Create generated base stage</Link>
-      </p>
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
       {!stages && !error && <AsyncMessage kind="loading">Loading base stages…</AsyncMessage>}
       {stages?.length === 0 && (
@@ -153,7 +184,15 @@ export function BaseStageListPage() {
       )}
       {stages && stages.length > 0 && (
         <div className="resource-list">
-          {stages.map((stage) => <BaseStageCard key={stage.id} stage={stage} busy={busyId === stage.id} onArchive={() => setConfirmId(stage.id)} />)}
+          {stages.map((stage) => (
+            <BaseStageCard
+              key={stage.id}
+              stage={stage}
+              busy={busyId === stage.id}
+              onOpen={() => navigate(`/base-stages/${stage.id}/preview`)}
+              onArchive={() => setConfirmId(stage.id)}
+            />
+          ))}
         </div>
       )}
       {archived.length > 0 && (
