@@ -44,6 +44,20 @@ describe('api client', () => {
     expect(character.name).toBe('Elias')
   })
 
+  it('rejects successful HTML responses instead of returning undefined', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response('<!doctype html><title>Forwarded port</title>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      }),
+    )
+
+    await expect(listCharacters()).rejects.toMatchObject({
+      type: 'InvalidResponseError',
+      status: 200,
+    })
+  })
+
   it('throws an ApiError with message/type from the backend error envelope', async () => {
     vi.mocked(globalThis.fetch).mockImplementation(async () =>
       jsonResponse(
