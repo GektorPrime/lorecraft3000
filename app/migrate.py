@@ -31,6 +31,8 @@ MIGRATIONS: list[str] = [
     "app.migrations.015_preserve_retired_ref_sets",
     "app.migrations.016_base_stages",
     "app.migrations.017_base_stage_generations",
+    "app.migrations.018_character_reference_roles",
+    "app.migrations.019_multiview_face_embeddings",
 ]
 
 

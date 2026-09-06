@@ -10,14 +10,16 @@ from __future__ import annotations
 # Locked parameter (documentation/phase-1-plan.md): visual-contract ceiling.
 VISUAL_CONTRACT_MAX_WORDS = 60
 
-# Allowed ref_image roles (mirrors the CHECK constraint in 001_initial.py).
+# Allowed ref_image roles, ordered with the preferred default image first.
 ALLOWED_ROLES: tuple[str, ...] = (
+    "turnaround",
     "face_front",
     "face_3q",
     "face_profile",
     "full_body",
-    "expression",
     "outfit",
+    "head_back",
+    "expression",
 )
 
 

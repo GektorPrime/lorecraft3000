@@ -12,6 +12,7 @@ from app.domain.generation import (
     CastInput,
     SceneInput,
 )
+from app.services.validation import ALLOWED_ROLES
 
 
 @dataclass(frozen=True)
@@ -38,14 +39,7 @@ class AssemblyError(Exception):
     """Raised before spending when a prompt cannot be assembled safely."""
 
 
-_ROLE_PRIORITY = {
-    "face_front": 0,
-    "face_3q": 1,
-    "face_profile": 2,
-    "full_body": 3,
-    "expression": 4,
-    "outfit": 5,
-}
+_ROLE_PRIORITY = {role: rank for rank, role in enumerate(ALLOWED_ROLES)}
 
 
 def capabilities_for(model: str) -> ModelCapabilities:

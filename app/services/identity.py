@@ -34,10 +34,9 @@ log = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------
 
-# Roles whose images are close-ups of a face.  full_body/outfit shots are
-# excluded from the gallery: the face is too small to embed reliably and
-# would poison the reference vectors.  Mirrors the spike's FACE_ROLES.
-FACE_ROLES = ("face_front", "face_3q", "face_profile")
+# Roles that provide reliable identity views. Turnaround sheets intentionally
+# contribute every detected face; body, outfit, and head-back images do not.
+FACE_ROLES = ("face_front", "face_3q", "face_profile", "turnaround")
 
 # ArcFace output dimensionality.
 _VECTOR_DIM = 512
@@ -352,11 +351,21 @@ def decode_embedding(blob: bytes) -> np.ndarray | None:
 
 
 def store_embedding(conn: sqlite3.Connection, sha256: str, vector: np.ndarray) -> None:
-    """Insert or replace an embedding into the face_embedding table."""
-    blob = encode_embedding(vector)
-    conn.execute(
-        "INSERT OR REPLACE INTO face_embedding (sha256, embedding) VALUES (?, ?)",
-        (sha256, blob),
+    """Replace an image's embeddings with one face vector."""
+    store_embeddings(conn, sha256, [vector])
+
+
+def store_embeddings(
+    conn: sqlite3.Connection, sha256: str, vectors: list[np.ndarray]
+) -> None:
+    """Replace an image's embeddings with all detected identity views."""
+    conn.execute("DELETE FROM face_embedding WHERE sha256 = ?", (sha256,))
+    conn.executemany(
+        "INSERT INTO face_embedding (sha256, face_index, embedding) VALUES (?, ?, ?)",
+        [
+            (sha256, face_index, encode_embedding(vector))
+            for face_index, vector in enumerate(vectors)
+        ],
     )
 
 
@@ -366,14 +375,15 @@ def load_gallery(conn: sqlite3.Connection) -> dict[int, list[tuple[str, np.ndarr
     Returns ``{character_id: [(sha256, vector), ...]}`` from the canonical
     ref_images joined against the face_embedding table.
     """
+    placeholders = ", ".join("?" for _ in FACE_ROLES)
     rows = conn.execute(
-        """
+        f"""
         SELECT ri.sha256, ri.role, rs.character_id, fe.embedding
           FROM ref_image   ri
           JOIN ref_set     rs ON rs.id = ri.ref_set_id
           JOIN face_embedding fe ON fe.sha256 = ri.sha256
          WHERE rs.status   = 'canonical'
-           AND ri.role     IN (?, ?, ?)
+            AND ri.role     IN ({placeholders})
         """,
         FACE_ROLES,
     ).fetchall()
@@ -420,6 +430,7 @@ def load_gallery_for_attachments(
         for sha in hashes:
             placeholders.append("?")
             params.append(sha)
+    role_placeholders = ", ".join("?" for _ in FACE_ROLES)
     rows = conn.execute(
         f"""
         SELECT ri.sha256, ri.role, rs.character_id, fe.embedding
@@ -427,7 +438,7 @@ def load_gallery_for_attachments(
           JOIN ref_set rs ON rs.id = ri.ref_set_id
           JOIN face_embedding fe ON fe.sha256 = ri.sha256
          WHERE ri.sha256 IN ({", ".join(placeholders)})
-           AND ri.role   IN (?, ?, ?)
+            AND ri.role   IN ({role_placeholders})
         """,
         (*params, *FACE_ROLES),
     ).fetchall()

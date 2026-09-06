@@ -121,7 +121,7 @@ def test_prompt_contains_constraints_but_no_unprovided_lore():
     assert "lore" not in result.text.lower()
 
 
-def test_identity_face_roles_win_when_capacity_is_tight():
+def test_turnaround_wins_when_capacity_is_tight():
     member = CastInput(
         character_id=1,
         name="ELIAS",
@@ -132,6 +132,8 @@ def test_identity_face_roles_win_when_capacity_is_tight():
         references=(
             ReferenceInput("f" * 64, "outfit", 10.0),
             ReferenceInput("a" * 64, "face_front", 1.0),
+            ReferenceInput("b" * 64, "full_body", 1.0),
+            ReferenceInput("c" * 64, "turnaround", 1.0),
         ),
     )
     cast = (member,) + tuple(_member(i, f"C{i}", refs=1) for i in range(2, 5))
@@ -142,7 +144,7 @@ def test_identity_face_roles_win_when_capacity_is_tight():
         scene=_scene(),
         style_contract="style",
     )
-    assert result.attachments[0].role == "face_front"
+    assert result.attachments[0].role == "turnaround"
 
 
 def test_staged_prompt_is_source_anchored_mapped_and_numbered_from_two():

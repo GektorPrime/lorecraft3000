@@ -26,24 +26,28 @@ def _make_image(role, weight, image_id):
     )
 
 
-def test_role_priority_face_front_wins_over_all_others():
+def test_role_priority_turnaround_then_face_views_then_body_and_outfit():
     images = [
         _make_image("outfit", 1.0, 1),
         _make_image("full_body", 1.0, 2),
         _make_image("face_profile", 1.0, 3),
         _make_image("face_3q", 1.0, 4),
         _make_image("face_front", 1.0, 5),
+        _make_image("turnaround", 1.0, 6),
     ]
     picked = select_avatar_image(images)
-    assert picked.id == 5
-    assert picked.role == "face_front"
+    assert picked.id == 6
+    assert picked.role == "turnaround"
+
+    assert select_avatar_image(images[:-1]).role == "face_front"
+    assert select_avatar_image(images[:4]).role == "face_3q"
 
 
-def test_role_priority_order_face_3q_then_face_profile_then_full_body():
-    images = [_make_image("full_body", 1.0, 1), _make_image("face_3q", 1.0, 2)]
+def test_legacy_face_role_priority_remains_deterministic():
+    images = [_make_image("head_back", 1.0, 1), _make_image("face_3q", 1.0, 2)]
     assert select_avatar_image(images).role == "face_3q"
 
-    images = [_make_image("face_profile", 1.0, 1), _make_image("full_body", 1.0, 2)]
+    images = [_make_image("face_profile", 1.0, 1), _make_image("head_back", 1.0, 2)]
     assert select_avatar_image(images).role == "face_profile"
 
 
@@ -107,19 +111,23 @@ def test_empty_set_cannot_become_canonical(conn, storage):
     assert AvatarService(conn, storage).avatar_image_for(character.id) is None
 
 
-def test_avatar_service_picks_face_front_from_canonical_set(conn, storage):
+def test_avatar_service_picks_turnaround_from_canonical_set(conn, storage):
     character = CharacterService(conn).create(name="Elias", slug="elias")
     ref_sets = RefSetService(conn, storage)
     draft = ref_sets.create_draft(character.id)
     ref_sets.add_image(draft.id, make_png_bytes((10, 10, 10)), "outfit")
     face = ref_sets.add_image(draft.id, make_png_bytes((20, 20, 20)), "face_front")
     ref_sets.add_image(draft.id, make_png_bytes((30, 30, 30)), "full_body")
+    turnaround = ref_sets.add_image(
+        draft.id, make_png_bytes((40, 40, 40)), "turnaround"
+    )
     ref_sets.promote(draft.id)
 
     result = AvatarService(conn, storage).avatar_image_for(character.id)
     assert result is not None
-    assert result.id == face.id
-    assert result.role == "face_front"
+    assert result.id == turnaround.id
+    assert result.id != face.id
+    assert result.role == "turnaround"
 
 
 def test_avatar_service_uses_canonical_set_not_drafts(conn, storage):

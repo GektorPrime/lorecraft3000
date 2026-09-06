@@ -21,7 +21,7 @@ from app.services.ref_sets import (
     RefSetService,
 )
 from app.services.validation import ALLOWED_ROLES
-from tests.conftest import FakeEmbedder, make_png_bytes
+from tests.conftest import FakeEmbedder, make_png_bytes, make_unit_vector
 
 
 def _character(conn, name="Elias", slug="elias") -> int:
@@ -469,6 +469,22 @@ def test_add_image_face_role_stores_embedding(conn, storage):
     for role in _FACE_ROLES:
         img = service.add_image(ref_set.id, make_png_bytes((10, 20, 30)), role, embedder=FakeEmbedder())
         assert _has_embedding(conn, img.sha256)
+
+
+def test_add_image_turnaround_stores_every_detected_face(conn, storage):
+    service = _service(conn, storage)
+    cid = _character(conn)
+    ref_set = service.create_draft(cid)
+    embedder = FakeEmbedder(faces=[make_unit_vector(0.2), make_unit_vector(0.8)])
+
+    img = service.add_image(
+        ref_set.id, make_png_bytes((10, 20, 30)), "turnaround", embedder=embedder
+    )
+
+    count = conn.execute(
+        "SELECT COUNT(*) FROM face_embedding WHERE sha256 = ?", (img.sha256,)
+    ).fetchone()[0]
+    assert count == 2
 
 
 def test_add_image_non_face_role_skips_embedding(conn, storage):

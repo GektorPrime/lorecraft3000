@@ -302,6 +302,32 @@ def test_load_gallery_for_attachments_resolves_captured_hashes(conn, storage):
     assert [sha for sha, _ in gallery[character.id]] == [elias_front.sha256]
 
 
+def test_turnaround_contributes_all_views_to_captured_gallery(conn, storage):
+    pytest.importorskip("numpy")
+    from app.services.characters import CharacterService
+    from app.services.identity import load_gallery_for_attachments, store_embeddings
+    from app.services.ref_sets import RefSetService
+    from tests.conftest import make_png_bytes
+
+    character = CharacterService(conn).create(name="ELIAS", slug="elias")
+    refs = RefSetService(conn, storage)
+    ref_set = refs.create_draft(character.id)
+    turnaround = refs.add_image(ref_set.id, make_png_bytes(), "turnaround")
+    refs.promote(ref_set.id)
+    store_embeddings(
+        conn,
+        turnaround.sha256,
+        [make_unit_vector(0.2), make_unit_vector(0.5), make_unit_vector(0.8)],
+    )
+
+    gallery = load_gallery_for_attachments(
+        conn, [{"character_id": character.id, "sha256": turnaround.sha256}]
+    )
+
+    assert len(gallery[character.id]) == 3
+    assert {sha for sha, _ in gallery[character.id]} == {turnaround.sha256}
+
+
 def test_load_gallery_for_attachments_accepts_empty_and_agrees_on_canonical(
     conn, storage
 ):

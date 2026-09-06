@@ -41,7 +41,7 @@ export function RefSetPanel({ refSetId, status, onChanged }: RefSetPanelProps) {
     kind: 'success' | 'error'
     text: string
   } | null>(null)
-  const [role, setRole] = useState(options.ref_image_roles[0] ?? 'face_front')
+  const [role, setRole] = useState(options.ref_image_roles[0] ?? 'turnaround')
   const [file, setFile] = useState<File | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<PendingConfirmation | null>(null)

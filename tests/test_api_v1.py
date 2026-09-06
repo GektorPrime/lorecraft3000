@@ -425,6 +425,13 @@ def test_options_summary_shape(api):
     assert "1K" in body["image_sizes"]
     assert "3:2" in body["aspect_ratios"]
     assert "face_front" in body["ref_image_roles"]
+    assert body["ref_image_roles"][:4] == [
+        "turnaround",
+        "face_front",
+        "face_3q",
+        "face_profile",
+    ]
+    assert "head_back" in body["ref_image_roles"]
     assert body["daily_spend_cap_cents"] > 0
     assert body["spent_today_cents"] == 0
     assert "cannot be edited" in body["ref_image_weight_explanation"].lower()

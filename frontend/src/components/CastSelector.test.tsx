@@ -63,6 +63,19 @@ describe('CastSelector', () => {
     expect(screen.getByText('Elias')).toBeInTheDocument()
   })
 
+  it('allows prominence to be cleared before typing a replacement', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: /Elias/ }))
+
+    const input = screen.getByRole('spinbutton', { name: 'Prominence for Elias' })
+    await user.clear(input)
+    expect(input).toHaveValue(null)
+
+    await user.type(input, '3')
+    expect(input).toHaveValue(3)
+  })
+
   it('reorders the cast with the up/down controls', async () => {
     const user = userEvent.setup()
     render(<Harness />)

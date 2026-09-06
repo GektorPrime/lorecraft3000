@@ -1,5 +1,6 @@
 import type { Character, CastMemberInput } from '../api/types'
 import { Avatar } from './Avatar'
+import { ProminenceInput } from './ProminenceInput'
 
 interface CastSelectorProps {
   characters: Character[]
@@ -92,14 +93,12 @@ export function CastSelector({ characters, value, onChange, labelledBy }: CastSe
                 value={member.role ?? ''}
                 onChange={(e) => updateRole(member.character_id, e.target.value)}
               />
-              <input
-                type="number"
+              <ProminenceInput
                 className="cast-list__prominence"
-                min={1}
                 aria-label={`Prominence for ${characterName}`}
                 aria-describedby="prominence-hint"
                 value={member.prominence ?? 1}
-                onChange={(e) => updateProminence(member.character_id, Number(e.target.value) || 1)}
+                onChange={(prominence) => updateProminence(member.character_id, prominence)}
               />
               <div className="cast-list__actions">
                 <button
