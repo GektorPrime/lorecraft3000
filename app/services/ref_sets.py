@@ -33,6 +33,7 @@ from app.services.identity import (
     FaceEmbedder,
     get_embedder,
     store_embedding,
+    store_embeddings,
 )
 from app.services.validation import ALLOWED_ROLES
 from app.storage import ImageStorage, ImageStorageError
@@ -49,13 +50,20 @@ def _embed_image(
     sha256: str,
     data: bytes,
     embedder: FaceEmbedder | None,
+    *,
+    all_faces: bool = False,
 ) -> None:
-    """Compute and store a face embedding.  Never raises."""
+    """Compute and store identity embeddings. Never raises."""
     if embedder is None:
         embedder = get_embedder()
     if embedder is None:
         return
     try:
+        if all_faces:
+            vectors = embedder.detect(data)
+            if vectors:
+                store_embeddings(conn, sha256, vectors)
+            return
         vector = embedder.embed(data)
         if vector is not None:
             store_embedding(conn, sha256, vector)
@@ -235,11 +243,10 @@ class RefSetService:
         for roles outside the allowed set, ImageRejectedError if the bytes are
         not a storable image.
 
-        For face-role images, an optional FaceEmbedder is used to compute a
-        512-d ArcFace vector.  The embedding is stored in the face_embedding
-        table keyed by content hash.  If the embedder is not provided, the
-        singleton is fetched via get_embedder().  Embedding failures never
-        prevent the image from being stored.
+        For identity-reference images, an optional FaceEmbedder computes
+        ArcFace vectors. Turnaround sheets retain every detected face; other
+        face roles retain the largest face. Embedding failures never prevent
+        the image from being stored.
         """
         self._require_draft(ref_set_id)
         self._validate_role(role)
@@ -265,7 +272,13 @@ class RefSetService:
         # the image is uploaded (not deferred to promote).  Failures are logged
         # and swallowed — the image is still usable without an embedding.
         if role in FACE_ROLES:
-            _embed_image(self.conn, meta.sha256, data, embedder)
+            _embed_image(
+                self.conn,
+                meta.sha256,
+                data,
+                embedder,
+                all_faces=role == "turnaround",
+            )
         self.conn.commit()
         return self._get_image(cur.lastrowid)
 

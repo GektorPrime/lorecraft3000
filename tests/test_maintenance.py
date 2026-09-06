@@ -8,7 +8,7 @@ import pytest
 
 from app.maintenance import run_check, run_repair
 from app.storage import ImageStorage
-from tests.conftest import FakeEmbedder, make_png_bytes
+from tests.conftest import FakeEmbedder, make_png_bytes, make_unit_vector
 
 
 def _store_image(storage: ImageStorage, color=(200, 30, 30)) -> str:
@@ -347,6 +347,28 @@ def test_backfill_embeds_canonical_face_refs(conn, storage, monkeypatch):
     # Idempotent: a second pass finds nothing left to embed.
     second = run_identity_backfill(conn, storage, scope="refs")
     assert second.refs_embedded == 0
+
+
+def test_backfill_embeds_every_turnaround_face(conn, storage, monkeypatch):
+    from app.services.characters import CharacterService
+    from app.services.ref_sets import RefSetService
+
+    character = CharacterService(conn).create(name="ELIAS", slug="elias")
+    refs = RefSetService(conn, storage)
+    ref_set = refs.create_draft(character.id)
+    image = refs.add_image(ref_set.id, make_png_bytes(), "turnaround")
+    refs.promote(ref_set.id)
+    embedder = FakeEmbedder(faces=[make_unit_vector(0.2), make_unit_vector(0.8)])
+    monkeypatch.setattr("app.maintenance.get_embedder", lambda: embedder)
+    from app.maintenance import run_identity_backfill
+
+    report = run_identity_backfill(conn, storage, scope="refs")
+
+    assert report.refs_embedded == 1
+    count = conn.execute(
+        "SELECT COUNT(*) FROM face_embedding WHERE sha256 = ?", (image.sha256,)
+    ).fetchone()[0]
+    assert count == 2
 
 
 def test_backfill_embeds_referenced_retired_refs(conn, storage, tmp_path, monkeypatch):

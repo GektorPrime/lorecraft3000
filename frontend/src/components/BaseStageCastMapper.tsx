@@ -4,6 +4,7 @@ import type {
   Character,
   PanelBaseStage,
 } from '../api/types'
+import { ProminenceInput } from './ProminenceInput'
 
 type StageChoice = BaseStage | PanelBaseStage
 
@@ -163,13 +164,11 @@ export function BaseStageCastMapper({
                   </div>
                   <div className="field">
                     <label htmlFor={`base-stage-prominence-${target.id}`}>Prominence</label>
-                    <input
+                    <ProminenceInput
                       id={`base-stage-prominence-${target.id}`}
-                      type="number"
-                      min={1}
                       disabled={!member}
                       value={member?.prominence ?? 1}
-                      onChange={(event) => updateProminence(target.id, Number(event.target.value) || 1)}
+                      onChange={(prominence) => updateProminence(target.id, prominence)}
                     />
                   </div>
                 </li>

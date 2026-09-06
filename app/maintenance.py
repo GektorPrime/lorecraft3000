@@ -61,7 +61,7 @@ from app.services.identity import (
     model_dir,
     model_status,
     score_generated_image,
-    store_embedding,
+    store_embeddings,
 )
 from app.storage import ImageStorage, _FORMAT_FROM_EXT
 
@@ -460,11 +460,14 @@ def run_identity_backfill(
             except Exception as exc:
                 errors.append(f"ref {sha[:12]} unreadable: {exc}")
                 continue
-            vec = embedder.embed(data)
-            if vec is None:
+            vectors = (
+                embedder.detect(data) if role == "turnaround" else [embedder.embed(data)]
+            )
+            vectors = [vector for vector in vectors if vector is not None]
+            if not vectors:
                 refs_no_face.append(f"{sha[:12]} ({role})")
                 continue
-            store_embedding(conn, sha, vec)
+            store_embeddings(conn, sha, vectors)
             refs_embedded += 1
             conn.commit()
 

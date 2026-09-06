@@ -234,6 +234,8 @@ def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
         "015_preserve_retired_ref_sets",
         "016_base_stages",
         "017_base_stage_generations",
+        "018_character_reference_roles",
+        "019_multiview_face_embeddings",
     ]
     conn = connect(db)
     try:
@@ -259,6 +261,23 @@ def test_generation_core_columns_are_migrated(conn):
         "price_table_version", "response_json", "error_text", "completed_at"
     } <= generation_columns
     assert "review_status" in candidate_columns
+
+
+def test_character_reference_roles_are_migrated(conn):
+    conn.execute("INSERT INTO character (name, slug) VALUES ('Elias', 'elias')")
+    ref_set_id = conn.execute(
+        "INSERT INTO ref_set (character_id, version, status) VALUES (1, 1, 'draft')"
+    ).lastrowid
+    for role in ("head_back", "turnaround"):
+        conn.execute(
+            "INSERT INTO ref_image (ref_set_id, sha256, role) VALUES (?, ?, ?)",
+            (ref_set_id, role, role),
+        )
+
+    roles = {
+        row["role"] for row in conn.execute("SELECT role FROM ref_image").fetchall()
+    }
+    assert roles == {"head_back", "turnaround"}
 
 
 def test_005_repairs_legacy_unconditional_canonical_trigger(tmp_path):
@@ -469,6 +488,8 @@ def test_011_repairs_legacy_generation_missing_scene_revision(tmp_path):
         "015_preserve_retired_ref_sets",
         "016_base_stages",
         "017_base_stage_generations",
+        "018_character_reference_roles",
+        "019_multiview_face_embeddings",
     ]
     assert run_migrations(db) == []  # and healing is idempotent
 

@@ -1,8 +1,7 @@
 """Deterministic character avatar/icon selection from canonical reference sets.
 
 Selection rule (issue #15):
-  1. Prefer roles in this fixed priority order: face_front, face_3q,
-     face_profile, full_body, then any other role.
+  1. Prefer turnaround, then face views, body/outfit, and remaining roles.
   2. Within the same role, prefer the higher (displayed, immutable) weight.
   3. Break remaining ties by the stable ref_image id (ascending) so the pick
      never changes between calls for unchanged data.
@@ -18,17 +17,12 @@ import sqlite3
 
 from app.domain.models import RefImage
 from app.services.ref_sets import RefSetService
+from app.services.validation import ALLOWED_ROLES
 from app.storage import ImageStorage
 
-# Fixed role priority (lower sorts first / wins). Roles outside this map
-# (currently "expression", "outfit") fall through to _OTHER_ROLE_RANK.
-_ROLE_PRIORITY: dict[str, int] = {
-    "face_front": 0,
-    "face_3q": 1,
-    "face_profile": 2,
-    "full_body": 3,
-}
-_OTHER_ROLE_RANK = 4
+# Fixed role priority (lower sorts first / wins).
+_ROLE_PRIORITY = {role: rank for rank, role in enumerate(ALLOWED_ROLES)}
+_OTHER_ROLE_RANK = len(ALLOWED_ROLES)
 
 
 def _role_rank(role: str) -> int:
@@ -38,9 +32,9 @@ def _role_rank(role: str) -> int:
 def select_avatar_image(images: list[RefImage]) -> RefImage | None:
     """Deterministically pick one image for use as an avatar/icon.
 
-    Order: role priority (face_front > face_3q > face_profile > full_body >
-    other), then higher weight, then lower (stabler, older) id. Returns None
-    for an empty list — callers must fall back to initials, never guess.
+    Order: role priority (turnaround > face views > body/outfit > remaining roles),
+    then higher weight, then lower (stabler, older) id. Returns None for an
+    empty list — callers must fall back to initials, never guess.
     """
     if not images:
         return None
