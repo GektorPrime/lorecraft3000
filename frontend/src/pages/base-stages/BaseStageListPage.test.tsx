@@ -97,6 +97,8 @@ describe('BaseStageListPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Open base stage #4 preview' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/base-stages/4/preview')
+    expect(screen.getByText('Generated')).toBeInTheDocument()
+    expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Create generated base stage/ })).toHaveAttribute(
       'href',
       '/base-stages/new',

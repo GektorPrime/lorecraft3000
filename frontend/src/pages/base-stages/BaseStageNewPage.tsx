@@ -1,42 +1,114 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { createGeneratedBaseStage, listStyles } from '../../api/client'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ApiError, createGeneratedBaseStage, getBaseStage, listStyles, updateBaseStage } from '../../api/client'
 import type { BaseStageGeneratedInput, Style } from '../../api/types'
+import { useOptions } from '../../api/useOptions'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Icon } from '../../components/Icon'
 import { PageHeader } from '../../components/PageHeader'
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges'
-
-const ASPECT_RATIOS = ['16:9', '3:2', '1:1', '2:3', '9:16'] as const
-const IMAGE_SIZES = ['1K', '2K'] as const
+import { RouteIdGuard } from '../../routing/routeId'
+import { usePageTitle } from '../../routing/usePageTitle'
+import { NotFoundPage } from '../NotFoundPage'
 
 export function BaseStageNewPage() {
+  const { id } = useParams()
+  if (id === undefined) return <BaseStageForm key="new" stageId={null} />
+  return (
+    <RouteIdGuard>{(stageId) => <BaseStageForm key={stageId} stageId={stageId} />}</RouteIdGuard>
+  )
+}
+
+function BaseStageForm({ stageId }: { stageId: number | null }) {
   const navigate = useNavigate()
+  const options = useOptions()
   const [styles, setStyles] = useState<Style[] | null>(null)
   const [description, setDescription] = useState('')
   const [beatText, setBeatText] = useState('')
   const [camera, setCamera] = useState('')
   const [framing, setFraming] = useState('')
   const [mood, setMood] = useState('')
-  const [aspectRatio, setAspectRatio] = useState('16:9')
+  const [aspectRatio, setAspectRatio] = useState(() =>
+    options.aspect_ratios.includes('16:9') ? '16:9' : options.aspect_ratios[0] ?? '',
+  )
   const [styleId, setStyleId] = useState<number | null>(null)
-  const [model, setModel] = useState('')
-  const [imageSize, setImageSize] = useState('1K')
+  const [model, setModel] = useState(options.default_model)
+  const [imageSize, setImageSize] = useState(options.default_image_size)
   const [targets, setTargets] = useState<string[]>([])
   const [validationError, setValidationError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [loaded, setLoaded] = useState(stageId === null)
+  const [locked, setLocked] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [baseline, setBaseline] = useState<string | null>(null)
+  const currentSnapshot = JSON.stringify({
+    description, beatText, camera, framing, mood, aspectRatio, styleId, model, imageSize, targets,
+  })
   const { allowNavigation, confirmationProps } = useUnsavedChanges(
-    description !== '' || beatText !== '' || targets.length > 0,
+    stageId === null
+      ? description !== '' || beatText !== '' || targets.length > 0
+      : baseline !== null && currentSnapshot !== baseline,
   )
+
+  usePageTitle(stageId === null ? 'New Generated Base Stage' : `Edit Base Stage #${stageId}`)
 
   useEffect(() => {
     listStyles().then((s) => {
       setStyles(s)
-      if (s.length > 0) setStyleId(s[0].id)
+      if (stageId === null && s.length > 0) setStyleId(s[0].id)
     }).catch(() => {})
-  }, [])
+  }, [stageId])
+
+  useEffect(() => {
+    if (stageId === null) return
+    let active = true
+    getBaseStage(stageId)
+      .then((stage) => {
+        if (!active) return
+        if (!stage.is_editable) {
+          setLocked(true)
+          setLoaded(true)
+          return
+        }
+        const hydrated = {
+          description: stage.description,
+          beatText: stage.beat_text ?? '',
+          camera: stage.camera ?? '',
+          framing: stage.framing ?? '',
+          mood: stage.mood ?? '',
+          aspectRatio: stage.aspect_ratio,
+          styleId: stage.style_id,
+          model: stage.model ?? options.default_model,
+          imageSize: stage.image_size ?? options.default_image_size,
+          targets: [...stage.targets]
+            .sort((a, b) => a.position - b.position)
+            .map((target) => target.description),
+        }
+        setDescription(hydrated.description)
+        setBeatText(hydrated.beatText)
+        setCamera(hydrated.camera)
+        setFraming(hydrated.framing)
+        setMood(hydrated.mood)
+        setAspectRatio(hydrated.aspectRatio)
+        setStyleId(hydrated.styleId)
+        setModel(hydrated.model)
+        setImageSize(hydrated.imageSize)
+        setTargets(hydrated.targets)
+        setBaseline(JSON.stringify(hydrated))
+        setLoadError(null)
+        setLoaded(true)
+      })
+      .catch((err) => {
+        if (!active) return
+        if (err instanceof ApiError && err.status === 404) setNotFound(true)
+        else setLoadError(err instanceof Error ? err.message : String(err))
+      })
+    return () => { active = false }
+  }, [loadAttempt, options.default_image_size, options.default_model, stageId])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -64,7 +136,9 @@ export function BaseStageNewPage() {
         image_size: imageSize,
         targets: trimmedTargets,
       }
-      const stage = await createGeneratedBaseStage(payload)
+      const stage = stageId === null
+        ? await createGeneratedBaseStage(payload)
+        : await updateBaseStage(stageId, payload)
       allowNavigation()
       navigate(`/base-stages/${stage.id}/preview`)
     } catch (err) {
@@ -73,15 +147,38 @@ export function BaseStageNewPage() {
     }
   }
 
+  if (notFound) return <NotFoundPage />
+  if (!loaded) {
+    return loadError ? (
+      <div>
+        <AsyncMessage kind="error">Could not load base stage: {loadError}</AsyncMessage>
+        <button type="button" className="btn" onClick={() => { setLoadError(null); setLoadAttempt((value) => value + 1) }}>
+          Retry
+        </button>
+      </div>
+    ) : <AsyncMessage kind="loading" aria-busy="true">Loading base stage…</AsyncMessage>
+  }
+  if (locked) {
+    return (
+      <section className="form-page">
+        <PageHeader title="Base stage locked" />
+        <AsyncMessage kind="error">This base stage can no longer be edited. Duplicate it to change the composition.</AsyncMessage>
+        <Link to={`/base-stages/${stageId}/preview`} className="btn btn--primary">Back to preview</Link>
+      </section>
+    )
+  }
+
   return (
     <section className="form-page form-page--wide">
       <PageHeader
-        title="Create generated base stage"
-        description="Compose a scene first, then generate the anonymous composition image."
+        title={stageId === null ? 'Create generated base stage' : `Edit base stage #${stageId}`}
+        description={stageId === null
+          ? 'Compose a scene first, then generate the anonymous composition image.'
+          : 'Update the anonymous composition before starting generation.'}
       />
       {validationError && <AsyncMessage kind="error">{validationError}</AsyncMessage>}
-      {apiError && <AsyncMessage kind="error">Could not create base stage: {apiError}</AsyncMessage>}
-      {submitting && <AsyncMessage kind="loading">Creating base stage…</AsyncMessage>}
+      {apiError && <AsyncMessage kind="error">Could not {stageId === null ? 'create' : 'update'} base stage: {apiError}</AsyncMessage>}
+      {submitting && <AsyncMessage kind="loading">{stageId === null ? 'Creating' : 'Updating'} base stage…</AsyncMessage>}
       <form className="form-card" noValidate aria-busy={submitting} onSubmit={(event) => void handleSubmit(event)}>
         <fieldset className="form-section">
           <legend>Composition</legend>
@@ -146,7 +243,7 @@ export function BaseStageNewPage() {
                 value={aspectRatio}
                 onChange={(event) => setAspectRatio(event.target.value)}
               >
-                {ASPECT_RATIOS.map((ar) => <option key={ar} value={ar}>{ar}</option>)}
+                {options.aspect_ratios.map((ar) => <option key={ar} value={ar}>{ar}</option>)}
               </select>
             </div>
             <div className="field">
@@ -167,7 +264,7 @@ export function BaseStageNewPage() {
                 value={imageSize}
                 onChange={(event) => setImageSize(event.target.value)}
               >
-                {IMAGE_SIZES.map((sz) => <option key={sz} value={sz}>{sz}</option>)}
+                {options.image_sizes.map((sz) => <option key={sz} value={sz}>{sz}</option>)}
               </select>
             </div>
           </div>
@@ -181,9 +278,9 @@ export function BaseStageNewPage() {
               value={model}
               onChange={(event) => setModel(event.target.value)}
             >
-              <option value="" disabled>Select model…</option>
-              <option value="gpt-image-2">gpt-image-2</option>
-              <option value="gemini-3.1-flash-image">gemini-3.1-flash-image</option>
+              {options.models.map((availableModel) => (
+                <option key={availableModel} value={availableModel}>{availableModel}</option>
+              ))}
             </select>
           </div>
         </fieldset>
@@ -221,9 +318,9 @@ export function BaseStageNewPage() {
         </fieldset>
         <div className="form-actions">
           <button type="submit" className="btn btn--primary" disabled={submitting}>
-            Create base stage
+            {stageId === null ? 'Create base stage' : 'Save changes'}
           </button>
-          <button type="button" className="btn" disabled={submitting} onClick={() => navigate('/base-stages')}>
+          <button type="button" className="btn" disabled={submitting} onClick={() => navigate(stageId === null ? '/base-stages' : `/base-stages/${stageId}/preview`)}>
             Cancel
           </button>
         </div>
