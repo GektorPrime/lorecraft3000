@@ -97,6 +97,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       response.status,
     )
   }
+  if (!isJson) {
+    throw new ApiError(
+      'The API returned an unexpected non-JSON response. Check the forwarded port and tunnel access settings.',
+      'InvalidResponseError',
+      response.status,
+    )
+  }
   return body as T
 }
 
