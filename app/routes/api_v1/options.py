@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header
 from app.deps import get_conn, settings
 from app.models import ModelRegistry
 from app.routes.api_v1._common import (
-    PANEL_IMMUTABILITY_EXPLANATION,
+    SCENE_IMMUTABILITY_EXPLANATION,
     REF_IMAGE_WEIGHT_EXPLANATION,
     REF_SET_IMMUTABILITY_EXPLANATION,
     TIMEZONE_HEADER,
@@ -39,7 +39,7 @@ def options_summary(
         remaining_today_cents=settings.daily_spend_cap_cents - spent,
         ref_image_weight_explanation=REF_IMAGE_WEIGHT_EXPLANATION,
         ref_set_immutability_explanation=REF_SET_IMMUTABILITY_EXPLANATION,
-        panel_immutability_explanation=PANEL_IMMUTABILITY_EXPLANATION,
+        scene_immutability_explanation=SCENE_IMMUTABILITY_EXPLANATION,
     )
 
 

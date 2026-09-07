@@ -1,6 +1,6 @@
 """Vertical-path tests for the /api/v1 JSON API.
 
-Covers the end-to-end "library -> ref-set -> panel -> preview -> generate ->
+Covers the end-to-end "library -> ref-set -> scene -> preview -> generate ->
 review -> content" flow plus the guard behaviors that live at the preview/gate
 boundary (budget cap, cast-size cap, visual-contract cap, missing on-disk
 files). All requests go through the typed /api/v1 endpoints (issue #15); there
@@ -115,9 +115,9 @@ def _default_style_id(route_app) -> int:
     return next(s["id"] for s in styles if s["name"] == "Victorian Oil Painting")
 
 
-def _create_panel(route_app, characters, model="gemini-3.1-flash-image"):
+def _create_scene(route_app, characters, model="gemini-3.1-flash-image"):
     resp = route_app.client.post(
-        "/api/v1/panels",
+        "/api/v1/scenes",
         json={
             "beat_text": "The cast studies a map beside the fire.",
             "camera": "eye level",
@@ -139,16 +139,16 @@ def _create_panel(route_app, characters, model="gemini-3.1-flash-image"):
 
 def test_generate_review_and_content_vertical_path(route_app):
     elias, ref_set = _seed_character_with_canon(route_app, "ELIAS", "elias", (100, 20, 20))
-    panel = _create_panel(route_app, [elias["id"]])
+    scene = _create_scene(route_app, [elias["id"]])
 
-    preview = route_app.client.get(f"/api/v1/panels/{panel['id']}/preview")
+    preview = route_app.client.get(f"/api/v1/scenes/{scene['id']}/preview")
     assert preview.status_code == 200
     body = preview.json()
     assert body["can_generate"] is True
     expected_prompt_hash = body["prompt_hash"]
 
     generated = route_app.client.post(
-        f"/api/v1/panels/{panel['id']}/generate",
+        f"/api/v1/scenes/{scene['id']}/generate",
         json={"expected_prompt_hash": expected_prompt_hash},
     )
     assert generated.status_code == 201, generated.text
@@ -183,7 +183,7 @@ def test_generate_review_and_content_vertical_path(route_app):
 
 def test_preview_blocks_when_daily_cap_would_be_exceeded(route_app):
     elias, _ = _seed_character_with_canon(route_app, "ELIAS", "elias")
-    panel = _create_panel(route_app, [elias["id"]])
+    scene = _create_scene(route_app, [elias["id"]])
     conn = route_app.conn()
     try:
         spent = settings.daily_spend_cap_cents - 1
@@ -194,13 +194,13 @@ def test_preview_blocks_when_daily_cap_would_be_exceeded(route_app):
                  actual_cost_usd_cents, state)
             VALUES (?, 'gemini-3.1-flash-image', ?, ?, ?, 'succeeded')
             """,
-            (panel["id"], spent, spent, spent),
+            (scene["id"], spent, spent, spent),
         )
         conn.commit()
     finally:
         conn.close()
 
-    preview = route_app.client.get(f"/api/v1/panels/{panel['id']}/preview")
+    preview = route_app.client.get(f"/api/v1/scenes/{scene['id']}/preview")
     assert preview.status_code == 200
     body = preview.json()
     assert body["can_generate"] is False
@@ -214,11 +214,11 @@ def test_preview_blocks_five_character_cast(route_app):
         _seed_character_with_canon(route_app, f"CHAR{i}", f"char-{i}", (20 * i, 10, 10))[0]
         for i in range(1, 6)
     ]
-    panel = _create_panel(route_app, [c["id"] for c in characters])
-    preview = route_app.client.get(f"/api/v1/panels/{panel['id']}/preview")
+    scene = _create_scene(route_app, [c["id"] for c in characters])
+    preview = route_app.client.get(f"/api/v1/scenes/{scene['id']}/preview")
     body = preview.json()
     assert body["can_generate"] is False
-    assert "split the panel" in body["blocked_reason"]
+    assert "split the scene" in body["blocked_reason"]
 
 
 def test_preview_blocks_over_limit_visual_contract(route_app):
@@ -232,8 +232,8 @@ def test_preview_blocks_over_limit_visual_contract(route_app):
         conn.commit()
     finally:
         conn.close()
-    panel = _create_panel(route_app, [elias["id"]])
-    preview = route_app.client.get(f"/api/v1/panels/{panel['id']}/preview")
+    scene = _create_scene(route_app, [elias["id"]])
+    preview = route_app.client.get(f"/api/v1/scenes/{scene['id']}/preview")
     body = preview.json()
     assert body["can_generate"] is False
     assert "60-word cap" in body["blocked_reason"]
@@ -241,8 +241,8 @@ def test_preview_blocks_over_limit_visual_contract(route_app):
 
 def test_missing_candidate_file_returns_404(route_app):
     elias, _ = _seed_character_with_canon(route_app, "ELIAS", "elias")
-    panel = _create_panel(route_app, [elias["id"]])
-    generation = _generate(route_app, panel)
+    scene = _create_scene(route_app, [elias["id"]])
+    generation = _generate(route_app, scene)
     candidate = generation["candidates"][0]
     conn = route_app.conn()
     try:
@@ -258,10 +258,10 @@ def test_missing_candidate_file_returns_404(route_app):
     assert resp.status_code == 404
 
 
-def _generate(route_app, panel):
-    preview = route_app.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
+def _generate(route_app, scene):
+    preview = route_app.client.get(f"/api/v1/scenes/{scene['id']}/preview").json()
     generated = route_app.client.post(
-        f"/api/v1/panels/{panel['id']}/generate",
+        f"/api/v1/scenes/{scene['id']}/generate",
         json={"expected_prompt_hash": preview["prompt_hash"]},
     )
     assert generated.status_code == 201, generated.text
@@ -270,8 +270,8 @@ def _generate(route_app, panel):
 
 def test_edit_candidate_creates_child_generation(route_app):
     elias, _ = _seed_character_with_canon(route_app, "ELIAS", "elias")
-    panel = _create_panel(route_app, [elias["id"]])
-    generation = _generate(route_app, panel)
+    scene = _create_scene(route_app, [elias["id"]])
+    generation = _generate(route_app, scene)
     candidate = generation["candidates"][0]
 
     edited = route_app.client.post(
@@ -305,8 +305,8 @@ def test_edit_candidate_creates_child_generation(route_app):
 
 def test_edit_requires_non_empty_instruction(route_app):
     elias, _ = _seed_character_with_canon(route_app, "ELIAS", "elias")
-    panel = _create_panel(route_app, [elias["id"]])
-    generation = _generate(route_app, panel)
+    scene = _create_scene(route_app, [elias["id"]])
+    generation = _generate(route_app, scene)
     candidate = generation["candidates"][0]
     resp = route_app.client.post(
         f"/api/v1/candidates/{candidate['id']}/edit",

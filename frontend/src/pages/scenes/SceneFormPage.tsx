@@ -2,21 +2,21 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ApiError,
-  createPanel,
-  duplicatePanel,
-  getPanel,
+  createScene,
+  duplicateScene,
+  getScene,
   listBaseStages,
   listCharacters,
   listStyles,
-  updatePanel,
+  updateScene,
 } from '../../api/client'
 import { useOptions } from '../../api/useOptions'
 import type {
   BaseStage,
   CastMemberInput,
   Character,
-  PanelBaseStage,
-  PanelInput,
+  SceneBaseStage,
+  SceneInput,
   Style,
 } from '../../api/types'
 import { BaseStageCastMapper } from '../../components/BaseStageCastMapper'
@@ -31,7 +31,7 @@ import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
 import { NotFoundPage } from '../NotFoundPage'
 
-const EMPTY = (defaults: { model: string; image_size: string }): PanelInput => ({
+const EMPTY = (defaults: { model: string; image_size: string }): SceneInput => ({
   beat_text: '',
   camera: '',
   framing: '',
@@ -44,7 +44,7 @@ const EMPTY = (defaults: { model: string; image_size: string }): PanelInput => (
 })
 
 const snapshot = (
-  values: PanelInput,
+  values: SceneInput,
   useBaseStage: boolean,
   selectedStageId: number | null,
   stagedCast: CastMemberInput[],
@@ -69,24 +69,24 @@ const snapshot = (
     stagedCast,
   })
 
-export function PanelFormPage() {
+export function SceneFormPage() {
   const { id } = useParams()
-  if (id === undefined) return <PanelForm key="new" panelId={null} />
+  if (id === undefined) return <SceneForm key="new" sceneId={null} />
   return (
-    <RouteIdGuard>{(panelId) => <PanelForm key={panelId} panelId={panelId} />}</RouteIdGuard>
+    <RouteIdGuard>{(sceneId) => <SceneForm key={sceneId} sceneId={sceneId} />}</RouteIdGuard>
   )
 }
 
-function PanelForm({ panelId }: { panelId: number | null }) {
+function SceneForm({ sceneId }: { sceneId: number | null }) {
   const navigate = useNavigate()
   const options = useOptions()
 
-  const [values, setValues] = useState<PanelInput>(() =>
+  const [values, setValues] = useState<SceneInput>(() =>
     EMPTY({ model: options.default_model, image_size: options.default_image_size }),
   )
   const [characters, setCharacters] = useState<Character[]>([])
   const [styles, setStyles] = useState<Style[]>([])
-  const [baseStages, setBaseStages] = useState<(BaseStage | PanelBaseStage)[]>([])
+  const [baseStages, setBaseStages] = useState<(BaseStage | SceneBaseStage)[]>([])
   const [useBaseStage, setUseBaseStage] = useState(false)
   const [selectedStageId, setSelectedStageId] = useState<number | null>(null)
   const [stagedCast, setStagedCast] = useState<CastMemberInput[]>([])
@@ -98,12 +98,12 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   const [stylesError, setStylesError] = useState<string | null>(null)
   const [baseStagesError, setBaseStagesError] = useState<string | null>(null)
   const [prerequisiteAttempt, setPrerequisiteAttempt] = useState(0)
-  const [panelState, setPanelState] = useState<'loading' | 'ready' | 'error'>(
-    panelId === null ? 'ready' : 'loading',
+  const [sceneState, setSceneState] = useState<'loading' | 'ready' | 'error'>(
+    sceneId === null ? 'ready' : 'loading',
   )
-  const [loadedPanelId, setLoadedPanelId] = useState<number | null>(panelId)
-  const [panelError, setPanelError] = useState<string | null>(null)
-  const [panelAttempt, setPanelAttempt] = useState(0)
+  const [loadedSceneId, setLoadedSceneId] = useState<number | null>(sceneId)
+  const [sceneError, setSceneError] = useState<string | null>(null)
+  const [sceneAttempt, setSceneAttempt] = useState(0)
   const [locked, setLocked] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [baseline, setBaseline] = useState<string | null>(null)
@@ -114,11 +114,11 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   const mutationRequest = useRef(0)
 
   usePageTitle(
-    panelId === null
-      ? 'New Panel'
-      : panelState === 'ready' && loadedPanelId === panelId
-        ? `Edit Panel #${panelId}`
-        : 'Edit Panel',
+    sceneId === null
+      ? 'New Scene'
+      : sceneState === 'ready' && loadedSceneId === sceneId
+        ? `Edit Scene #${sceneId}`
+        : 'Edit Scene',
   )
 
   useEffect(() => {
@@ -152,7 +152,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
         setValues((v) => v.style_id === 0 && styleList[0]
           ? { ...v, style_id: styleList[0].id }
           : v)
-        if (panelId === null) {
+        if (sceneId === null) {
           const hydratedValues = EMPTY({
             model: options.default_model,
             image_size: options.default_image_size,
@@ -165,40 +165,40 @@ function PanelForm({ panelId }: { panelId: number | null }) {
     return () => {
       active = false
     }
-  }, [options.default_image_size, options.default_model, panelId, prerequisiteAttempt])
+  }, [options.default_image_size, options.default_model, sceneId, prerequisiteAttempt])
 
   useEffect(() => {
-    if (panelId === null) return
+    if (sceneId === null) return
     let active = true
-    getPanel(panelId)
-      .then((panel) => {
+    getScene(sceneId)
+      .then((scene) => {
         if (!active) return
-        setLoadedPanelId(panelId)
-        if (!panel.is_editable) {
+        setLoadedSceneId(sceneId)
+        if (!scene.is_editable) {
           setLocked(true)
-          setPanelState('ready')
+          setSceneState('ready')
           return
         }
         setLocked(false)
-        const hydratedValues: PanelInput = {
-          beat_text: panel.base_stage ? '' : panel.beat_text,
-          camera: panel.base_stage ? '' : panel.camera,
-          framing: panel.base_stage ? '' : panel.framing,
-          mood: panel.base_stage ? '' : panel.mood,
-          aspect_ratio: panel.aspect_ratio,
-          cast: panel.base_stage ? [] : panel.cast.map((m) => ({
+        const hydratedValues: SceneInput = {
+          beat_text: scene.base_stage ? '' : scene.beat_text,
+          camera: scene.base_stage ? '' : scene.camera,
+          framing: scene.base_stage ? '' : scene.framing,
+          mood: scene.base_stage ? '' : scene.mood,
+          aspect_ratio: scene.aspect_ratio,
+          cast: scene.base_stage ? [] : scene.cast.map((m) => ({
             character_id: m.character_id,
             role: m.role,
             prominence: m.prominence,
             base_stage_target_id: m.base_stage_target_id,
           })),
-          style_id: panel.style_id ?? 0,
-          model: panel.model,
-          image_size: panel.image_size,
+          style_id: scene.style_id ?? 0,
+          model: scene.model,
+          image_size: scene.image_size,
         }
-        const hydratedStagedCast = panel.base_stage
-          ? [...panel.cast].sort((a, b) => {
-              const positions = new Map(panel.base_stage!.targets.map((target) => [target.id, target.position]))
+        const hydratedStagedCast = scene.base_stage
+          ? [...scene.cast].sort((a, b) => {
+              const positions = new Map(scene.base_stage!.targets.map((target) => [target.id, target.position]))
               return (positions.get(a.base_stage_target_id ?? -1) ?? 0) - (positions.get(b.base_stage_target_id ?? -1) ?? 0)
             }).map((member) => ({
               character_id: member.character_id,
@@ -207,33 +207,33 @@ function PanelForm({ panelId }: { panelId: number | null }) {
               base_stage_target_id: member.base_stage_target_id,
             }))
           : []
-        const staged = panel.base_stage !== null
+        const staged = scene.base_stage !== null
         setUseBaseStage(staged)
-        setSelectedStageId(panel.base_stage_id)
+        setSelectedStageId(scene.base_stage_id)
         setStagedCast(hydratedStagedCast)
-        const linkedStage = panel.base_stage
+        const linkedStage = scene.base_stage
         if (linkedStage) {
           setBaseStages((current) => current.some((stage) => stage.id === linkedStage.id)
             ? current
             : [...current, linkedStage])
         }
-        setBaseline(snapshot(hydratedValues, staged, panel.base_stage_id, hydratedStagedCast))
+        setBaseline(snapshot(hydratedValues, staged, scene.base_stage_id, hydratedStagedCast))
         setValues(hydratedValues)
-        setPanelState('ready')
+        setSceneState('ready')
       })
       .catch((err) => {
         if (!active) return
-        setLoadedPanelId(panelId)
+        setLoadedSceneId(sceneId)
         if (err instanceof ApiError && err.status === 404) setNotFound(true)
         else {
-          setPanelError(err instanceof ApiError ? err.message : String(err))
-          setPanelState('error')
+          setSceneError(err instanceof ApiError ? err.message : String(err))
+          setSceneState('error')
         }
       })
     return () => {
       active = false
     }
-  }, [panelAttempt, panelId])
+  }, [sceneAttempt, sceneId])
 
   useEffect(() => {
     mounted.current = true
@@ -244,14 +244,14 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   }, [])
 
   const handleDuplicate = async () => {
-    if (panelId === null) return
+    if (sceneId === null) return
     const request = ++mutationRequest.current
     setDuplicating(true)
     setError(null)
     try {
-      const copy = await duplicatePanel(panelId)
+      const copy = await duplicateScene(sceneId)
       if (!mounted.current || request !== mutationRequest.current) return
-      navigate(`/panels/${copy.id}/edit`)
+      navigate(`/scenes/${copy.id}/edit`)
     } catch (err) {
       if (!mounted.current || request !== mutationRequest.current) return
       setError(err instanceof ApiError ? err.message : String(err))
@@ -271,7 +271,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
     setSubmitting(true)
     setError(null)
     try {
-      const payload: PanelInput = useBaseStage && selectedStage
+      const payload: SceneInput = useBaseStage && selectedStage
         ? {
             base_stage_id: selectedStage.id,
             beat_text: null,
@@ -280,15 +280,15 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             mood: null,
             aspect_ratio: selectedStage.aspect_ratio,
             cast: stagedCast.map((member) => ({ ...member, role: '' })),
-            style_id: null,
+            style_id: values.style_id || null,
             model: values.model,
             image_size: values.image_size,
           }
         : { ...values, base_stage_id: null }
-      const saved = panelId === null ? await createPanel(payload) : await updatePanel(panelId, payload)
+      const saved = sceneId === null ? await createScene(payload) : await updateScene(sceneId, payload)
       if (!mounted.current || request !== mutationRequest.current) return
       allowNavigation()
-      navigate(`/panels/${saved.id}/preview`)
+      navigate(`/scenes/${saved.id}/preview`)
     } catch (err) {
       if (!mounted.current || request !== mutationRequest.current) return
       setError(err instanceof ApiError ? err.message : String(err))
@@ -297,27 +297,27 @@ function PanelForm({ panelId }: { panelId: number | null }) {
     }
   }
 
-  const heading = panelId === null ? 'Stage new panel' : 'Edit panel'
-  const currentPanelState = panelId === null ? 'ready' : loadedPanelId === panelId ? panelState : 'loading'
+  const heading = sceneId === null ? 'Stage new scene' : 'Edit scene'
+  const currentSceneState = sceneId === null ? 'ready' : loadedSceneId === sceneId ? sceneState : 'loading'
 
   if (notFound) return <NotFoundPage />
 
-  if (prerequisiteState !== 'ready' || currentPanelState !== 'ready') {
+  if (prerequisiteState !== 'ready' || currentSceneState !== 'ready') {
     return (
       <section className="form-page form-page--wide">
         <PageHeader title={heading} description="Scene direction, framing, output settings and cast." />
         {prerequisiteState === 'loading' && (
-          <AsyncMessage kind="loading" aria-busy="true">Loading panel prerequisites...</AsyncMessage>
+          <AsyncMessage kind="loading" aria-busy="true">Loading scene prerequisites...</AsyncMessage>
         )}
         {prerequisiteState === 'error' && (
           <div>
             <AsyncMessage kind="error">
-              Could not load panel prerequisites: {prerequisiteError}
+              Could not load scene prerequisites: {prerequisiteError}
             </AsyncMessage>
             <button
               type="button"
               className="btn"
-              aria-label="Retry panel prerequisites"
+              aria-label="Retry scene prerequisites"
               onClick={() => {
                 setPrerequisiteState('loading')
                 setPrerequisiteError(null)
@@ -328,20 +328,20 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             </button>
           </div>
         )}
-        {currentPanelState === 'loading' && (
-          <AsyncMessage kind="loading" aria-busy="true">Loading panel details...</AsyncMessage>
+        {currentSceneState === 'loading' && (
+          <AsyncMessage kind="loading" aria-busy="true">Loading scene details...</AsyncMessage>
         )}
-        {currentPanelState === 'error' && (
+        {currentSceneState === 'error' && (
           <div>
-            <AsyncMessage kind="error">Could not load panel details: {panelError}</AsyncMessage>
+            <AsyncMessage kind="error">Could not load scene details: {sceneError}</AsyncMessage>
             <button
               type="button"
               className="btn"
-              aria-label="Retry panel details"
+              aria-label="Retry scene details"
               onClick={() => {
-                setPanelState('loading')
-                setPanelError(null)
-                setPanelAttempt((attempt) => attempt + 1)
+                setSceneState('loading')
+                setSceneError(null)
+                setSceneAttempt((attempt) => attempt + 1)
               }}
             >
               Retry
@@ -355,11 +355,11 @@ function PanelForm({ panelId }: { panelId: number | null }) {
   if (locked) {
     return (
       <section className="form-page">
-        <PageHeader title="Panel locked" />
+        <PageHeader title="Scene locked" />
         <div className="content-stack">
-          <Notice>{options.panel_immutability_explanation}</Notice>
+          <Notice>{options.scene_immutability_explanation}</Notice>
           {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
-          {duplicating && <AsyncMessage kind="loading">Duplicating panel…</AsyncMessage>}
+          {duplicating && <AsyncMessage kind="loading">Duplicating scene…</AsyncMessage>}
           <div>
             <button type="button" className="btn btn--primary" disabled={duplicating} aria-busy={duplicating} onClick={() => void handleDuplicate()}>
               Duplicate &amp; edit
@@ -377,7 +377,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
         <EmptyState
           icon="characters"
           title="A character is required"
-          description="Add a character before staging a panel."
+          description="Add a character before staging a scene."
           action={<Link to="/characters/new" className="btn btn--primary">Create a character</Link>}
         />
       </section>
@@ -386,7 +386,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
 
   if (
     !characters.some((character) => character.has_canonical_ref_set) &&
-    (panelId === null || values.cast.length === 0)
+    (sceneId === null || values.cast.length === 0)
   ) {
     return (
       <section className="form-page">
@@ -394,7 +394,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
         <EmptyState
           icon="gallery"
           title="A canonical reference set is required"
-          description="A character needs a canonical reference set before you can stage a panel."
+          description="A character needs a canonical reference set before you can stage a scene."
           action={<Link to="/characters" className="btn btn--primary">Manage characters</Link>}
         />
       </section>
@@ -407,17 +407,15 @@ function PanelForm({ panelId }: { panelId: number | null }) {
     <section className="form-page form-page--wide">
       <PageHeader title={heading} description="Scene direction, framing, output settings and cast." />
       {error && <AsyncMessage kind="error">{error}</AsyncMessage>}
-      {submitting && <AsyncMessage kind="loading">Saving panel…</AsyncMessage>}
+      {submitting && <AsyncMessage kind="loading">Saving scene…</AsyncMessage>}
       <form className="form-card" onSubmit={handleSubmit} aria-busy={submitting}>
-        <div className="field panel-mode-toggle">
+        <div className="field scene-mode-toggle">
           <label>
             <input
               type="checkbox"
               checked={useBaseStage}
               onChange={(event) => {
                 setUseBaseStage(event.target.checked)
-                // A staged panel carries no style; returning to direct mode
-                // must land on a selectable one rather than the 0 placeholder.
                 if (!event.target.checked) {
                   setValues((v) =>
                     (v.style_id === 0 || v.style_id === null) && styles[0]
@@ -441,7 +439,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             <button
               type="button"
               className="btn"
-              aria-label="Retry panel prerequisites"
+              aria-label="Retry scene prerequisites"
               onClick={() => {
                 setPrerequisiteState('loading')
                 setPrerequisiteAttempt((attempt) => attempt + 1)
@@ -455,7 +453,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           <EmptyState
             icon="styles"
             title="A style is required"
-            description="Define a visual contract before staging a panel, or use a Base Stage."
+            description="Define a visual contract before staging a scene, or use a Base Stage."
             action={<Link to="/styles/new" className="btn btn--primary">Create a style</Link>}
             compact
           />
@@ -475,7 +473,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             onChange={(e) => setValues((v) => ({ ...v, beat_text: e.target.value }))}
           />
           <span className="field__hint" id="beat_text-hint">
-            What is happening in this panel — the beat/action, not the camera. Example: "Elias
+            What is happening in this scene — the beat/action, not the camera. Example: "Elias
             draws his sword as Mara backs toward the door."
           </span>
         </div>
@@ -552,11 +550,13 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           </select>
           <span className="field__hint" id="aspect_ratio-hint">
             The shape (width:height) of the generated image. Example: "16:9" for a wide,
-            cinematic panel; "1:1" for a square panel; "3:4" for a tall portrait panel.
+            cinematic scene; "1:1" for a square scene; "3:4" for a tall portrait scene.
           </span>
         </div>
 
-        <div className="field">
+        </>}
+
+        {!stylesError && styles.length > 0 && <div className="field">
           <label htmlFor="style_id">Style</label>
           <select
             id="style_id"
@@ -575,8 +575,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             sent verbatim with the generation. Example: "Victorian Oil Painting" for rich
             chiaroscuro brushwork.
           </span>
-        </div>
-        </>}
+        </div>}
 
         {useBaseStage && (
           <div className="field">
@@ -589,7 +588,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
               aria-describedby="inherited_aspect_ratio-hint"
             />
             <span className="field__hint" id="inherited_aspect_ratio-hint">
-              The source image fixes the panel aspect ratio.
+              The source image fixes the scene aspect ratio.
             </span>
           </div>
         )}
@@ -630,7 +629,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
           </select>
           <span className="field__hint" id="image_size-hint">
             Output resolution. Larger sizes look sharper but cost more per generation. Example:
-            "1K" for a quick draft, "2K" or "4K" for a final panel.
+            "1K" for a quick draft, "2K" or "4K" for a final scene.
           </span>
         </div>
 
@@ -672,6 +671,14 @@ function PanelForm({ panelId }: { panelId: number | null }) {
                   if (stageId === selectedStageId) return
                   setSelectedStageId(stageId)
                   setStagedCast([])
+                  const stage = baseStages.find((candidate) => candidate.id === stageId)
+                  if (stage) {
+                    setValues((current) => ({
+                      ...current,
+                      aspect_ratio: stage.aspect_ratio,
+                      style_id: stage.style_id ?? current.style_id,
+                    }))
+                  }
                   setError(null)
                 }}
                 onChange={setStagedCast}
@@ -708,7 +715,7 @@ function PanelForm({ panelId }: { panelId: number | null }) {
             className="btn"
             disabled={submitting}
             onClick={() =>
-              navigate(panelId === null ? '/panels' : `/panels/${panelId}/preview`)
+              navigate(sceneId === null ? '/scenes' : `/scenes/${sceneId}/preview`)
             }
           >
             Cancel

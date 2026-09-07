@@ -53,7 +53,7 @@ export function CastSelector({ characters, value, onChange, labelledBy }: CastSe
       <p className="field__hint" id="cast-order-hint">
         <strong>Cast order:</strong> the list order below sets who is introduced first in the
         reference declaration sent to the model and gets first pick of a canonical reference
-        slot. Reorder with the ↑/↓ buttons. Example: put your two leads first if the panel has
+        slot. Reorder with the ↑/↓ buttons. Example: put your two leads first if the scene has
         more characters than reference slots. Order does not change a character's position or
         size in the generated artwork.
       </p>
@@ -65,7 +65,7 @@ export function CastSelector({ characters, value, onChange, labelledBy }: CastSe
       </p>
       <p className="field__hint" id="staging-hint">
         <strong>Staging:</strong> a short free-text description of what this character is doing
-        or where they stand in this specific panel. It is sent to the model as part of the scene
+        or where they stand in this specific scene. It is sent to the model as part of the scene
         description. Example: "kneeling by the fire" or "reaching for the door".
       </p>
       {value.length === 0 && <p className="field__hint">No cast selected yet — add one below.</p>}

@@ -96,9 +96,29 @@ export function ImageDialog({
             onClick={() => setOpen(false)}
           >
             {/* Decorative: the button already carries the accessible name. */}
-            <Icon name="close" size={20} />
+            <Icon name="close" size="lg" />
           </button>
+          {onPrevious && (
+            <button
+              type="button"
+              className="image-dialog__nav image-dialog__nav--prev"
+              aria-label="Previous image"
+              onClick={onPrevious}
+            >
+              <Icon name="chevronLeft" size="lg" />
+            </button>
+          )}
           <ImageWithFallback className="image-dialog__image" src={previewSrc} alt={previewAlt} />
+          {onNext && (
+            <button
+              type="button"
+              className="image-dialog__nav image-dialog__nav--next"
+              aria-label="Next image"
+              onClick={onNext}
+            >
+              <Icon name="chevronRight" size="lg" />
+            </button>
+          )}
         </div>
       </dialog>
     </>

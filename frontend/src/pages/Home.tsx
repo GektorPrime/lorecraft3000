@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, getGallery, listBaseStages, listCharacters, listPanels, listStyles } from '../api/client'
-import type { BaseStage, Character, GalleryItem, Panel, Style } from '../api/types'
+import { ApiError, getGallery, listBaseStages, listCharacters, listScenes, listStyles } from '../api/client'
+import type { BaseStage, Character, GalleryItem, Scene, Style } from '../api/types'
 import { useBudget } from '../api/useBudget'
 import { AsyncMessage } from '../components/AsyncMessage'
 import { EmptyState } from '../components/EmptyState'
@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon'
 import { ImageDialog } from '../components/ImageDialog'
 import { PageHeader } from '../components/PageHeader'
 
-const RECENT_PANEL_COUNT = 3
+const RECENT_SCENE_COUNT = 3
 const RECENT_OUTPUT_COUNT = 6
 
 function message(error: unknown): string {
@@ -18,7 +18,7 @@ function message(error: unknown): string {
 
 /**
  * Workflow dashboard. Its four collections load independently: a gallery
- * outage must not hide panel work, and a character failure must not suppress
+ * outage must not hide scene work, and a character failure must not suppress
  * the style count. Budget comes from the shell provider and is available
  * immediately from the options snapshot.
  *
@@ -27,8 +27,8 @@ function message(error: unknown): string {
  */
 export function Home() {
   const { budget, refreshError } = useBudget()
-  const [panels, setPanels] = useState<Panel[] | null>(null)
-  const [panelError, setPanelError] = useState<string | null>(null)
+  const [scenes, setScenes] = useState<Scene[] | null>(null)
+  const [sceneError, setSceneError] = useState<string | null>(null)
   const [gallery, setGallery] = useState<GalleryItem[] | null>(null)
   const [galleryError, setGalleryError] = useState<string | null>(null)
   const [characters, setCharacters] = useState<Character[] | null>(null)
@@ -43,12 +43,12 @@ export function Home() {
   useEffect(() => {
     mounted.current = true
 
-    void listPanels()
+    void listScenes()
       .then((value) => {
-        if (mounted.current) setPanels(value)
+        if (mounted.current) setScenes(value)
       })
       .catch((error) => {
-        if (mounted.current) setPanelError(message(error))
+        if (mounted.current) setSceneError(message(error))
       })
 
     void getGallery()
@@ -93,18 +93,18 @@ export function Home() {
   const remainingCents = budget.remaining_today_cents
   const ratio = capCents > 0 ? Math.min(1, Math.max(0, spentCents / capCents)) : 0
   const budgetLevel = ratio >= 0.9 ? 'danger' : ratio >= 0.75 ? 'warn' : null
-  const recentPanels = panels?.slice(0, RECENT_PANEL_COUNT)
+  const recentScenes = scenes?.slice(0, RECENT_SCENE_COUNT)
   const recentOutput = gallery?.slice(0, RECENT_OUTPUT_COUNT)
 
   return (
     <section className="dashboard" aria-label="Dashboard">
       <PageHeader
         title="Dashboard"
-        description="Your comic workspace at a glance. Continue a panel or start the next shot."
+        description="Your comic workspace at a glance. Continue a scene or start the next shot."
         actions={(
-          <Link to="/panels/new" className="btn btn--primary">
-            <Icon name="sparkles" size={17} />
-            Stage new panel
+          <Link to="/scenes/new" className="btn btn--primary">
+            <Icon name="sparkles" size="sm" />
+            Stage new scene
           </Link>
         )}
       />
@@ -113,14 +113,14 @@ export function Home() {
         <section
           className={
             budgetLevel
-              ? `dashboard-card dashboard-budget dashboard-budget--${budgetLevel}`
-              : 'dashboard-card dashboard-budget'
+              ? `card dashboard-card dashboard-budget dashboard-budget--${budgetLevel}`
+              : 'card dashboard-card dashboard-budget'
           }
           aria-labelledby="dashboard-budget-title"
         >
           <div className="dashboard-card__heading">
-            <span className="dashboard-card__icon">
-              <Icon name="budget" size={18} />
+            <span className="icon-chip dashboard-card__icon">
+              <Icon name="budget" size="md" />
             </span>
             <h2 id="dashboard-budget-title">Daily budget</h2>
           </div>
@@ -149,10 +149,10 @@ export function Home() {
           )}
         </section>
 
-        <section className="dashboard-card dashboard-library" aria-labelledby="dashboard-library-title">
+        <section className="card dashboard-card dashboard-library" aria-labelledby="dashboard-library-title">
           <div className="dashboard-card__heading">
-            <span className="dashboard-card__icon">
-              <Icon name="characters" size={18} />
+            <span className="icon-chip dashboard-card__icon">
+              <Icon name="characters" size="md" />
             </span>
             <h2 id="dashboard-library-title">Library</h2>
           </div>
@@ -162,7 +162,7 @@ export function Home() {
               className="dashboard-stat"
               aria-label={characters ? `${characters.length} Characters` : 'Loading Characters'}
             >
-              <Icon name="characters" size={18} />
+              <Icon name="characters" size="md" />
               <span>
                 <strong>{characters ? characters.length : '...'}</strong>
                 Characters
@@ -173,7 +173,7 @@ export function Home() {
               className="dashboard-stat"
               aria-label={styles ? `${styles.length} Styles` : 'Loading Styles'}
             >
-              <Icon name="styles" size={18} />
+              <Icon name="styles" size="md" />
               <span>
                 <strong>{styles ? styles.length : '...'}</strong>
                 Styles
@@ -184,7 +184,7 @@ export function Home() {
               className="dashboard-stat"
               aria-label={baseStages ? `${baseStages.length} Base Stages` : 'Loading Base Stages'}
             >
-              <Icon name="baseStages" size={18} />
+              <Icon name="baseStages" size="md" />
               <span>
                 <strong>{baseStages ? baseStages.length : '...'}</strong>
                 Base Stages
@@ -215,47 +215,47 @@ export function Home() {
             <h2 id="continue-working-title">Continue working</h2>
             <p>Pick up where you left off.</p>
           </div>
-          <Link to="/panels" className="dashboard-section__link">
-            View all panels <Icon name="chevronRight" size={16} />
+          <Link to="/scenes" className="dashboard-section__link">
+            View all scenes <Icon name="chevronRight" size="sm" />
           </Link>
         </div>
 
-        {!panels && !panelError && <AsyncMessage kind="loading">Loading recent panels...</AsyncMessage>}
-        {panelError && <AsyncMessage kind="error">Could not load panels: {panelError}</AsyncMessage>}
-        {recentPanels && recentPanels.length === 0 && (
+        {!scenes && !sceneError && <AsyncMessage kind="loading">Loading recent scenes...</AsyncMessage>}
+        {sceneError && <AsyncMessage kind="error">Could not load scenes: {sceneError}</AsyncMessage>}
+        {recentScenes && recentScenes.length === 0 && (
           <EmptyState
-            icon="panels"
-            title="No panels staged yet"
+            icon="scenes"
+            title="No scenes staged yet"
             description="Build your first shot from a character, style and scene direction."
             action={(
-              <Link to="/panels/new" className="btn btn--primary">
-                <Icon name="plus" size={16} />
-                Stage first panel
+              <Link to="/scenes/new" className="btn btn--primary">
+                <Icon name="plus" size="sm" />
+                Stage first scene
               </Link>
             )}
           />
         )}
-        {recentPanels && recentPanels.length > 0 && (
-          <div className="dashboard-panels">
-            {recentPanels.map((panel) => (
-              <article key={panel.id} className="dashboard-panel">
-                <div className="dashboard-panel__topline">
-                  <span className={`badge ${panel.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
-                    {panel.is_editable ? 'Editable' : 'Locked'}
+        {recentScenes && recentScenes.length > 0 && (
+          <div className="dashboard-scenes">
+            {recentScenes.map((scene) => (
+              <article key={scene.id} className="card dashboard-scene">
+                <div className="dashboard-scene__topline">
+                  <span className={`badge ${scene.is_editable ? 'badge--draft' : 'badge--canonical'}`}>
+                    {scene.is_editable ? 'Editable' : 'Locked'}
                   </span>
-                  <span>Panel #{panel.id}</span>
+                  <span>Scene #{scene.id}</span>
                 </div>
-                <p className="dashboard-panel__beat">{panel.beat_text}</p>
-                <p className="dashboard-panel__meta">
-                  {panel.cast.length} cast / {panel.generation_count} attempt
-                  {panel.generation_count === 1 ? '' : 's'}
+                <p className="dashboard-scene__beat">{scene.beat_text}</p>
+                <p className="dashboard-scene__meta">
+                  {scene.cast.length} cast / {scene.generation_count} attempt
+                  {scene.generation_count === 1 ? '' : 's'}
                 </p>
                 <Link
-                  to={panel.is_editable ? `/panels/${panel.id}/edit` : `/panels/${panel.id}/preview`}
-                  className="dashboard-panel__action"
+                  to={scene.is_editable ? `/scenes/${scene.id}/edit` : `/scenes/${scene.id}/preview`}
+                  className="dashboard-scene__action"
                 >
-                  {panel.is_editable ? 'Continue editing' : 'Open preview'}
-                  <Icon name="chevronRight" size={15} />
+                  {scene.is_editable ? 'Continue editing' : 'Open preview'}
+                  <Icon name="chevronRight" size="sm" />
                 </Link>
               </article>
             ))}
@@ -270,7 +270,7 @@ export function Home() {
             <p>Your latest accepted images.</p>
           </div>
           <Link to="/gallery" className="dashboard-section__link">
-            Open gallery <Icon name="chevronRight" size={16} />
+            Open gallery <Icon name="chevronRight" size="sm" />
           </Link>
         </div>
 
@@ -281,7 +281,7 @@ export function Home() {
             icon="gallery"
             title="No accepted images yet"
             description="Accepted generation candidates will collect here automatically."
-            action={<Link to="/panels">Review panels</Link>}
+            action={<Link to="/scenes">Review scenes</Link>}
             compact
           />
         )}
@@ -290,14 +290,14 @@ export function Home() {
             {recentOutput.map((item, index) => {
               const previewItem = recentOutput[previewIndex ?? index]
               return (
-                <article key={item.candidate_id} className="dashboard-output__item">
+                <article key={item.candidate_id} className="card card--flush dashboard-output__item">
                   <ImageDialog
                     src={item.content_url}
                     previewSrc={previewItem.content_url}
-                    thumbnailAlt={`Accepted image from panel ${item.panel_id}`}
-                    previewAlt={`Accepted image from panel ${previewItem.panel_id}, full-size preview`}
-                    triggerLabel={`Preview accepted image from panel ${item.panel_id}`}
-                    dialogLabel={`Accepted image from panel ${previewItem.panel_id}, larger preview`}
+                    thumbnailAlt={`Accepted image from scene ${item.scene_id}`}
+                    previewAlt={`Accepted image from scene ${previewItem.scene_id}, full-size preview`}
+                    triggerLabel={`Preview accepted image from scene ${item.scene_id}`}
+                    dialogLabel={`Accepted image from scene ${previewItem.scene_id}, larger preview`}
                     onPrevious={() =>
                       setPreviewIndex(
                         (current) => ((current ?? index) - 1 + recentOutput.length) % recentOutput.length,
@@ -308,8 +308,8 @@ export function Home() {
                     }
                     onOpenChange={(open) => setPreviewIndex(open ? index : null)}
                   />
-                  <Link to={`/panels/${item.panel_id}/preview`}>
-                    Panel #{item.panel_id}
+                  <Link to={`/scenes/${item.scene_id}/preview`}>
+                    Scene #{item.scene_id}
                   </Link>
                 </article>
               )

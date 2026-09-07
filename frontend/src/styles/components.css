@@ -32,28 +32,17 @@
   box-shadow: var(--elev-3);
 }
 
+/* The tinted chip anatomy lives on the shared .icon-chip; the dialog only
+   positions it in the grid. The danger tone comes from .icon-chip--danger. */
 .confirm-dialog__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
   align-self: start;
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
-  background: var(--accent-subtle);
-  color: var(--accent-text);
-}
-
-.confirm-dialog__icon--danger {
-  background: var(--danger-subtle);
-  color: var(--danger-text);
 }
 
 .confirm-dialog__copy h2 {
   margin-top: 0;
   margin-bottom: var(--space-2);
   font-size: var(--text-xl);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .confirm-dialog__copy p {
@@ -134,13 +123,15 @@
   color: var(--text-muted);
 }
 
-.command-palette__search kbd {
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
+/* The bare `input` above dropped the global focus ring; restore a visible
+   keyboard affordance without tinting the whole search surface. */
+.command-palette__search input:focus-visible {
+  outline: none;
+  box-shadow: 0 4px 0 -2px var(--accent);
+}
+
+.command-palette__search .kbd {
+  flex-shrink: 0;
 }
 
 .command-palette__results {
@@ -207,7 +198,7 @@
 }
 
 .command-palette__footer {
-  min-height: 2.25rem;
+  min-height: var(--control-height-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -347,12 +338,11 @@
   margin-bottom: var(--space-10);
 }
 
+/* Card anatomy (border, radius, surface, shadow) comes from composing the
+   shared .card / .card--flush primitives; these rules own only feature
+   layout. */
 .dashboard-card {
   padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
 }
 
 .dashboard-card__heading {
@@ -367,13 +357,7 @@
   font-size: var(--text-lg);
 }
 
-.dashboard-card__icon {
-  display: inline-flex;
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
-  background: var(--accent-subtle);
-  color: var(--accent-text);
-}
+/* The tinted chip anatomy lives on the shared .icon-chip. */
 
 .dashboard-card__message {
   margin: var(--space-3) 0 0;
@@ -498,7 +482,7 @@
 }
 
 .dashboard-section__link,
-.dashboard-panel__action {
+.dashboard-scene__action {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -508,34 +492,29 @@
   text-decoration: none;
 }
 
-.dashboard-panels {
+.dashboard-scenes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
-.dashboard-panel {
+.dashboard-scene {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
   transition:
     transform var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out);
 }
 
-.dashboard-panel:hover {
+.dashboard-scene:hover {
   transform: translateY(-2px);
   border-color: var(--border-strong);
   box-shadow: var(--elev-2);
 }
 
-.dashboard-panel__topline {
+.dashboard-scene__topline {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -546,7 +525,7 @@
   font-weight: var(--weight-semibold);
 }
 
-.dashboard-panel__beat {
+.dashboard-scene__beat {
   display: -webkit-box;
   min-height: 4.3em;
   margin-bottom: var(--space-3);
@@ -558,7 +537,7 @@
   -webkit-box-orient: vertical;
 }
 
-.dashboard-panel__meta {
+.dashboard-scene__meta {
   margin: auto 0 var(--space-3);
   color: var(--text-muted);
   font-size: var(--text-sm);
@@ -572,11 +551,6 @@
 
 .dashboard-output__item {
   min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
 }
 
 .dashboard-output__item .image-dialog__trigger-image {
@@ -606,7 +580,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .dashboard-panels {
+  .dashboard-scenes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -621,7 +595,7 @@
     flex-direction: column;
   }
 
-  .dashboard-panels {
+  .dashboard-scenes {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -633,7 +607,7 @@
 /* ------------------------------------------------------------------------ */
 /* Prompt preview                                                            */
 /* ------------------------------------------------------------------------ */
-/* Must stay a <pre> with this exact class: asserted in PanelPreviewPage      */
+/* Must stay a <pre> with this exact class: asserted in ScenePreviewPage      */
 /* tests, which also compare its text content without whitespace             */
 /* normalisation. Do not alter white-space handling.                          */
 
@@ -706,7 +680,7 @@
 }
 
 /* ------------------------------------------------------------------------ */
-/* Panel preview                                                             */
+/* Scene preview                                                             */
 /* ------------------------------------------------------------------------ */
 
 .base-stage-card__preview {
@@ -727,8 +701,33 @@
   gap: var(--space-2);
 }
 
-.panel-list-card__stage-link {
+.scene-list-card__stage-link {
   text-decoration: none;
+}
+
+/* "Use a base stage" mode switch on the scene form: a labelled checkbox with
+   a native toggle-style accent. */
+.scene-mode-toggle {
+  margin-bottom: var(--space-5);
+}
+
+.scene-mode-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.scene-mode-toggle input[type='checkbox'] {
+  width: 1.1em;
+  height: 1.1em;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.scene-mode-toggle .field__hint {
+  margin-top: var(--space-1);
 }
 
 .base-stage-picker {
@@ -869,6 +868,11 @@
   gap: var(--space-2);
 }
 
+.base-stage-usage a {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .base-stage-upload__preview {
   margin: 0 0 var(--space-5);
 }
@@ -949,7 +953,7 @@
   }
 }
 
-.panel-list-card__preview {
+.scene-list-card__preview {
   width: 8rem;
   height: 6rem;
   flex-shrink: 0;
@@ -957,29 +961,29 @@
   object-fit: cover;
 }
 
-.panel-preview__beat {
+.scene-preview__beat {
   margin-bottom: var(--space-5);
   color: var(--text-heading);
   font-size: var(--text-lg);
   font-weight: var(--weight-medium);
 }
 
-.panel-preview__workspace {
+.scene-preview__workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
   gap: var(--space-6);
   align-items: start;
 }
 
-.panel-preview__content {
+.scene-preview__content {
   min-width: 0;
 }
 
-.panel-preview__section-header {
+.scene-preview__section-header {
   margin-top: 0;
 }
 
-.panel-preview__base-stage {
+.scene-preview__base-stage {
   margin-bottom: var(--space-6);
   padding: var(--space-4);
   border: 1px solid var(--border);
@@ -987,32 +991,32 @@
   background: var(--bg-subtle);
 }
 
-.panel-preview__source {
+.scene-preview__source {
   display: grid;
   grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
 
-.panel-preview__source .image-dialog__trigger-image {
+.scene-preview__source .image-dialog__trigger-image {
   width: 100%;
   max-height: 14rem;
   object-fit: contain;
   background: var(--media-bg);
 }
 
-.panel-preview__source h3,
-.panel-preview__source p {
+.scene-preview__source h3,
+.scene-preview__source p {
   margin-top: 0;
 }
 
-.panel-preview__mapping {
+.scene-preview__mapping {
   display: grid;
   gap: var(--space-2);
   padding-left: var(--space-5);
 }
 
-.panel-preview__mapping li {
+.scene-preview__mapping li {
   display: grid;
   grid-template-columns: minmax(10rem, 1fr) minmax(8rem, 1fr) auto;
   gap: var(--space-3);
@@ -1068,11 +1072,11 @@
   line-height: var(--leading-snug);
 }
 
-.panel-preview__content > .notice + .notice {
+.scene-preview__content > .notice + .notice {
   margin-top: var(--space-3);
 }
 
-.panel-preview__cost {
+.scene-preview__cost {
   margin: var(--space-4) 0 0;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
@@ -1082,65 +1086,65 @@
   font-size: var(--text-sm);
 }
 
-.panel-preview__sidebar {
+.scene-preview__sidebar {
   position: sticky;
   top: var(--space-6);
 }
 
-.panel-preview__actions {
+.scene-preview__actions {
   flex-direction: column;
   align-items: stretch;
   margin: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
 }
 
-.panel-preview__actions .action-bar__group {
+/* Push the published-state hint below the actions card on the sidebar. */
+.scene-preview__aside-hint {
+  margin-top: var(--space-2);
+}
+
+.scene-preview__actions .action-bar__group {
   width: 100%;
   flex-direction: column;
   align-items: stretch;
   margin-inline: 0;
 }
 
-.panel-preview__model {
+.scene-preview__model {
   margin: 0;
 }
 
-.panel-preview__actions .btn {
+.scene-preview__actions .btn {
   justify-content: center;
   width: 100%;
 }
 
-.panel-preview__attempts-heading {
+.scene-preview__attempts-heading {
   margin-top: var(--space-10);
 }
 
 @media (max-width: 1023.98px) {
-  .panel-preview__workspace {
+  .scene-preview__workspace {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .panel-preview__sidebar {
+  .scene-preview__sidebar {
     position: static;
   }
 
-  .panel-preview__actions,
-  .panel-preview__actions .action-bar__group {
+  .scene-preview__actions,
+  .scene-preview__actions .action-bar__group {
     flex-direction: row;
     flex-wrap: wrap;
   }
 
-  .panel-preview__actions .btn {
+  .scene-preview__actions .btn {
     width: auto;
   }
 }
 
 @media (max-width: 640px) {
-  .panel-preview__source,
-  .panel-preview__mapping li {
+  .scene-preview__source,
+  .scene-preview__mapping li {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -1183,6 +1187,8 @@
 
 .image-dialog__content {
   position: relative;
+  width: fit-content;
+  margin-inline: auto;
 }
 
 .image-dialog__image {
@@ -1199,8 +1205,8 @@
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
   border: 1px solid var(--on-scrim-border);
   border-radius: var(--radius-full);
   background: var(--scrim-soft);
@@ -1213,6 +1219,38 @@
 .image-dialog__close:hover,
 .image-dialog__close:focus-visible {
   background: var(--scrim);
+}
+
+/* Lightbox navigation (previous/next), shown only when the caller supplies
+   the matching handler (gallery, candidate carousel, base-stage previews). */
+.image-dialog__nav {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  border: 1px solid var(--on-scrim-border);
+  border-radius: var(--radius-full);
+  background: var(--scrim-soft);
+  color: var(--on-scrim);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.image-dialog__nav:hover,
+.image-dialog__nav:focus-visible {
+  background: var(--scrim);
+}
+
+.image-dialog__nav--prev {
+  left: calc(-1 * var(--space-2));
+}
+
+.image-dialog__nav--next {
+  right: calc(-1 * var(--space-2));
 }
 
 .image-fallback {
@@ -1245,44 +1283,92 @@
 /* ------------------------------------------------------------------------ */
 /* Candidate carousel                                                        */
 /* ------------------------------------------------------------------------ */
+/* The stage reserves one fixed box (via aspect-ratio) so switching between
+   candidates never reflows the page; arrows sit on the image edges as
+   full-height touch targets. The card anatomy comes from the shared `.card`
+   primitive composed in the markup. */
 
 .carousel {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4);
   margin-bottom: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
 }
 
 .carousel__stage {
   position: relative;
   display: flex;
+  align-items: center;
   justify-content: center;
   width: 100%;
   max-width: 40rem;
+  aspect-ratio: 4 / 3;
   margin-inline: auto;
+  border-radius: var(--radius-lg);
+  background: var(--media-bg);
+  /* No overflow clip: the arrow buttons straddle the border (half in, half
+     out) like the on-click lightbox arrows. The contained image is letterboxed
+     by object-fit, so it never reaches the rounded corners. */
+}
+
+.carousel__stage .image-dialog__trigger {
+  width: 100%;
+  height: 100%;
 }
 
 .carousel__stage .image-dialog__trigger-image {
-  width: auto;
-  max-width: 100%;
-  max-height: 26rem;
-  margin-inline: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .carousel__counter {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  top: var(--space-3);
+  right: var(--space-3);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-full);
   background: var(--scrim-soft);
   color: var(--on-scrim);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Overlay navigation, centered on the stage edges. Straddles the stage border
+   (half in, half out) to match the on-click lightbox arrows. */
+.carousel__nav {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  border: 1px solid var(--on-scrim-border);
+  border-radius: var(--radius-full);
+  background: var(--scrim-soft);
+  color: var(--on-scrim);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.carousel__nav:hover:not(:disabled) {
+  background: var(--scrim);
+}
+
+.carousel__nav:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.carousel__nav--prev {
+  left: calc(-1 * var(--space-2));
+}
+
+.carousel__nav--next {
+  right: calc(-1 * var(--space-2));
 }
 
 .carousel__meta {
@@ -1335,12 +1421,44 @@
 }
 
 .carousel__controls {
-  margin-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.carousel__controls-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.carousel__controls .field__hint {
+  margin: 0;
 }
 
 @media (max-width: 640px) {
+  .carousel__nav {
+    width: var(--control-height-sm);
+    height: var(--control-height-sm);
+  }
+
   .carousel__controls {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .carousel__controls-group {
+    justify-content: stretch;
+  }
+
+  .carousel__controls .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
   }
 }
 
@@ -1359,11 +1477,6 @@
   grid-template-columns: minmax(12rem, 0.8fr) minmax(14rem, 1.6fr) auto;
   gap: var(--space-4);
   align-items: start;
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
 }
 
 .attempt-row__detail {
@@ -1378,6 +1491,10 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-1);
+}
+
+.attempt-row__summary .field__hint > span {
+  display: block;
 }
 
 .attempt-row__badges {
@@ -1505,12 +1622,12 @@
 }
 
 @media (max-width: 640px) {
-  .panel-list-card {
+  .scene-list-card {
     flex-direction: row;
     flex-wrap: wrap;
   }
 
-  .panel-list-card__preview {
+  .scene-list-card__preview {
     width: 5rem;
     height: 5rem;
   }
@@ -1680,21 +1797,12 @@
 /* ------------------------------------------------------------------------ */
 /* Gallery                                                                   */
 /* ------------------------------------------------------------------------ */
-
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--space-4);
-}
+/* Uses the shared .resource-grid for columns; the card composes .card with
+   the flush variant so the accepted image bleeds to the corners. */
 
 .gallery-card {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
   transition:
     border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);

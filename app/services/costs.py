@@ -125,7 +125,7 @@ class CostLedger:
         scene_revision: int | None = None,
         base_stage_revision: int | None = None,
     ) -> Reservation:
-        """Reserve budget for one attempt owned by a panel or a Base Stage.
+        """Reserve budget for one attempt owned by a scene or a Base Stage.
 
         Exactly one of ``scene_id``/``base_stage_id`` identifies the owner; the
         database enforces the same rule (017_base_stage_generations). Every
@@ -134,11 +134,11 @@ class CostLedger:
         """
         if (scene_id is None) == (base_stage_id is None):
             raise CostError(
-                "a generation must belong to exactly one panel or base stage"
+                "a generation must belong to exactly one scene or base stage"
             )
         owner_column = "scene_id" if scene_id is not None else "base_stage_id"
         owner_id = scene_id if scene_id is not None else base_stage_id
-        owner_label = "panel" if scene_id is not None else "base stage"
+        owner_label = "scene" if scene_id is not None else "base stage"
         revision = scene_revision if scene_id is not None else base_stage_revision
         revision_column = "scene_revision" if scene_id is not None else "base_stage_revision"
         owner_table = "scene" if scene_id is not None else "base_stage"
@@ -378,7 +378,7 @@ class CostLedger:
                 )
 
     def recover_stale_pending(self) -> int:
-        """Release panel locks left by interrupted calls, retaining reserved cost."""
+        """Release scene locks left by interrupted calls, retaining reserved cost."""
         try:
             self.conn.execute("BEGIN IMMEDIATE")
             recovered = self._recover_stale_pending()

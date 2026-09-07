@@ -83,8 +83,8 @@ REF_SET_IMMUTABILITY_EXPLANATION = (
     "the draft \u2014 this retires the current canonical set (kept forever) "
     "and makes the new one canonical."
 )
-PANEL_IMMUTABILITY_EXPLANATION = (
-    "A panel can be edited after failed generation attempts because each "
+SCENE_IMMUTABILITY_EXPLANATION = (
+    "A scene can be edited after failed generation attempts because each "
     "failure preserves its own request snapshot. A pending or successful "
     "generation locks its visual definition. The model for future attempts "
     "can still be changed from Preview when no generation is in progress. "
@@ -238,15 +238,15 @@ def _cast_member_out(conn, storage: ImageStorage, entry: dict) -> "CastMember":
     )
 
 
-def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
-    from app.schemas import Panel, PanelBaseStage, PanelBaseStageTarget
+def _scene_out(conn, storage: ImageStorage, scene) -> "Scene":
+    from app.schemas import Scene, SceneBaseStage, SceneBaseStageTarget
 
     scenes = SceneService(conn, settings)
     latest_candidate_id = scenes.latest_attempt_candidate_id(scene.id)
     base_stage = None
     if scene.base_stage_id is not None:
         stage = BaseStageService(conn, storage).get(scene.base_stage_id)
-        base_stage = PanelBaseStage(
+        base_stage = SceneBaseStage(
             id=stage.id,
             state=stage.state,
             description=stage.description,
@@ -254,7 +254,7 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
             style_id=stage.style_id,
             content_url=f"/api/v1/base-stages/{stage.id}/content",
             targets=[
-                PanelBaseStageTarget(
+                SceneBaseStageTarget(
                     id=target.id,
                     position=target.position,
                     description=target.description,
@@ -263,7 +263,7 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
             ],
             archived_at=stage.archived_at,
         )
-    return Panel(
+    return Scene(
         id=scene.id,
         beat_text=scene.beat_text,
         camera=scene.camera,
@@ -287,12 +287,12 @@ def _panel_out(conn, storage: ImageStorage, scene) -> "Panel":
     )
 
 
-def _panel_summary_out(conn, scene) -> "PanelSummary":
-    from app.schemas import PanelSummary
+def _scene_summary_out(conn, scene) -> "SceneSummary":
+    from app.schemas import SceneSummary
 
     scenes = SceneService(conn, settings)
     latest_candidate_id = scenes.latest_attempt_candidate_id(scene.id)
-    return PanelSummary(
+    return SceneSummary(
         id=scene.id,
         beat_text=scene.beat_text,
         created_at=scene.created_at,

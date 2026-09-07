@@ -82,7 +82,7 @@ export function StyleListPage() {
         title="Styles"
         actions={(
           <Link to="/styles/new" className="btn btn--primary">
-            <Icon name="plus" size={16} />
+            <Icon name="plus" size="sm" />
             New style
           </Link>
         )}
@@ -93,10 +93,10 @@ export function StyleListPage() {
         <EmptyState
           icon="styles"
           title="No styles yet"
-          description="Define a visual contract before staging your first panel."
+          description="Define a visual contract before staging your first scene."
           action={(
             <Link to="/styles/new" className="btn btn--primary">
-              <Icon name="plus" size={16} />
+              <Icon name="plus" size="sm" />
               New style
             </Link>
           )}
@@ -135,7 +135,7 @@ export function StyleListPage() {
                     setConfirmId(style.id)
                   }}
                 >
-                  <Icon name="trash" size={15} />
+                  <Icon name="trash" size="sm" />
                   Delete
                 </button>
               </div>
@@ -186,8 +186,8 @@ export function StyleListPage() {
         title="Archive this style?"
         description={
           pendingStyle
-            ? `"${pendingStyle.name}" stays on existing panels but is hidden from lists and can't be used for new panels. You can restore it later.`
-            : 'The style stays on existing panels but is hidden from lists. You can restore it later.'
+            ? `"${pendingStyle.name}" stays on existing scenes but is hidden from lists and can't be used for new scenes. You can restore it later.`
+            : 'The style stays on existing scenes but is hidden from lists. You can restore it later.'
         }
         confirmLabel="Archive style"
         onConfirm={() => void confirmArchive()}

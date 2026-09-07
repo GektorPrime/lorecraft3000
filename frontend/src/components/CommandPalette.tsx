@@ -6,7 +6,7 @@ import {
   type RefObject,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listBaseStages, listCharacters, listPanels, listStyles } from '../api/client'
+import { listBaseStages, listCharacters, listScenes, listStyles } from '../api/client'
 import { useTheme } from '../theme/useTheme'
 import { Icon, type IconName } from './Icon'
 
@@ -63,13 +63,13 @@ export function CommandPalette({
   const close = () => onRequestClose()
   const staticCommands: Command[] = [
     {
-      id: 'new-panel',
-      label: 'Stage new panel',
-      detail: 'Create a panel from your cast and visual style',
+      id: 'new-scene',
+      label: 'Stage new scene',
+      detail: 'Create a scene from your cast and visual style',
       category: 'Create',
       icon: 'sparkles',
-      search: searchable('stage new panel create generate'),
-      to: '/panels/new',
+      search: searchable('stage new scene create generate'),
+      to: '/scenes/new',
     },
     {
       id: 'new-character',
@@ -200,10 +200,10 @@ export function CommandPalette({
     void Promise.allSettled([
       listCharacters(),
       listStyles(),
-      listPanels(),
+      listScenes(),
       listBaseStages(),
     ]).then(
-      ([charactersResult, stylesResult, panelsResult, baseStagesResult]) => {
+      ([charactersResult, stylesResult, scenesResult, baseStagesResult]) => {
         if (!mounted.current) return
         const commands: Command[] = []
         let failures = 0
@@ -239,19 +239,19 @@ export function CommandPalette({
           )
         } else tally(stylesResult)
 
-        if (panelsResult.status === 'fulfilled') {
+        if (scenesResult.status === 'fulfilled') {
           commands.push(
-            ...panelsResult.value.map((panel) => ({
-              id: `panel-${panel.id}`,
-              label: `Panel #${panel.id}`,
-              detail: panel.beat_text,
-              category: 'Panels',
-              icon: 'panels' as const,
-              search: searchable(panel.id, panel.beat_text, 'panel'),
-              to: `/panels/${panel.id}/preview`,
+            ...scenesResult.value.map((scene) => ({
+              id: `scene-${scene.id}`,
+              label: `Scene #${scene.id}`,
+              detail: scene.beat_text,
+              category: 'Scenes',
+              icon: 'scenes' as const,
+              search: searchable(scene.id, scene.beat_text, 'scene'),
+              to: `/scenes/${scene.id}/preview`,
             })),
           )
-        } else tally(panelsResult)
+        } else tally(scenesResult)
 
         if (baseStagesResult.status === 'fulfilled') {
           commands.push(
@@ -311,7 +311,7 @@ export function CommandPalette({
     >
       <div className="command-palette__surface">
         <div className="command-palette__search">
-          <Icon name="search" size={19} />
+          <Icon name="search" size="lg" />
           <input
             ref={inputRef}
             type="text"
@@ -323,7 +323,7 @@ export function CommandPalette({
             aria-autocomplete="list"
             aria-activedescendant={activeCommand ? `command-${activeCommand.id}` : undefined}
             autoComplete="off"
-            placeholder="Search characters, styles, base stages, panels and actions"
+            placeholder="Search characters, styles, base stages, scenes and actions"
             onChange={(event) => {
               setQuery(event.target.value)
               setActiveIndex(0)
@@ -345,7 +345,7 @@ export function CommandPalette({
               }
             }}
           />
-          <kbd>Esc</kbd>
+          <kbd className="kbd">Esc</kbd>
         </div>
 
         <div id={RESULTS_ID} className="command-palette__results" role="listbox">
@@ -362,7 +362,7 @@ export function CommandPalette({
               onClick={() => runCommand(command)}
             >
               <span className="command-palette__option-icon">
-                <Icon name={command.icon} size={18} />
+                <Icon name={command.icon} size="md" />
               </span>
               <span className="command-palette__option-copy">
                 <strong>{command.label}</strong>

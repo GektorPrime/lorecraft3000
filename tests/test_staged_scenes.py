@@ -5,6 +5,7 @@ import pytest
 from app.services.base_stages import BaseStageService
 from app.services.characters import CharacterService
 from app.services.scenes import SceneError, SceneImmutableError, SceneService
+from app.services.styles import StyleService
 from tests.conftest import make_png_bytes
 
 
@@ -71,7 +72,7 @@ def test_staged_scene_normalizes_composition_and_duplicate_preserves_archived_st
         mood="ignored",
         aspect_ratio="9:16",
         cast=_cast(stage, characters),
-        style_id=999,
+        style_id=scene.style_id,
         model=scene.model,
         image_size=scene.image_size,
         base_stage_id=stage.id,
@@ -80,6 +81,30 @@ def test_staged_scene_normalizes_composition_and_duplicate_preserves_archived_st
     duplicate = service.duplicate(scene.id)
     assert duplicate.base_stage_id == stage.id
     assert duplicate.cast == scene.cast
+
+
+def test_staged_scene_accepts_a_selected_style(conn, storage, settings):
+    service = SceneService(conn, settings)
+    stage = _stage(storage, conn)
+    characters = _characters(conn)
+    selected_style = StyleService(conn).create(
+        name="Ink Wash",
+        style_contract="Loose monochrome ink washes.",
+    )
+    scene = service.create(
+        beat_text=None,
+        camera=None,
+        framing=None,
+        mood=None,
+        aspect_ratio="1:1",
+        cast=_cast(stage, characters),
+        style_id=selected_style.id,
+        model="gemini-3.1-flash-image",
+        image_size="1K",
+        base_stage_id=stage.id,
+    )
+
+    assert scene.style_id == selected_style.id
 
 
 @pytest.mark.parametrize("mutation, message", [

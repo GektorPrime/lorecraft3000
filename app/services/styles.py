@@ -28,7 +28,7 @@ class StyleArchivedError(StyleError):
     """Raised when an operation is invalid for the seeded default style.
 
     The default style is the app's baseline and is never archivable — archiving
-    it would leave characters/panels that rely on the default without one.
+    it would leave characters/scenes that rely on the default without one.
     """
 
 
@@ -81,7 +81,7 @@ class StyleService:
     def get(self, style_id: int) -> Style:
         """Resolve any style, archived or not.
 
-        Archived styles must still resolve so panels that already reference them
+        Archived styles must still resolve so scenes that already reference them
         keep rendering and previewing — archiving hides a style from new work,
         it does not break existing dependencies.
         """

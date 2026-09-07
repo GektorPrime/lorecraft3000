@@ -12,6 +12,7 @@ import { OptionsProvider } from './api/OptionsProvider'
 import { AppShell } from './components/AppShell'
 import { Home } from './pages/Home'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { PanelsStubPage } from './pages/PanelsStubPage'
 import { BaseStageListPage } from './pages/base-stages/BaseStageListPage'
 import { BaseStageNewPage } from './pages/base-stages/BaseStageNewPage'
 import { BaseStagePreviewPage } from './pages/base-stages/BaseStagePreviewPage'
@@ -20,9 +21,9 @@ import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
 import { GalleryPage } from './pages/gallery/GalleryPage'
-import { PanelFormPage } from './pages/panels/PanelFormPage'
-import { PanelListPage } from './pages/panels/PanelListPage'
-import { PanelPreviewPage } from './pages/panels/PanelPreviewPage'
+import { SceneFormPage } from './pages/scenes/SceneFormPage'
+import { SceneListPage } from './pages/scenes/SceneListPage'
+import { ScenePreviewPage } from './pages/scenes/ScenePreviewPage'
 import { StyleFormPage } from './pages/styles/StyleFormPage'
 import { StyleListPage } from './pages/styles/StyleListPage'
 import { parseRouteId } from './routing/parseRouteId'
@@ -174,25 +175,30 @@ const appRoutes: RouteObject[] = [
           },
           {
             path: 'panels',
-            element: <PanelListPage />,
+            element: <PanelsStubPage />,
             handle: { title: 'Panels' } satisfies RouteHandle,
           },
           {
-            path: 'panels/new',
-            element: <PanelFormPage />,
-            handle: { title: 'New Panel' } satisfies RouteHandle,
+            path: 'scenes',
+            element: <SceneListPage />,
+            handle: { title: 'Scenes' } satisfies RouteHandle,
           },
           {
-            path: 'panels/:id/edit',
-            loader: requireRouteId,
-            element: <PanelFormPage />,
-            handle: { title: 'Edit Panel' } satisfies RouteHandle,
+            path: 'scenes/new',
+            element: <SceneFormPage />,
+            handle: { title: 'New Scene' } satisfies RouteHandle,
           },
           {
-            path: 'panels/:id/preview',
+            path: 'scenes/:id/edit',
             loader: requireRouteId,
-            element: <PanelPreviewPage />,
-            handle: { title: 'Loading Panel Preview' } satisfies RouteHandle,
+            element: <SceneFormPage />,
+            handle: { title: 'Edit Scene' } satisfies RouteHandle,
+          },
+          {
+            path: 'scenes/:id/preview',
+            loader: requireRouteId,
+            element: <ScenePreviewPage />,
+            handle: { title: 'Loading Scene Preview' } satisfies RouteHandle,
           },
         ],
       },

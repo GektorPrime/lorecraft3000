@@ -122,7 +122,7 @@ if (FRONTEND_DIST_DIR / "assets").is_dir():
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    """Landing page for the library-to-panel workflow.
+    """Landing page for the library-to-scene workflow.
 
     Serves the built React app (frontend/). The frontend is the only UI: when
     it has not been built, "/" returns a short notice pointing at `npm run

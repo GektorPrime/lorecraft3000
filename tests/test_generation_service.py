@@ -112,6 +112,11 @@ def _staged_scene(conn, storage, tmp_path, character_id):
     )
     from app.services.scenes import SceneService
 
+    style = StyleService(conn).create(
+        name="Selected Scene Style",
+        style_contract="SELECTED SCENE STYLE CONTRACT",
+    )
+
     scene = SceneService(conn, _settings(tmp_path)).create(
         beat_text=None,
         camera=None,
@@ -124,7 +129,7 @@ def _staged_scene(conn, storage, tmp_path, character_id):
                 "base_stage_target_id": stage.targets[0].id,
             }
         ],
-        style_id=None,
+        style_id=style.id,
         model="gemini-3.1-flash-image",
         image_size="1K",
         base_stage_id=stage.id,
@@ -170,7 +175,7 @@ def test_two_character_fake_generation_captures_complete_provenance(
     assert generation["state"] == "succeeded"
     assert generation["interaction_id"] == "interaction-fake"
     assert capture["schema_version"] == 2
-    assert capture["operation"] == "direct_panel_generate"
+    assert capture["operation"] == "direct_scene_generate"
     assert [item["sha256"] for item in capture["input_images"]] == [
         elias_image.sha256, mara_image.sha256
     ]
@@ -184,7 +189,7 @@ def test_two_character_fake_generation_captures_complete_provenance(
     _, sidecar = storage.read(outcome.candidate_sha256)
     provenance = sidecar["provenance"][0]
     assert provenance["schema_version"] == 2
-    assert provenance["operation"] == "direct_panel_generate"
+    assert provenance["operation"] == "direct_scene_generate"
     assert provenance["input_images"][0]["sha256"] == elias_image.sha256
     assert provenance["input_images"][1]["sha256"] == mara_image.sha256
     assert provenance["generation_id"] == outcome.generation_id
@@ -221,9 +226,10 @@ def test_staged_preview_and_generation_use_edit_with_source_aware_provenance(
     assert preview.provider_request.source_image == make_png_bytes((4, 5, 6))
     assert preview.provider_request.source_interaction_id is None
     assert [ref.image_number for ref in preview.provider_request.references] == [2]
-    assert preview.request_capture["operation"] == "base_stage_panel_generate"
+    assert preview.request_capture["operation"] == "base_stage_scene_generate"
     assert preview.request_capture["base_stage"]["id"] == stage.id
     assert preview.request_capture["base_stage"]["content_sha256"]
+    assert "SELECTED SCENE STYLE CONTRACT" in preview.provider_request.prompt
     assert [item["image_number"] for item in preview.request_capture["input_images"]] == [1, 2]
     assert preview.request_capture["input_images"][1]["sha256"] == ref_image.sha256
 
@@ -356,7 +362,7 @@ def test_publish_promotes_one_candidate_and_freezes_the_stage(
     assert (published.image_width, published.image_height) == (8, 8)
     assert stages.content_sha(stage.id) == outcome.candidate_sha256
 
-    # Promotion is one-way: the source image any panel generates from is frozen.
+    # Promotion is one-way: the source image any scene generates from is frozen.
     with pytest.raises(BaseStageLockedError):
         stages.publish(stage.id, outcome.candidate_id)
     with pytest.raises(BaseStageLockedError):
@@ -384,12 +390,12 @@ def test_publish_rejects_candidates_from_another_owner(conn, storage, tmp_path):
     scene_id = _scene(conn, [{"character_id": character.id, "prominence": 1}])
     settings = _settings(tmp_path)
     service = GenerationService(conn, storage, settings, FakeProvider())
-    panel_outcome = service.generate(scene_id)
+    scene_outcome = service.generate(scene_id)
 
     stage = _generated_stage(conn, storage, tmp_path)
     stages = BaseStageService(conn, storage, settings)
     with pytest.raises(BaseStageValidationError, match="not a succeeded candidate"):
-        stages.publish(stage.id, panel_outcome.candidate_id)
+        stages.publish(stage.id, scene_outcome.candidate_id)
     assert stages.get(stage.id).state == "draft"
 
 
@@ -549,7 +555,7 @@ def test_storage_failure_records_known_actual_provider_cost(
     assert tuple(row) == ("failed", 11, 11)
 
 
-def test_idempotency_key_cannot_be_reused_after_panel_edit(
+def test_idempotency_key_cannot_be_reused_after_scene_edit(
     conn, storage, tmp_path
 ):
     character, _, _ = _character_with_canon(

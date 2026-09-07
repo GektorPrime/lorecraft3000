@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useRef, useState } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BaseStage, Character, Panel, Style } from '../api/types'
+import type { BaseStage, Character, Scene, Style } from '../api/types'
 import * as client from '../api/client'
 import { CommandPalette } from './CommandPalette'
 
@@ -13,7 +13,7 @@ vi.mock('../api/client', async () => {
     ...actual,
     listCharacters: vi.fn(),
     listStyles: vi.fn(),
-    listPanels: vi.fn(),
+    listScenes: vi.fn(),
     listBaseStages: vi.fn(),
   }
 })
@@ -64,7 +64,7 @@ const STAGE: BaseStage = {
   style_id: null,
 }
 
-const PANEL: Panel = {
+const PANEL: Scene = {
   base_stage_id: null,
   base_stage: null,
   id: 12,
@@ -116,7 +116,7 @@ describe('CommandPalette', () => {
   beforeEach(() => {
     vi.mocked(client.listCharacters).mockReset().mockResolvedValue([CHARACTER])
     vi.mocked(client.listStyles).mockReset().mockResolvedValue([STYLE])
-    vi.mocked(client.listPanels).mockReset().mockResolvedValue([PANEL])
+    vi.mocked(client.listScenes).mockReset().mockResolvedValue([PANEL])
     vi.mocked(client.listBaseStages).mockReset().mockResolvedValue([STAGE])
   })
 
@@ -129,7 +129,7 @@ describe('CommandPalette', () => {
     expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Search commands' })).toHaveFocus()
     expect(screen.getByRole('combobox')).toHaveAttribute('aria-controls', 'command-palette-results')
-    expect(screen.getByRole('option', { name: /Stage new panel/ })).toHaveAttribute(
+    expect(screen.getByRole('option', { name: /Stage new scene/ })).toHaveAttribute(
       'aria-selected',
       'true',
     )
@@ -183,7 +183,7 @@ describe('CommandPalette', () => {
 
     expect(client.listCharacters).toHaveBeenCalledOnce()
     expect(client.listStyles).toHaveBeenCalledOnce()
-    expect(client.listPanels).toHaveBeenCalledOnce()
+    expect(client.listScenes).toHaveBeenCalledOnce()
     expect(client.listBaseStages).toHaveBeenCalledOnce()
   })
 

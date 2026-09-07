@@ -29,7 +29,7 @@ export function CharacterListPage() {
         title="Characters"
         actions={(
           <Link to="/characters/new" className="btn btn--primary">
-            <Icon name="plus" size={16} />
+            <Icon name="plus" size="sm" />
             New character
           </Link>
         )}
@@ -43,7 +43,7 @@ export function CharacterListPage() {
           description="Create a character, then build a canonical reference set for consistent generations."
           action={(
             <Link to="/characters/new" className="btn btn--primary">
-              <Icon name="plus" size={16} />
+              <Icon name="plus" size="sm" />
               New character
             </Link>
           )}

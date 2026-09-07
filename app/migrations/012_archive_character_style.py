@@ -1,10 +1,10 @@
 """Soft-delete (archive) support for characters and styles.
 
-Characters and styles are archived, not hard-deleted, so panels that already
-reference them keep working (an archived character stays in a panel's cast;
-an archived style stays on existing panels). Archived rows are hidden from
-every list/picker (see CharacterService.list / StyleService.list), so they can
-no longer be reused for NEW panels, but their dependencies are never broken.
+Characters and styles are archived, not hard-deleted, so scenes that already
+reference them keep working (an archived character stays in a scene's cast;
+an archived style stays on existing scenes). Archived rows are hidden from
+lists/pickers and can
+no longer be reused for NEW scenes, but their dependencies are never broken.
 
 Freeing the name/slug on archive
 --------------------------------

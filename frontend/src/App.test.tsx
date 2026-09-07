@@ -16,7 +16,7 @@ const OPTIONS: OptionsSummary = {
   remaining_today_cents: 300,
   ref_image_weight_explanation: 'Reference weight',
   ref_set_immutability_explanation: 'Reference sets are immutable',
-  panel_immutability_explanation: 'Panels are immutable',
+  scene_immutability_explanation: 'Scenes are immutable',
 }
 
 const jsonResponse = (value: unknown) =>
@@ -33,7 +33,7 @@ function resolvedAppFetch() {
     if (url.endsWith('/styles')) return Promise.resolve(jsonResponse([]))
     if (url.endsWith('/base-stages/archived')) return Promise.resolve(jsonResponse([]))
     if (url.endsWith('/base-stages')) return Promise.resolve(jsonResponse([]))
-    if (url.endsWith('/panels')) return Promise.resolve(jsonResponse([]))
+    if (url.endsWith('/scenes')) return Promise.resolve(jsonResponse([]))
     throw new Error(`Unexpected request: ${url}`)
   })
 }
@@ -71,6 +71,7 @@ describe('App routing', () => {
     expect(within(library).getByRole('link', { name: 'Base Stages' })).toBeInTheDocument()
 
     const work = screen.getByRole('list', { name: 'Work' })
+    expect(within(work).getByRole('link', { name: 'Scenes' })).toBeInTheDocument()
     expect(within(work).getByRole('link', { name: 'Panels' })).toBeInTheDocument()
     expect(within(work).getByRole('link', { name: 'Gallery' })).toBeInTheDocument()
   })
@@ -84,16 +85,33 @@ describe('App routing', () => {
     await waitFor(() => expect(document.title).toBe('Base Stages | LoreCraft3000'))
   })
 
-  it('does not mark Panels active when on Stage new panel', async () => {
-    await renderApp('#/panels/new')
+  it('renders the Panels placeholder route', async () => {
+    await renderApp('#/panels')
+
+    expect(await screen.findByRole('heading', { name: 'Panels' })).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '#/',
+    )
+    await waitFor(() => expect(document.title).toBe('Panels | LoreCraft3000'))
+  })
+
+  it('does not mark Scenes active when on /scenes/new', async () => {
+    await renderApp('#/scenes/new')
 
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
-    const panels = Array.from(nav.querySelectorAll('a')).find((a) => a.textContent === 'Panels')
-    const stage = Array.from(nav.querySelectorAll('a')).find((a) => a.textContent?.includes('Stage new panel'))
-    expect(panels).toBeDefined()
-    expect(stage).toBeDefined()
-    await waitFor(() => expect(stage?.classList.contains('active')).toBe(true))
-    expect(panels?.classList.contains('active')).toBe(false)
+    const scenes = Array.from(nav.querySelectorAll('a')).find((a) => a.textContent === 'Scenes')
+    expect(scenes).toBeDefined()
+    await waitFor(() => expect(scenes?.classList.contains('active')).toBe(false))
+  })
+
+  it('marks Dashboard active on the home route', async () => {
+    await renderApp('#/')
+
+    const nav = await screen.findByRole('navigation', { name: 'Primary' })
+    const dashboard = Array.from(nav.querySelectorAll('a')).find((a) => a.textContent === 'Dashboard')
+    expect(dashboard).toBeDefined()
+    await waitFor(() => expect(dashboard?.classList.contains('active')).toBe(true))
   })
 
   it('opens the mobile navigation as a focus-managed drawer', async () => {
@@ -141,8 +159,8 @@ describe('App routing', () => {
     '#/characters/nope',
     '#/characters/0/edit',
     '#/styles/01/edit',
-    '#/panels/-1/edit',
-    '#/panels/1.5/preview',
+    '#/scenes/-1/edit',
+    '#/scenes/1.5/preview',
   ])('redirects malformed dynamic IDs to hash not-found without loading config: %s', async (hash) => {
     globalThis.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
     await renderApp(hash)

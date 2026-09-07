@@ -70,7 +70,7 @@ MODEL_PRICES_CENTS: dict[str, dict[str, int]] = {
 }
 
 # Which provider adapter serves each model. Selection keys on the model string
-# so a panel can freely choose a Gemini or OpenAI model; edits stay on the same
+# so a scene can freely choose a Gemini or OpenAI model; edits stay on the same
 # provider that produced the source image (see app/deps.py::get_provider).
 MODEL_PROVIDERS: dict[str, str] = {
     "gemini-3.1-flash-lite-image": "gemini",

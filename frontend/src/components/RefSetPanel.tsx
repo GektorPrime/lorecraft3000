@@ -190,7 +190,7 @@ export function RefSetPanel({ refSetId, status, onChanged }: RefSetPanelProps) {
             disabled={busyAction !== null}
             onClick={() => void runAction('copy reference set', 'Reference set copied to a new draft.', () => copyRefSet(refSetId))}
           >
-            <Icon name="copy" size={16} />
+            <Icon name="copy" size="sm" />
             Copy to new draft
           </button>
           {isDraft && (
@@ -200,7 +200,7 @@ export function RefSetPanel({ refSetId, status, onChanged }: RefSetPanelProps) {
               disabled={busyAction !== null || refSet.images.length === 0}
               onClick={handlePromote}
             >
-              <Icon name="check" size={16} />
+              <Icon name="check" size="sm" />
               Promote to canonical
             </button>
           )}
@@ -273,7 +273,7 @@ export function RefSetPanel({ refSetId, status, onChanged }: RefSetPanelProps) {
             />
           </div>
           <button type="submit" className="btn" disabled={busyAction !== null || !file}>
-            <Icon name="plus" size={16} />
+            <Icon name="plus" size="sm" />
             Upload
           </button>
         </form>

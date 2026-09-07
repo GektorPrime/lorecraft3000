@@ -21,7 +21,7 @@ export function Notice({ tone = 'info', children, className }: NoticeProps) {
   const classes = ['notice', `notice--${tone}`, className].filter(Boolean).join(' ')
   return (
     <div className={classes}>
-      <Icon name={ICONS[tone]} size={18} />
+      <Icon name={ICONS[tone]} size="md" />
       <div className="notice__content">{children}</div>
     </div>
   )

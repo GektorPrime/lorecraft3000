@@ -375,8 +375,8 @@ def _candidate_attachments(request_json: str) -> list[dict]:
     """Reference-image captures recorded on a candidate's request.
 
     ``attachments`` carries ``character_id`` and ``sha256`` for every
-    canonical reference the request used, on every path (direct panel, Base
-    Stage panel, and candidate edit). These hashes let a candidate be scored
+    canonical reference the request used, on every path (direct scene, Base
+    Stage scene, and candidate edit). These hashes let a candidate be scored
     against the exact references it was generated from, including references
     whose set has since been retired. Returns only dict entries.
     """

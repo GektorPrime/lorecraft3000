@@ -8,16 +8,18 @@ interface NavItem {
   to: string
   label: string
   icon: IconName
-  /** Exact matching, so /panels does not light up on /panels/new. */
+  /** Exact matching, so /scenes does not light up on /scenes/new. */
   end?: boolean
 }
 
 /**
  * Navigation grouped by workflow rather than alphabetically: you define a
- * Library (characters, styles, base stages), use it to stage Work (panels), and the
+ * Library (characters, styles, base stages), use it to stage Work (scenes), and the
  * accepted results collect in the Gallery. The previous flat bar ordered
  * these arbitrarily.
  */
+const TOP_ITEM: NavItem = { to: '/', label: 'Dashboard', icon: 'dashboard', end: true }
+
 const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
   {
     id: 'nav-group-library',
@@ -32,8 +34,9 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     id: 'nav-group-work',
     label: 'Work',
     items: [
-      { to: '/panels', label: 'Panels', icon: 'panels', end: true },
+      { to: '/scenes', label: 'Scenes', icon: 'scenes', end: true },
       { to: '/gallery', label: 'Gallery', icon: 'gallery' },
+      { to: '/panels', label: 'Panels', icon: 'panels', end: true },
     ],
   },
 ]
@@ -69,31 +72,36 @@ export function Sidebar({ open = false, onClose, dismissRef, onCommandClick }: S
         <button
           ref={dismissRef}
           type="button"
-          className="app-sidebar__dismiss"
+          className="icon-button icon-button--ghost app-sidebar__dismiss"
           aria-label="Close navigation"
           onClick={onClose}
         >
-          <Icon name="close" size={18} />
+          <Icon name="close" size="lg" />
         </button>
       </div>
 
       <nav className="app-sidebar__nav" aria-label="Primary">
-        <NavLink
-          to="/panels/new"
-          className="btn btn--primary app-sidebar__cta"
-          onClick={onClose}
-        >
-          <Icon name="plus" size={16} />
-          Stage new panel
-        </NavLink>
-
         {onCommandClick && (
           <button type="button" className="app-sidebar__command" onClick={onCommandClick}>
-            <Icon name="search" size={16} />
+            <Icon name="search" size="sm" />
             <span>Search</span>
-            <kbd>Cmd K</kbd>
+            <kbd className="kbd">Cmd K</kbd>
           </button>
         )}
+
+        <ul className="app-sidebar__list">
+          <li>
+            <NavLink
+              to={TOP_ITEM.to}
+              end={TOP_ITEM.end}
+              className="app-sidebar__link"
+              onClick={onClose}
+            >
+              <Icon name={TOP_ITEM.icon} size="md" />
+              {TOP_ITEM.label}
+            </NavLink>
+          </li>
+        </ul>
 
         {NAV_GROUPS.map((group) => (
           <div key={group.id} className="app-sidebar__group">
@@ -109,7 +117,7 @@ export function Sidebar({ open = false, onClose, dismissRef, onCommandClick }: S
                     className="app-sidebar__link"
                     onClick={onClose}
                   >
-                    <Icon name={item.icon} size={18} />
+                    <Icon name={item.icon} size="md" />
                     {item.label}
                   </NavLink>
                 </li>

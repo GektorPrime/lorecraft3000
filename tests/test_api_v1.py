@@ -1,9 +1,9 @@
 """Tests for the typed /api/v1 JSON API (issue #15).
 
 Covers: options/summary, characters, styles, ref-sets/images/promotion,
-ref-image content by ID, panels CRUD/preview/generation, generations,
+ref-image content by ID, scenes CRUD/preview/generation, generations,
 candidate review/content, budget — plus the two behavioral contracts most at
-risk of regression: panel edit immutability after any generation attempt (and
+risk of regression: scene edit immutability after any generation attempt (and
 duplicate as the escape hatch), and that no sha256/hash ever appears in a
 JSON response body.
 """
@@ -128,9 +128,9 @@ def _promote_canonical(api, character_id, color=(100, 20, 20), role="face_front"
     return promoted.json()
 
 
-def _create_panel(api, character_ids, model="gemini-3.1-flash-image"):
+def _create_scene(api, character_ids, model="gemini-3.1-flash-image"):
     resp = api.client.post(
-        "/api/v1/panels",
+        "/api/v1/scenes",
         json={
             "beat_text": "The cast studies a map beside the fire.",
             "camera": "eye level",
@@ -150,10 +150,10 @@ def _create_panel(api, character_ids, model="gemini-3.1-flash-image"):
     return resp.json()
 
 
-def _generate_panel(api, panel_id, *, headers=None):
-    preview = api.client.get(f"/api/v1/panels/{panel_id}/preview").json()
+def _generate_scene(api, scene_id, *, headers=None):
+    preview = api.client.get(f"/api/v1/scenes/{scene_id}/preview").json()
     return api.client.post(
-        f"/api/v1/panels/{panel_id}/generate",
+        f"/api/v1/scenes/{scene_id}/generate",
         json={"expected_prompt_hash": preview["prompt_hash"]},
         headers=headers,
     )
@@ -317,7 +317,7 @@ def test_generated_base_stage_draft_preview_generate_and_publish(api):
     stage = created.json()
     stage_id = stage["id"]
 
-    # A draft is not usable yet: no image, and no panel may select it.
+    # A draft is not usable yet: no image, and no scene may select it.
     assert (stage["origin"], stage["state"]) == ("generated", "draft")
     assert stage["content_url"] is None
     assert stage["is_editable"] is True
@@ -436,7 +436,7 @@ def test_options_summary_shape(api):
     assert body["spent_today_cents"] == 0
     assert "cannot be edited" in body["ref_image_weight_explanation"].lower()
     assert "canonical" in body["ref_set_immutability_explanation"].lower()
-    assert "duplicate" in body["panel_immutability_explanation"].lower()
+    assert "duplicate" in body["scene_immutability_explanation"].lower()
 
 
 def test_budget_reflects_spend(api):
@@ -457,8 +457,8 @@ def test_budget_accepts_timezone_header_and_falls_back_to_utc(api):
     conn = connect(api.db_path)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     try:
-        # Every generation must belong to exactly one panel or base stage
-        # (017_base_stage_generations), so the spend row gets a real panel.
+        # Every generation must belong to exactly one scene or base stage
+        # (017_base_stage_generations), so the spend row gets a real scene.
         style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
         scene_id = conn.execute(
             "INSERT INTO scene (style_id) VALUES (?)", (style_id,)
@@ -679,25 +679,25 @@ def test_invalid_role_upload_is_422(api):
 
 
 # ---------------------------------------------------------------------------
-# panels: CRUD, immutability, duplication, preview, generation
+# scenes: CRUD, immutability, duplication, preview, generation
 # ---------------------------------------------------------------------------
 
 
-def test_panel_create_and_list(api):
+def test_scene_create_and_list(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    assert panel["is_editable"] is True
-    assert panel["generation_count"] == 0
-    assert panel["latest_attempt_preview_url"] is None
-    assert panel["cast"][0]["name"] == "Elias"
-    assert panel["cast"][0]["avatar_url"] is not None
+    scene = _create_scene(api, [character["id"]])
+    assert scene["is_editable"] is True
+    assert scene["generation_count"] == 0
+    assert scene["latest_attempt_preview_url"] is None
+    assert scene["cast"][0]["name"] == "Elias"
+    assert scene["cast"][0]["avatar_url"] is not None
 
-    listed = api.client.get("/api/v1/panels").json()
+    listed = api.client.get("/api/v1/scenes").json()
     assert len(listed) == 1
 
 
-def test_panel_create_rejects_zero_or_negative_prominence(api):
+def test_scene_create_rejects_zero_or_negative_prominence(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
     base_payload = {
@@ -712,7 +712,7 @@ def test_panel_create_rejects_zero_or_negative_prominence(api):
     }
     for bad_prominence in (0, -1, -100):
         resp = api.client.post(
-            "/api/v1/panels",
+            "/api/v1/scenes",
             json={
                 **base_payload,
                 "cast": [
@@ -726,8 +726,8 @@ def test_panel_create_rejects_zero_or_negative_prominence(api):
         )
         # Rejected at the Pydantic boundary (schemas.CastMemberIn ge=1).
         assert resp.status_code == 422, resp.text
-    # No panel was created by any of the rejected attempts.
-    assert api.client.get("/api/v1/panels").json() == []
+    # No scene was created by any of the rejected attempts.
+    assert api.client.get("/api/v1/scenes").json() == []
 
 
 def test_scene_service_rejects_zero_or_negative_prominence_even_bypassing_pydantic(api):
@@ -794,34 +794,34 @@ def test_scene_service_rejects_zero_or_negative_prominence_even_bypassing_pydant
         conn.close()
 
 
-def test_panel_update_rejects_zero_or_negative_prominence(api):
+def test_scene_update_rejects_zero_or_negative_prominence(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
+    scene = _create_scene(api, [character["id"]])
     resp = api.client.put(
-        f"/api/v1/panels/{panel['id']}",
+        f"/api/v1/scenes/{scene['id']}",
         json={
-            "beat_text": panel["beat_text"],
-            "camera": panel["camera"],
-            "framing": panel["framing"],
-            "mood": panel["mood"],
-            "aspect_ratio": panel["aspect_ratio"],
+            "beat_text": scene["beat_text"],
+            "camera": scene["camera"],
+            "framing": scene["framing"],
+            "mood": scene["mood"],
+            "aspect_ratio": scene["aspect_ratio"],
             "cast": [{"character_id": character["id"], "role": "lead", "prominence": -1}],
-            "style_id": panel["style_id"],
-            "model": panel["model"],
-            "image_size": panel["image_size"],
+            "style_id": scene["style_id"],
+            "model": scene["model"],
+            "image_size": scene["image_size"],
         },
     )
     assert resp.status_code == 422
-    # The panel is unchanged.
-    unchanged = api.client.get(f"/api/v1/panels/{panel['id']}").json()
-    assert unchanged["cast"][0]["prominence"] == panel["cast"][0]["prominence"]
+    # The scene is unchanged.
+    unchanged = api.client.get(f"/api/v1/scenes/{scene['id']}").json()
+    assert unchanged["cast"][0]["prominence"] == scene["cast"][0]["prominence"]
 
 
-def test_panel_editable_until_generation_succeeds_then_backend_rejects_update(api):
+def test_scene_editable_until_generation_succeeds_then_backend_rejects_update(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
+    scene = _create_scene(api, [character["id"]])
 
     # Editable with zero generations: update succeeds.
     update_payload = {
@@ -831,94 +831,94 @@ def test_panel_editable_until_generation_succeeds_then_backend_rejects_update(ap
         "mood": "calm",
         "aspect_ratio": "3:2",
         "cast": [{"character_id": character["id"], "role": "lead", "prominence": 1}],
-        "style_id": panel["style_id"],
-        "model": panel["model"],
-        "image_size": panel["image_size"],
+        "style_id": scene["style_id"],
+        "model": scene["model"],
+        "image_size": scene["image_size"],
     }
-    updated = api.client.put(f"/api/v1/panels/{panel['id']}", json=update_payload)
+    updated = api.client.put(f"/api/v1/scenes/{scene['id']}", json=update_payload)
     assert updated.status_code == 200
     assert updated.json()["beat_text"] == "Updated beat."
 
     # Generate once.
-    generated = _generate_panel(api, panel["id"])
+    generated = _generate_scene(api, scene["id"])
     assert generated.status_code == 201, generated.text
     assert generated.json()["state"] == "succeeded"
 
-    listed_panel = api.client.get("/api/v1/panels").json()[0]
+    listed_scene = api.client.get("/api/v1/scenes").json()[0]
     candidate_id = generated.json()["candidates"][0]["id"]
-    assert listed_panel["latest_attempt_preview_url"] == (
+    assert listed_scene["latest_attempt_preview_url"] == (
         f"/api/v1/candidates/{candidate_id}/content"
     )
 
-    # Now the panel must report non-editable and reject a further update,
+    # Now the scene must report non-editable and reject a further update,
     # even though the request itself is well-formed (backend enforcement,
     # not just a disabled UI control).
-    refreshed = api.client.get(f"/api/v1/panels/{panel['id']}").json()
+    refreshed = api.client.get(f"/api/v1/scenes/{scene['id']}").json()
     assert refreshed["is_editable"] is False
     assert refreshed["generation_count"] == 1
 
-    rejected = api.client.put(f"/api/v1/panels/{panel['id']}", json=update_payload)
+    rejected = api.client.put(f"/api/v1/scenes/{scene['id']}", json=update_payload)
     assert rejected.status_code == 409
     assert rejected.json()["detail"]["type"] == "SceneImmutableError"
 
     # The original beat_text from before the rejected update is preserved.
-    still = api.client.get(f"/api/v1/panels/{panel['id']}").json()
+    still = api.client.get(f"/api/v1/scenes/{scene['id']}").json()
     assert still["beat_text"] == "Updated beat."
 
 
-def test_panel_model_can_change_after_success_without_rewriting_history(api):
+def test_scene_model_can_change_after_success_without_rewriting_history(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    generated = _generate_panel(api, panel["id"]).json()
+    scene = _create_scene(api, [character["id"]])
+    generated = _generate_scene(api, scene["id"]).json()
 
     changed = api.client.patch(
-        f"/api/v1/panels/{panel['id']}/model",
+        f"/api/v1/scenes/{scene['id']}/model",
         json={"model": "gemini-3-pro-image"},
     )
 
     assert changed.status_code == 200
     assert changed.json()["model"] == "gemini-3-pro-image"
-    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
+    preview = api.client.get(f"/api/v1/scenes/{scene['id']}/preview").json()
     assert preview["model"] == "gemini-3-pro-image"
-    history = api.client.get(f"/api/v1/panels/{panel['id']}/generations").json()
+    history = api.client.get(f"/api/v1/scenes/{scene['id']}/generations").json()
     assert history[0]["id"] == generated["id"]
     assert history[0]["model"] == "gemini-3.1-flash-image"
 
 
-def test_panel_model_cannot_change_while_generation_is_pending(api):
+def test_scene_model_cannot_change_while_generation_is_pending(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
+    scene = _create_scene(api, [character["id"]])
     conn = api.conn()
     try:
         conn.execute(
             "INSERT INTO generation (scene_id, model, state) VALUES (?, ?, 'pending')",
-            (panel["id"], panel["model"]),
+            (scene["id"], scene["model"]),
         )
         conn.commit()
     finally:
         conn.close()
 
     rejected = api.client.patch(
-        f"/api/v1/panels/{panel['id']}/model",
+        f"/api/v1/scenes/{scene['id']}/model",
         json={"model": "gemini-3-pro-image"},
     )
 
     assert rejected.status_code == 409
     assert rejected.json()["detail"]["type"] == "SceneImmutableError"
-    unchanged = api.client.get(f"/api/v1/panels/{panel['id']}").json()
+    unchanged = api.client.get(f"/api/v1/scenes/{scene['id']}").json()
     assert unchanged["model"] == "gemini-3.1-flash-image"
 
 
 def test_generation_idempotency_key_returns_existing_attempt(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
+    scene = _create_scene(api, [character["id"]])
     headers = {"Idempotency-Key": "browser-request-1"}
 
-    first = _generate_panel(api, panel["id"], headers=headers)
-    replay = _generate_panel(api, panel["id"], headers=headers)
+    first = _generate_scene(api, scene["id"], headers=headers)
+    replay = _generate_scene(api, scene["id"], headers=headers)
 
     assert first.status_code == 201
     assert replay.status_code == 200
@@ -929,11 +929,11 @@ def test_generation_idempotency_key_returns_existing_attempt(api):
 def test_actual_cost_overrun_is_returned_as_a_warning(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
+    scene = _create_scene(api, [character["id"]])
     from app.deps import settings
 
     api.provider.billed_cost_cents = settings.daily_spend_cap_cents + 1
-    response = _generate_panel(api, panel["id"])
+    response = _generate_scene(api, scene["id"])
 
     assert response.status_code == 201
     body = response.json()
@@ -944,18 +944,18 @@ def test_actual_cost_overrun_is_returned_as_a_warning(api):
 def test_failed_generation_remains_editable_and_is_preserved_in_history(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
+    scene = _create_scene(api, [character["id"]])
     api.provider.error = RuntimeError("provider unavailable")
 
-    failed = _generate_panel(api, panel["id"])
+    failed = _generate_scene(api, scene["id"])
     assert failed.status_code == 422
 
-    refreshed = api.client.get(f"/api/v1/panels/{panel['id']}").json()
+    refreshed = api.client.get(f"/api/v1/scenes/{scene['id']}").json()
     assert refreshed["is_editable"] is True
     assert refreshed["generation_count"] == 1
 
     history = api.client.get(
-        f"/api/v1/panels/{panel['id']}/generations"
+        f"/api/v1/scenes/{scene['id']}/generations"
     )
     assert history.status_code == 200
     attempts = history.json()
@@ -965,55 +965,55 @@ def test_failed_generation_remains_editable_and_is_preserved_in_history(api):
 
     update_payload = {
         "beat_text": "Revised after provider failure.",
-        "camera": panel["camera"],
-        "framing": panel["framing"],
-        "mood": panel["mood"],
-        "aspect_ratio": panel["aspect_ratio"],
+        "camera": scene["camera"],
+        "framing": scene["framing"],
+        "mood": scene["mood"],
+        "aspect_ratio": scene["aspect_ratio"],
         "cast": [
             {"character_id": character["id"], "role": "lead", "prominence": 1}
         ],
-        "style_id": panel["style_id"],
-        "model": panel["model"],
-        "image_size": panel["image_size"],
+        "style_id": scene["style_id"],
+        "model": scene["model"],
+        "image_size": scene["image_size"],
     }
     updated = api.client.put(
-        f"/api/v1/panels/{panel['id']}", json=update_payload
+        f"/api/v1/scenes/{scene['id']}", json=update_payload
     )
     assert updated.status_code == 200
     assert updated.json()["beat_text"] == "Revised after provider failure."
 
 
-def test_panel_duplicate_prefills_all_fields_with_new_id_and_preserves_original(api):
+def test_scene_duplicate_prefills_all_fields_with_new_id_and_preserves_original(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    _generate_panel(api, panel["id"])
+    scene = _create_scene(api, [character["id"]])
+    _generate_scene(api, scene["id"])
 
-    duplicated = api.client.post(f"/api/v1/panels/{panel['id']}/duplicate")
+    duplicated = api.client.post(f"/api/v1/scenes/{scene['id']}/duplicate")
     assert duplicated.status_code == 201
     copy = duplicated.json()
-    assert copy["id"] != panel["id"]
-    assert copy["beat_text"] == panel["beat_text"]
-    assert copy["camera"] == panel["camera"]
-    assert copy["framing"] == panel["framing"]
-    assert copy["cast"][0]["character_id"] == panel["cast"][0]["character_id"]
+    assert copy["id"] != scene["id"]
+    assert copy["beat_text"] == scene["beat_text"]
+    assert copy["camera"] == scene["camera"]
+    assert copy["framing"] == scene["framing"]
+    assert copy["cast"][0]["character_id"] == scene["cast"][0]["character_id"]
     assert copy["is_editable"] is True
     assert copy["generation_count"] == 0
 
-    # Original panel and its generation history are untouched.
-    original = api.client.get(f"/api/v1/panels/{panel['id']}").json()
+    # Original scene and its generation history are untouched.
+    original = api.client.get(f"/api/v1/scenes/{scene['id']}").json()
     assert original["generation_count"] == 1
     assert original["is_editable"] is False
 
 
-def test_panel_preview_is_no_spend_and_reports_allocation(api):
+def test_scene_preview_is_no_spend_and_reports_allocation(api):
     elias = _create_character(api, "Elias", "elias")
     _promote_canonical(api, elias["id"], (100, 20, 20))
     mara = _create_character(api, "Mara", "mara")
     _promote_canonical(api, mara["id"], (20, 100, 20))
-    panel = _create_panel(api, [elias["id"], mara["id"]])
+    scene = _create_scene(api, [elias["id"], mara["id"]])
 
-    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview")
+    preview = api.client.get(f"/api/v1/scenes/{scene['id']}/preview")
     assert preview.status_code == 200
     body = preview.json()
     assert body["can_generate"] is True
@@ -1027,7 +1027,7 @@ def test_panel_preview_is_no_spend_and_reports_allocation(api):
     assert budget["spent_today_cents"] == 0
 
 
-def test_staged_panel_crud_preview_generate_duplicate_and_no_source_hash(api):
+def test_staged_scene_crud_preview_generate_duplicate_and_no_source_hash(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
     stage_response = _upload_base_stage(
@@ -1036,6 +1036,7 @@ def test_staged_panel_crud_preview_generate_duplicate_and_no_source_hash(api):
         targets=["traveler beneath arch"],
     )
     stage = stage_response.json()
+    style_id = _default_style_id(api)
     payload = {
         "base_stage_id": stage["id"],
         "cast": [
@@ -1045,33 +1046,34 @@ def test_staged_panel_crud_preview_generate_duplicate_and_no_source_hash(api):
                 "role": "this must be discarded",
             }
         ],
+        "style_id": style_id,
         "model": "gemini-3.1-flash-image",
         "image_size": "1K",
     }
 
-    created = api.client.post("/api/v1/panels", json=payload)
+    created = api.client.post("/api/v1/scenes", json=payload)
     assert created.status_code == 201, created.text
-    panel = created.json()
-    assert panel["base_stage_id"] == stage["id"]
-    assert panel["base_stage"]["content_url"] == stage["content_url"]
-    assert panel["beat_text"] == stage["description"]
-    assert panel["camera"] == panel["framing"] == panel["mood"] == ""
-    assert panel["aspect_ratio"] == stage["aspect_ratio"]
-    assert panel["style_id"] is None
-    assert panel["cast"][0]["role"] == ""
-    assert "sha" not in json.dumps(panel).lower()
-    assert api.client.get(f"/api/v1/panels/{panel['id']}").json() == panel
+    scene = created.json()
+    assert scene["base_stage_id"] == stage["id"]
+    assert scene["base_stage"]["content_url"] == stage["content_url"]
+    assert scene["beat_text"] == stage["description"]
+    assert scene["camera"] == scene["framing"] == scene["mood"] == ""
+    assert scene["aspect_ratio"] == stage["aspect_ratio"]
+    assert scene["style_id"] == style_id
+    assert scene["cast"][0]["role"] == ""
+    assert "sha" not in json.dumps(scene).lower()
+    assert api.client.get(f"/api/v1/scenes/{scene['id']}").json() == scene
 
-    updated = api.client.put(f"/api/v1/panels/{panel['id']}", json=payload)
+    updated = api.client.put(f"/api/v1/scenes/{scene['id']}", json=payload)
     assert updated.status_code == 200
-    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
+    preview = api.client.get(f"/api/v1/scenes/{scene['id']}/preview").json()
     assert preview["base_stage_id"] == stage["id"]
     assert preview["source_content_url"] == stage["content_url"]
     assert preview["attachments"][0]["image_number"] == 2
     assert "content_sha256" not in json.dumps(preview)
 
     generated = api.client.post(
-        f"/api/v1/panels/{panel['id']}/generate",
+        f"/api/v1/scenes/{scene['id']}/generate",
         json={"expected_prompt_hash": preview["prompt_hash"]},
     )
     assert generated.status_code == 201, generated.text
@@ -1080,13 +1082,13 @@ def test_staged_panel_crud_preview_generate_duplicate_and_no_source_hash(api):
     assert len(api.provider.edits) == 1
 
     assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
-    duplicated = api.client.post(f"/api/v1/panels/{panel['id']}/duplicate")
+    duplicated = api.client.post(f"/api/v1/scenes/{scene['id']}/duplicate")
     assert duplicated.status_code == 201
     assert duplicated.json()["base_stage_id"] == stage["id"]
     assert duplicated.json()["cast"][0]["base_stage_target_id"] == stage["targets"][0]["id"]
 
 
-def test_staged_panel_validation_and_blocked_preview_include_source_fields(api):
+def test_staged_scene_validation_and_blocked_preview_include_source_fields(api):
     first = _create_character(api, "Elias", "elias")
     second = _create_character(api, "Mara", "mara")
     stage = _upload_base_stage(
@@ -1098,7 +1100,7 @@ def test_staged_panel_validation_and_blocked_preview_include_source_fields(api):
         "image_size": "1K",
     }
     duplicate_target = api.client.post(
-        "/api/v1/panels",
+        "/api/v1/scenes",
         json={
             **base,
             "cast": [
@@ -1111,7 +1113,7 @@ def test_staged_panel_validation_and_blocked_preview_include_source_fields(api):
     assert "mapped only once" in duplicate_target.text
 
     valid = api.client.post(
-        "/api/v1/panels",
+        "/api/v1/scenes",
         json={
             **base,
             "cast": [
@@ -1120,14 +1122,14 @@ def test_staged_panel_validation_and_blocked_preview_include_source_fields(api):
             ],
         },
     ).json()
-    blocked = api.client.get(f"/api/v1/panels/{valid['id']}/preview").json()
+    blocked = api.client.get(f"/api/v1/scenes/{valid['id']}/preview").json()
     assert blocked["can_generate"] is False
     assert blocked["base_stage_id"] == stage["id"]
     assert blocked["source_content_url"] == stage["content_url"]
     assert "no canonical reference set" in blocked["blocked_reason"]
 
     assert api.client.delete(f"/api/v1/base-stages/{stage['id']}").status_code == 204
-    newly_selected = api.client.post("/api/v1/panels", json={**base, "cast": [
+    newly_selected = api.client.post("/api/v1/scenes", json={**base, "cast": [
         {"character_id": first["id"], "base_stage_target_id": stage["targets"][0]["id"]},
         {"character_id": second["id"], "base_stage_target_id": stage["targets"][1]["id"]},
     ]})
@@ -1135,14 +1137,14 @@ def test_staged_panel_validation_and_blocked_preview_include_source_fields(api):
     assert "archived" in newly_selected.text
 
 
-def test_panel_generate_rejects_prompt_changed_after_preview(api):
+def test_scene_generate_rejects_prompt_changed_after_preview(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview").json()
-    style = api.client.get(f"/api/v1/styles/{panel['style_id']}").json()
+    scene = _create_scene(api, [character["id"]])
+    preview = api.client.get(f"/api/v1/scenes/{scene['id']}/preview").json()
+    style = api.client.get(f"/api/v1/styles/{scene['style_id']}").json()
     updated = api.client.put(
-        f"/api/v1/styles/{panel['style_id']}",
+        f"/api/v1/styles/{scene['style_id']}",
         json={
             "name": style["name"],
             "style_contract": f"{style['style_contract']} Changed after preview.",
@@ -1151,20 +1153,20 @@ def test_panel_generate_rejects_prompt_changed_after_preview(api):
     assert updated.status_code == 200
 
     response = api.client.post(
-        f"/api/v1/panels/{panel['id']}/generate",
+        f"/api/v1/scenes/{scene['id']}/generate",
         json={"expected_prompt_hash": preview["prompt_hash"]},
     )
 
     assert response.status_code == 409
     assert response.json()["detail"]["type"] == "PreviewChangedError"
     assert api.provider.requests == []
-    assert api.client.get(f"/api/v1/panels/{panel['id']}/generations").json() == []
+    assert api.client.get(f"/api/v1/scenes/{scene['id']}/generations").json() == []
 
 
-def test_panel_preview_blocked_without_canonical_ref_set(api):
+def test_scene_preview_blocked_without_canonical_ref_set(api):
     character = _create_character(api)  # no canonical ref-set
     resp = api.client.post(
-        "/api/v1/panels",
+        "/api/v1/scenes",
         json={
             "beat_text": "A scene.",
             "camera": "eye level",
@@ -1178,20 +1180,20 @@ def test_panel_preview_blocked_without_canonical_ref_set(api):
         },
     )
     assert resp.status_code == 201
-    panel_id = resp.json()["id"]
-    preview = api.client.get(f"/api/v1/panels/{panel_id}/preview")
+    scene_id = resp.json()["id"]
+    preview = api.client.get(f"/api/v1/scenes/{scene_id}/preview")
     assert preview.status_code == 200
     body = preview.json()
     assert body["can_generate"] is False
     assert "no canonical reference set" in body["blocked_reason"]
 
 
-def test_panel_generate_and_review_and_content(api):
+def test_scene_generate_and_review_and_content(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
+    scene = _create_scene(api, [character["id"]])
 
-    generated = _generate_panel(api, panel["id"])
+    generated = _generate_scene(api, scene["id"])
     assert generated.status_code == 201
     generation = generated.json()
     assert generation["state"] == "succeeded"
@@ -1220,11 +1222,11 @@ def test_panel_generate_and_review_and_content(api):
 def test_generation_history_includes_candidate_previews(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    generated = _generate_panel(api, panel["id"])
+    scene = _create_scene(api, [character["id"]])
+    generated = _generate_scene(api, scene["id"])
     assert generated.status_code == 201
 
-    history = api.client.get(f"/api/v1/panels/{panel['id']}/generations")
+    history = api.client.get(f"/api/v1/scenes/{scene['id']}/generations")
     assert history.status_code == 200
     attempts = history.json()
     assert len(attempts) == 1
@@ -1239,8 +1241,8 @@ def test_generation_history_includes_candidate_previews(api):
 def test_invalid_review_verdict_is_422(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    generation = _generate_panel(api, panel["id"]).json()
+    scene = _create_scene(api, [character["id"]])
+    generation = _generate_scene(api, scene["id"]).json()
     candidate_id = generation["candidates"][0]["id"]
     resp = api.client.post(
         f"/api/v1/candidates/{candidate_id}/review", json={"verdict": "maybe"}
@@ -1251,16 +1253,16 @@ def test_invalid_review_verdict_is_422(api):
 def test_gallery_lists_only_accepted_candidates(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    accepted = _generate_panel(api, panel["id"]).json()
+    scene = _create_scene(api, [character["id"]])
+    accepted = _generate_scene(api, scene["id"]).json()
     candidate = accepted["candidates"][0]
     resp = api.client.post(
         f"/api/v1/candidates/{candidate['id']}/review", json={"verdict": "accepted"}
     )
     assert resp.status_code == 200
 
-    pending_panel = _create_panel(api, [character["id"]])
-    _generate_panel(api, pending_panel["id"])
+    pending_scene = _create_scene(api, [character["id"]])
+    _generate_scene(api, pending_scene["id"])
 
     gallery = api.client.get("/api/v1/gallery")
     assert gallery.status_code == 200
@@ -1269,7 +1271,7 @@ def test_gallery_lists_only_accepted_candidates(api):
     item = items[0]
     assert item["candidate_id"] == candidate["id"]
     assert item["content_url"] == f"/api/v1/candidates/{candidate['id']}/content"
-    assert item["panel_id"] == panel["id"]
+    assert item["scene_id"] == scene["id"]
     assert item["aspect_ratio"]
     assert item["beat_text"].strip()
 
@@ -1279,13 +1281,13 @@ def test_generation_not_found_is_404(api):
     assert resp.status_code == 404
 
 
-def test_panel_not_found_is_404(api):
-    resp = api.client.get("/api/v1/panels/9999")
+def test_scene_not_found_is_404(api):
+    resp = api.client.get("/api/v1/scenes/9999")
     assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# archive / restore (characters, styles) and hard delete (panels)
+# archive / restore (characters, styles) and hard delete (scenes)
 # ---------------------------------------------------------------------------
 
 
@@ -1302,7 +1304,7 @@ def test_character_archive_hides_from_list_and_restore_brings_it_back(api):
     archived_list = api.client.get("/api/v1/characters/archived").json()
     assert cid in {c["id"] for c in archived_list}
 
-    # The archived character still resolves individually (existing panels need it).
+    # The archived character still resolves individually (existing scenes need it).
     still_there = api.client.get(f"/api/v1/characters/{cid}")
     assert still_there.status_code == 200
     assert still_there.json()["archived_at"] is not None
@@ -1347,13 +1349,13 @@ def test_default_style_archive_is_409(api):
     assert resp.status_code == 409
 
 
-def test_archived_style_still_usable_by_existing_panel(api):
-    """Archiving a style must not break panels that already reference it."""
+def test_archived_style_still_usable_by_existing_scene(api):
+    """Archiving a style must not break scenes that already reference it."""
     style = api.client.post("/api/v1/styles", json={"name": "Ephemeral"}).json()
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = api.client.post(
-        "/api/v1/panels",
+    scene = api.client.post(
+        "/api/v1/scenes",
         json={
             "beat_text": "A lone figure on the moor.",
             "camera": "eye level",
@@ -1369,28 +1371,28 @@ def test_archived_style_still_usable_by_existing_panel(api):
 
     assert api.client.delete(f"/api/v1/styles/{style['id']}").status_code == 204
 
-    # The panel still loads and previews with the archived style.
-    fetched = api.client.get(f"/api/v1/panels/{panel['id']}")
+    # The scene still loads and previews with the archived style.
+    fetched = api.client.get(f"/api/v1/scenes/{scene['id']}")
     assert fetched.status_code == 200
     assert fetched.json()["style_id"] == style["id"]
-    preview = api.client.get(f"/api/v1/panels/{panel['id']}/preview")
+    preview = api.client.get(f"/api/v1/scenes/{scene['id']}/preview")
     assert preview.status_code == 200
 
 
-def test_panel_hard_delete_removes_panel_and_generation_history(api):
+def test_scene_hard_delete_removes_scene_and_generation_history(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
-    panel = _create_panel(api, [character["id"]])
-    pid = panel["id"]
+    scene = _create_scene(api, [character["id"]])
+    pid = scene["id"]
 
-    gen = _generate_panel(api, pid)
+    gen = _generate_scene(api, pid)
     assert gen.status_code in (200, 201), gen.text
 
-    deleted = api.client.delete(f"/api/v1/panels/{pid}")
+    deleted = api.client.delete(f"/api/v1/scenes/{pid}")
     assert deleted.status_code == 204
 
-    assert api.client.get(f"/api/v1/panels/{pid}").status_code == 404
-    assert pid not in {p["id"] for p in api.client.get("/api/v1/panels").json()}
+    assert api.client.get(f"/api/v1/scenes/{pid}").status_code == 404
+    assert pid not in {p["id"] for p in api.client.get("/api/v1/scenes").json()}
 
     # The generation history is gone too (hard delete cascades).
     conn = connect(api.db_path)
@@ -1403,8 +1405,8 @@ def test_panel_hard_delete_removes_panel_and_generation_history(api):
     assert remaining == 0
 
 
-def test_panel_delete_missing_is_404(api):
-    assert api.client.delete("/api/v1/panels/9999").status_code == 404
+def test_scene_delete_missing_is_404(api):
+    assert api.client.delete("/api/v1/scenes/9999").status_code == 404
 
 
 def test_character_and_style_restore_missing_is_404(api):
@@ -1412,17 +1414,17 @@ def test_character_and_style_restore_missing_is_404(api):
     assert api.client.post("/api/v1/styles/9999/restore").status_code == 404
 
 
-def test_base_stage_panels_endpoint_lists_only_staged_panels(api):
+def test_base_stage_scenes_endpoint_lists_only_staged_scenes(api):
     character = _create_character(api)
     _promote_canonical(api, character["id"])
     stage = _upload_base_stage(
         api, description="Under an arch.", targets=["traveler beneath arch"]
     ).json()
 
-    _create_panel(api, [character["id"]])  # unrelated direct panel
+    _create_scene(api, [character["id"]])  # unrelated direct scene
 
     staged = api.client.post(
-        "/api/v1/panels",
+        "/api/v1/scenes",
         json={
             "base_stage_id": stage["id"],
             "cast": [
@@ -1437,16 +1439,16 @@ def test_base_stage_panels_endpoint_lists_only_staged_panels(api):
         },
     )
     assert staged.status_code == 201, staged.text
-    panel = staged.json()
+    scene = staged.json()
 
-    listed = api.client.get(f"/api/v1/base-stages/{stage['id']}/panels")
+    listed = api.client.get(f"/api/v1/base-stages/{stage['id']}/scenes")
     assert listed.status_code == 200, listed.text
     rows = listed.json()
-    assert [row["id"] for row in rows] == [panel["id"]]
+    assert [row["id"] for row in rows] == [scene["id"]]
     assert rows[0]["beat_text"] == stage["description"]
     assert rows[0]["is_editable"] is True
     assert rows[0]["generation_count"] == 0
     assert rows[0]["latest_attempt_preview_url"] is None
     assert "cast" not in json.dumps(rows)
 
-    assert api.client.get("/api/v1/base-stages/99999/panels").status_code == 404
+    assert api.client.get("/api/v1/base-stages/99999/scenes").status_code == 404

@@ -31,7 +31,7 @@ const options: OptionsSummary = {
   remaining_today_cents: 100,
   ref_image_weight_explanation: 'Weights are fixed.',
   ref_set_immutability_explanation: 'Canonical sets are immutable.',
-  panel_immutability_explanation: 'Generated panels are immutable.',
+  scene_immutability_explanation: 'Generated scenes are immutable.',
 }
 
 const draft: RefSet = {

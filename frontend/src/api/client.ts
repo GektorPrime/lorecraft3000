@@ -20,10 +20,10 @@ import type {
   Generation,
   GenerationSummary,
   OptionsSummary,
-  Panel,
-  PanelInput,
-  PanelPreview,
-  PanelSummary,
+  Scene,
+  SceneInput,
+  ScenePreview,
+  SceneSummary,
   RefImage,
   RefSet,
   RefSetSummary,
@@ -138,7 +138,7 @@ export const restoreBaseStage = (id: number) =>
   request<BaseStage>(`/base-stages/${id}/restore`, { method: 'POST' })
 
 // Generated Base Stages: a draft is composed first, generated, and only becomes
-// selectable by panels once one candidate is explicitly published.
+// selectable by scenes once one candidate is explicitly published.
 export const createGeneratedBaseStage = (payload: BaseStageGeneratedInput) =>
   request<BaseStage>('/base-stages/generated', json('POST', payload))
 export const updateBaseStage = (id: number, payload: BaseStageGeneratedInput) =>
@@ -149,8 +149,8 @@ export const previewBaseStage = (id: number) =>
   request<BaseStagePreview>(`/base-stages/${id}/preview`)
 export const listBaseStageGenerations = (id: number) =>
   request<GenerationSummary[]>(`/base-stages/${id}/generations`)
-export const listBaseStagePanels = (id: number) =>
-  request<PanelSummary[]>(`/base-stages/${id}/panels`)
+export const listBaseStageScenes = (id: number) =>
+  request<SceneSummary[]>(`/base-stages/${id}/scenes`)
 export const generateBaseStage = (id: number, expectedPromptHash: string) => {
   const controller = new AbortController()
   const t = window.setTimeout(
@@ -182,7 +182,7 @@ export const createCharacter = (payload: CharacterInput) =>
   request<Character>('/characters', json('POST', payload))
 export const updateCharacter = (id: number, payload: CharacterInput) =>
   request<Character>(`/characters/${id}`, json('PUT', payload))
-// Archive (soft-delete): the character stays linked to existing panels but is
+// Archive (soft-delete): the character stays linked to existing scenes but is
 // hidden from lists/pickers. restoreCharacter reverses it.
 export const archiveCharacter = (id: number) =>
   request<void>(`/characters/${id}`, { method: 'DELETE' })
@@ -199,7 +199,7 @@ export const getStyle = (id: number) => request<Style>(`/styles/${id}`)
 export const createStyle = (payload: StyleInput) => request<Style>('/styles', json('POST', payload))
 export const updateStyle = (id: number, payload: StyleInput) =>
   request<Style>(`/styles/${id}`, json('PUT', payload))
-// Archive (soft-delete): the style stays on existing panels but is hidden from
+// Archive (soft-delete): the style stays on existing scenes but is hidden from
 // lists/pickers. restoreStyle reverses it. The seeded default style cannot be
 // archived (the backend returns 409).
 export const archiveStyle = (id: number) =>
@@ -233,33 +233,33 @@ export const removeRefImage = (refSetId: number, imageId: number) =>
   request<void>(`/ref-sets/${refSetId}/images/${imageId}`, { method: 'DELETE' })
 
 // ---------------------------------------------------------------------------
-// panels
+// scenes
 // ---------------------------------------------------------------------------
 
-export const listPanels = () => request<Panel[]>('/panels')
-export const getPanel = (id: number) => request<Panel>(`/panels/${id}`)
-export const createPanel = (payload: PanelInput) => request<Panel>('/panels', json('POST', payload))
-export const updatePanel = (id: number, payload: PanelInput) =>
-  request<Panel>(`/panels/${id}`, json('PUT', payload))
-export const updatePanelModel = (id: number, model: string) =>
-  request<Panel>(`/panels/${id}/model`, json('PATCH', { model }))
-export const duplicatePanel = (id: number) =>
-  request<Panel>(`/panels/${id}/duplicate`, { method: 'POST' })
-// Panels are hard-deleted (not archived): this permanently removes the panel
+export const listScenes = () => request<Scene[]>('/scenes')
+export const getScene = (id: number) => request<Scene>(`/scenes/${id}`)
+export const createScene = (payload: SceneInput) => request<Scene>('/scenes', json('POST', payload))
+export const updateScene = (id: number, payload: SceneInput) =>
+  request<Scene>(`/scenes/${id}`, json('PUT', payload))
+export const updateSceneModel = (id: number, model: string) =>
+  request<Scene>(`/scenes/${id}/model`, json('PATCH', { model }))
+export const duplicateScene = (id: number) =>
+  request<Scene>(`/scenes/${id}/duplicate`, { method: 'POST' })
+// Scenes are hard-deleted (not archived): this permanently removes the scene
 // and its entire generation history.
-export const deletePanel = (id: number) =>
-  request<void>(`/panels/${id}`, { method: 'DELETE' })
-export const previewPanel = (id: number) => request<PanelPreview>(`/panels/${id}/preview`)
-export const listPanelGenerations = (id: number) =>
-  request<GenerationSummary[]>(`/panels/${id}/generations`)
-export const generatePanel = (id: number, expectedPromptHash: string) => {
+export const deleteScene = (id: number) =>
+  request<void>(`/scenes/${id}`, { method: 'DELETE' })
+export const previewScene = (id: number) => request<ScenePreview>(`/scenes/${id}/preview`)
+export const listSceneGenerations = (id: number) =>
+  request<GenerationSummary[]>(`/scenes/${id}/generations`)
+export const generateScene = (id: number, expectedPromptHash: string) => {
   const controller = new AbortController()
   const t = window.setTimeout(
     () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
     180_000,
   )
   controller.signal.addEventListener('abort', () => window.clearTimeout(t), { once: true })
-  return request<Generation>(`/panels/${id}/generate`, {
+  return request<Generation>(`/scenes/${id}/generate`, {
     method: 'POST',
     signal: controller.signal,
     headers: {
@@ -279,7 +279,7 @@ export const reviewCandidate = (id: number, verdict: 'accepted' | 'rejected') =>
 
 // Edit an existing candidate with a natural-language instruction. Produces a
 // new candidate under a child generation on the same provider/model, keeping
-// character identity anchored to the panel's canonical references.
+// character identity anchored to the scene's canonical references.
 export const editCandidate = (id: number, instruction: string) => {
   const controller = new AbortController()
   const t = window.setTimeout(

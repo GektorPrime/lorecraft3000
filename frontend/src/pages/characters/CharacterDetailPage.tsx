@@ -222,7 +222,7 @@ function CharacterDetail({ characterId }: { characterId: number }) {
           ) : (
             <>
               <Link to={`/characters/${character.id}/edit`} className="btn btn--primary">
-                <Icon name="edit" size={16} />
+                <Icon name="edit" size="sm" />
                 Edit
               </Link>
               <button
@@ -231,7 +231,7 @@ function CharacterDetail({ characterId }: { characterId: number }) {
                 disabled={archiving}
                 onClick={() => setConfirmingArchive(true)}
               >
-                <Icon name="trash" size={16} />
+                <Icon name="trash" size="sm" />
                 {archiving ? 'Deleting…' : 'Delete'}
               </button>
             </>
@@ -272,7 +272,7 @@ function CharacterDetail({ characterId }: { characterId: number }) {
             disabled={creatingDraft}
             onClick={() => void handleNewDraft()}
           >
-            <Icon name="plus" size={16} />
+            <Icon name="plus" size="sm" />
             {creatingDraft ? 'Creating draft…' : 'New draft'}
           </button>
         ) : undefined}
@@ -344,7 +344,7 @@ function CharacterDetail({ characterId }: { characterId: number }) {
       <ConfirmDialog
         open={confirmingArchive}
         title="Archive this character?"
-        description={`"${character.name}" stays in existing panels but is hidden from active lists and can't be cast in new panels. You can restore it from its detail page.`}
+        description={`"${character.name}" stays in existing scenes but is hidden from active lists and can't be cast in new scenes. You can restore it from its detail page.`}
         confirmLabel="Archive character"
         onConfirm={() => void handleArchive()}
         onCancel={() => setConfirmingArchive(false)}

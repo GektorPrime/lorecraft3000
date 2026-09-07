@@ -50,7 +50,7 @@ def get_style(style_id: int, conn=Depends(get_conn)):
 
 @router.delete("/styles/{style_id}", status_code=204)
 def archive_style(style_id: int, conn=Depends(get_conn)):
-    """Archive (soft-delete) a style. Existing panels keep referencing it."""
+    """Archive (soft-delete) a style. Existing scenes keep referencing it."""
     try:
         StyleService(conn).archive(style_id)
     except StyleError as exc:

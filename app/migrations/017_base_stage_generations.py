@@ -1,9 +1,9 @@
 """Generation ownership for generated Base Stages.
 
-Phase 3 generations always belonged to a panel (``scene_id``). Generated Base
+Phase 3 generations always belonged to a scene (``scene_id``). Generated Base
 Stages need their own paid attempts, so a generation now belongs to exactly one
-owner: a panel or a Base Stage. Ownership is immutable once written, and the
-per-owner "one pending attempt" and idempotency rules mirror the panel indexes
+owner: a scene or a Base Stage. Ownership is immutable once written, and the
+per-owner "one pending attempt" and idempotency rules mirror the scene indexes
 added in 007_phase1_safety.
 
 SQLite cannot add a table-level CHECK with ALTER TABLE, so the XOR rule is
@@ -35,7 +35,7 @@ def upgrade(conn: sqlite3.Connection) -> None:
             ON generation (base_stage_id)
             WHERE state = 'pending' AND base_stage_id IS NOT NULL
         """,
-        # Panel idempotency keys are scoped by scene_id; Base Stage attempts
+        # Scene idempotency keys are scoped by scene_id; Base Stage attempts
         # have a NULL scene_id, so they need their own scoped uniqueness.
         """
         CREATE UNIQUE INDEX idx_generation_base_stage_idempotency

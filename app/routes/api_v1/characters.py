@@ -51,7 +51,7 @@ def get_character(character_id: int, conn=Depends(get_conn), storage=Depends(get
 
 @router.delete("/characters/{character_id}", status_code=204)
 def archive_character(character_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
-    """Archive (soft-delete) a character. Existing panels keep referencing it."""
+    """Archive (soft-delete) a character. Existing scenes keep referencing it."""
     try:
         CharacterService(conn).archive(character_id)
     except CharacterError as exc:

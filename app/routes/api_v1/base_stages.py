@@ -1,7 +1,7 @@
 """Base Stage endpoints for the /api/v1 JSON API.
 
 Uploaded stages are ready immediately; generated stages are drafts that must be
-previewed, generated, and explicitly published before any panel can use them.
+previewed, generated, and explicitly published before any scene can use them.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from app.routes.api_v1._common import (
     _base_stage_out,
     _candidate_out,
     _generation_out,
-    _panel_summary_out,
+    _scene_summary_out,
     _raise_for,
     _serve_stored_image,
 )
@@ -31,7 +31,7 @@ from app.schemas import (
     Generation,
     GenerationCreate,
     GenerationSummary,
-    PanelSummary,
+    SceneSummary,
 )
 from app.services.base_stages import (
     BaseStageError,
@@ -310,17 +310,17 @@ def generate_base_stage(
     return _generation_out(row, candidates)
 
 
-@router.get("/{base_stage_id}/panels", response_model=list[PanelSummary])
-def list_base_stage_panels(
+@router.get("/{base_stage_id}/scenes", response_model=list[SceneSummary])
+def list_base_stage_scenes(
     base_stage_id: int, conn=Depends(get_conn), storage=Depends(get_storage)
 ):
-    """Panels whose composition is anchored on this Base Stage."""
+    """Scenes whose composition is anchored on this Base Stage."""
     try:
         BaseStageService(conn, storage, settings).get(base_stage_id)
     except BaseStageError as exc:
         _raise_for(exc)
     scenes = SceneService(conn, settings).list_for_base_stage(base_stage_id)
-    return [_panel_summary_out(conn, scene) for scene in scenes]
+    return [_scene_summary_out(conn, scene) for scene in scenes]
 
 
 @router.post("/{base_stage_id}/publish", response_model=BaseStage)

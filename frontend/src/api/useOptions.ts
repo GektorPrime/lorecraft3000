@@ -6,7 +6,7 @@ import type { OptionsSummary } from './types'
  * Reads the OptionsSummary loaded by <OptionsProvider> (see
  * OptionsProvider.tsx) — the single source of truth for model/size/aspect-
  * ratio/role choices and the fixed explanatory copy for reference-image
- * weight and ref-set / panel immutability (issue #15).
+ * weight and ref-set / scene immutability (issue #15).
  */
 export function useOptions(): OptionsSummary {
   const options = useContext(OptionsContext)

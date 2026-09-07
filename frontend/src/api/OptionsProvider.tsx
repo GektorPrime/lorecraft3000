@@ -8,7 +8,7 @@ import { AsyncMessage } from '../components/AsyncMessage'
  * Loads /api/v1/options/summary once and makes it available to every page
  * via useOptions() (see useOptions.ts) — the single source of truth for
  * model/size/aspect-ratio/role choices and the fixed explanatory copy for
- * reference-image weight and ref-set / panel immutability (issue #15).
+ * reference-image weight and ref-set / scene immutability (issue #15).
  */
 export function OptionsProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<OptionsSummary | null>(null)

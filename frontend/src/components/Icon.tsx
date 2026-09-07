@@ -2,6 +2,17 @@ import { ICON_PATHS, type IconName } from './iconPaths'
 
 export type { IconName } from './iconPaths'
 
+/** The canonical icon scale. Values are the pixel bounds on the 24-unit grid. */
+export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+
+const ICON_SIZE_PX: Record<IconSize, number> = {
+  xs: 14,
+  sm: 16,
+  md: 18,
+  lg: 20,
+  xl: 22,
+}
+
 /**
  * Renders one glyph from the registry in `iconPaths.tsx`.
  *
@@ -12,20 +23,27 @@ export type { IconName } from './iconPaths'
  */
 interface IconProps {
   name: IconName
-  /** Rendered box in px. Icons are drawn on a 24-unit grid and scale cleanly. */
-  size?: number
+  /** A named scale entry, or a raw pixel size for one-off exceptions. */
+  size?: IconSize | number
   /** Supply only when the icon carries meaning on its own. */
   label?: string
   className?: string
   strokeWidth?: number
 }
 
-export function Icon({ name, size = 20, label, className, strokeWidth = 2 }: IconProps) {
+export function Icon({
+  name,
+  size = 'lg',
+  label,
+  className,
+  strokeWidth = 2,
+}: IconProps) {
+  const box = typeof size === 'number' ? size : ICON_SIZE_PX[size]
   return (
     <svg
       className={className ? `icon ${className}` : 'icon'}
-      width={size}
-      height={size}
+      width={box}
+      height={box}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

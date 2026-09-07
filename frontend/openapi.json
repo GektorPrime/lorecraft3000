@@ -199,7 +199,7 @@
         "type": "object"
       },
       "BaseStageGeneratedInput": {
-        "description": "Composition for a generated Base Stage draft.\n\nIdentity targets are required: they are injected into the prompt and are\nwhat a panel later maps its cast onto.",
+        "description": "Composition for a generated Base Stage draft.\n\nIdentity targets are required: they are injected into the prompt and are\nwhat a scene later maps its cast onto.",
         "properties": {
           "aspect_ratio": {
             "default": "3:2",
@@ -768,15 +768,15 @@
             "title": "Created At",
             "type": "string"
           },
-          "panel_id": {
-            "title": "Panel Id",
+          "scene_id": {
+            "title": "Scene Id",
             "type": "integer"
           }
         },
         "required": [
           "candidate_id",
           "content_url",
-          "panel_id",
+          "scene_id",
           "beat_text",
           "aspect_ratio",
           "created_at"
@@ -1158,10 +1158,6 @@
             "title": "Models",
             "type": "array"
           },
-          "panel_immutability_explanation": {
-            "title": "Panel Immutability Explanation",
-            "type": "string"
-          },
           "ref_image_roles": {
             "items": {
               "type": "string"
@@ -1181,6 +1177,10 @@
             "title": "Remaining Today Cents",
             "type": "integer"
           },
+          "scene_immutability_explanation": {
+            "title": "Scene Immutability Explanation",
+            "type": "string"
+          },
           "spent_today_cents": {
             "title": "Spent Today Cents",
             "type": "integer"
@@ -1198,473 +1198,9 @@
           "remaining_today_cents",
           "ref_image_weight_explanation",
           "ref_set_immutability_explanation",
-          "panel_immutability_explanation"
+          "scene_immutability_explanation"
         ],
         "title": "OptionsSummary",
-        "type": "object"
-      },
-      "Panel": {
-        "properties": {
-          "aspect_ratio": {
-            "title": "Aspect Ratio",
-            "type": "string"
-          },
-          "base_stage": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PanelBaseStage"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "base_stage_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Stage Id"
-          },
-          "beat_text": {
-            "title": "Beat Text",
-            "type": "string"
-          },
-          "camera": {
-            "title": "Camera",
-            "type": "string"
-          },
-          "cast": {
-            "items": {
-              "$ref": "#/components/schemas/CastMember"
-            },
-            "title": "Cast",
-            "type": "array"
-          },
-          "created_at": {
-            "title": "Created At",
-            "type": "string"
-          },
-          "framing": {
-            "title": "Framing",
-            "type": "string"
-          },
-          "generation_count": {
-            "title": "Generation Count",
-            "type": "integer"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "image_size": {
-            "title": "Image Size",
-            "type": "string"
-          },
-          "is_editable": {
-            "title": "Is Editable",
-            "type": "boolean"
-          },
-          "latest_attempt_preview_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Attempt Preview Url"
-          },
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "mood": {
-            "title": "Mood",
-            "type": "string"
-          },
-          "style_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Style Id"
-          }
-        },
-        "required": [
-          "id",
-          "beat_text",
-          "camera",
-          "framing",
-          "mood",
-          "aspect_ratio",
-          "cast",
-          "style_id",
-          "base_stage_id",
-          "base_stage",
-          "model",
-          "image_size",
-          "created_at",
-          "is_editable",
-          "generation_count",
-          "latest_attempt_preview_url"
-        ],
-        "title": "Panel",
-        "type": "object"
-      },
-      "PanelBaseStage": {
-        "properties": {
-          "archived_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived At"
-          },
-          "aspect_ratio": {
-            "title": "Aspect Ratio",
-            "type": "string"
-          },
-          "content_url": {
-            "title": "Content Url",
-            "type": "string"
-          },
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "state": {
-            "title": "State",
-            "type": "string"
-          },
-          "style_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Style Id"
-          },
-          "targets": {
-            "items": {
-              "$ref": "#/components/schemas/PanelBaseStageTarget"
-            },
-            "title": "Targets",
-            "type": "array"
-          }
-        },
-        "required": [
-          "id",
-          "state",
-          "description",
-          "aspect_ratio",
-          "style_id",
-          "content_url",
-          "targets",
-          "archived_at"
-        ],
-        "title": "PanelBaseStage",
-        "type": "object"
-      },
-      "PanelBaseStageTarget": {
-        "properties": {
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "position": {
-            "title": "Position",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "position",
-          "description"
-        ],
-        "title": "PanelBaseStageTarget",
-        "type": "object"
-      },
-      "PanelInput": {
-        "properties": {
-          "aspect_ratio": {
-            "default": "3:2",
-            "title": "Aspect Ratio",
-            "type": "string"
-          },
-          "base_stage_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Stage Id"
-          },
-          "beat_text": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Beat Text"
-          },
-          "camera": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Camera"
-          },
-          "cast": {
-            "items": {
-              "$ref": "#/components/schemas/CastMemberInput"
-            },
-            "title": "Cast",
-            "type": "array"
-          },
-          "framing": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Framing"
-          },
-          "image_size": {
-            "title": "Image Size",
-            "type": "string"
-          },
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "mood": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mood"
-          },
-          "style_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Style Id"
-          }
-        },
-        "required": [
-          "cast",
-          "model",
-          "image_size"
-        ],
-        "title": "PanelInput",
-        "type": "object"
-      },
-      "PanelModelInput": {
-        "properties": {
-          "model": {
-            "title": "Model",
-            "type": "string"
-          }
-        },
-        "required": [
-          "model"
-        ],
-        "title": "PanelModelInput",
-        "type": "object"
-      },
-      "PanelPreview": {
-        "properties": {
-          "attachments": {
-            "items": {
-              "$ref": "#/components/schemas/GenerationAttachment"
-            },
-            "title": "Attachments",
-            "type": "array"
-          },
-          "base_stage_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Stage Id"
-          },
-          "blocked_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Blocked Reason"
-          },
-          "can_generate": {
-            "title": "Can Generate",
-            "type": "boolean"
-          },
-          "estimated_cost_cents": {
-            "title": "Estimated Cost Cents",
-            "type": "integer"
-          },
-          "image_size": {
-            "title": "Image Size",
-            "type": "string"
-          },
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "prompt": {
-            "title": "Prompt",
-            "type": "string"
-          },
-          "prompt_hash": {
-            "title": "Prompt Hash",
-            "type": "string"
-          },
-          "remaining_after_cents": {
-            "title": "Remaining After Cents",
-            "type": "integer"
-          },
-          "scene_id": {
-            "title": "Scene Id",
-            "type": "integer"
-          },
-          "source_content_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Content Url"
-          },
-          "spent_today_cents": {
-            "title": "Spent Today Cents",
-            "type": "integer"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Warnings",
-            "type": "array"
-          }
-        },
-        "required": [
-          "scene_id",
-          "model",
-          "image_size",
-          "prompt",
-          "prompt_hash",
-          "attachments",
-          "warnings",
-          "estimated_cost_cents",
-          "spent_today_cents",
-          "remaining_after_cents",
-          "can_generate"
-        ],
-        "title": "PanelPreview",
-        "type": "object"
-      },
-      "PanelSummary": {
-        "description": "Lightweight panel reference used where a full panel payload is overkill,\ne.g. \"which panels use this Base Stage\".",
-        "properties": {
-          "beat_text": {
-            "title": "Beat Text",
-            "type": "string"
-          },
-          "created_at": {
-            "title": "Created At",
-            "type": "string"
-          },
-          "generation_count": {
-            "title": "Generation Count",
-            "type": "integer"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "is_editable": {
-            "title": "Is Editable",
-            "type": "boolean"
-          },
-          "latest_attempt_preview_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Attempt Preview Url"
-          }
-        },
-        "required": [
-          "id",
-          "beat_text",
-          "created_at",
-          "is_editable",
-          "generation_count",
-          "latest_attempt_preview_url"
-        ],
-        "title": "PanelSummary",
         "type": "object"
       },
       "RefImage": {
@@ -1805,6 +1341,470 @@
         "title": "RefSetSummary",
         "type": "object"
       },
+      "Scene": {
+        "properties": {
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "base_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SceneBaseStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
+          },
+          "beat_text": {
+            "title": "Beat Text",
+            "type": "string"
+          },
+          "camera": {
+            "title": "Camera",
+            "type": "string"
+          },
+          "cast": {
+            "items": {
+              "$ref": "#/components/schemas/CastMember"
+            },
+            "title": "Cast",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "framing": {
+            "title": "Framing",
+            "type": "string"
+          },
+          "generation_count": {
+            "title": "Generation Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "is_editable": {
+            "title": "Is Editable",
+            "type": "boolean"
+          },
+          "latest_attempt_preview_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Attempt Preview Url"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "mood": {
+            "title": "Mood",
+            "type": "string"
+          },
+          "style_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Id"
+          }
+        },
+        "required": [
+          "id",
+          "beat_text",
+          "camera",
+          "framing",
+          "mood",
+          "aspect_ratio",
+          "cast",
+          "style_id",
+          "base_stage_id",
+          "base_stage",
+          "model",
+          "image_size",
+          "created_at",
+          "is_editable",
+          "generation_count",
+          "latest_attempt_preview_url"
+        ],
+        "title": "Scene",
+        "type": "object"
+      },
+      "SceneBaseStage": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "aspect_ratio": {
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "style_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Id"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/SceneBaseStageTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "description",
+          "aspect_ratio",
+          "style_id",
+          "content_url",
+          "targets",
+          "archived_at"
+        ],
+        "title": "SceneBaseStage",
+        "type": "object"
+      },
+      "SceneBaseStageTarget": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "description"
+        ],
+        "title": "SceneBaseStageTarget",
+        "type": "object"
+      },
+      "SceneInput": {
+        "properties": {
+          "aspect_ratio": {
+            "default": "3:2",
+            "title": "Aspect Ratio",
+            "type": "string"
+          },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
+          },
+          "beat_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beat Text"
+          },
+          "camera": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera"
+          },
+          "cast": {
+            "items": {
+              "$ref": "#/components/schemas/CastMemberInput"
+            },
+            "title": "Cast",
+            "type": "array"
+          },
+          "framing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framing"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "mood": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mood"
+          },
+          "style_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Id"
+          }
+        },
+        "required": [
+          "cast",
+          "model",
+          "image_size"
+        ],
+        "title": "SceneInput",
+        "type": "object"
+      },
+      "SceneModelInput": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "SceneModelInput",
+        "type": "object"
+      },
+      "ScenePreview": {
+        "properties": {
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/GenerationAttachment"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "base_stage_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Stage Id"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "can_generate": {
+            "title": "Can Generate",
+            "type": "boolean"
+          },
+          "estimated_cost_cents": {
+            "title": "Estimated Cost Cents",
+            "type": "integer"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "prompt_hash": {
+            "title": "Prompt Hash",
+            "type": "string"
+          },
+          "remaining_after_cents": {
+            "title": "Remaining After Cents",
+            "type": "integer"
+          },
+          "scene_id": {
+            "title": "Scene Id",
+            "type": "integer"
+          },
+          "source_content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Content Url"
+          },
+          "spent_today_cents": {
+            "title": "Spent Today Cents",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scene_id",
+          "model",
+          "image_size",
+          "prompt",
+          "prompt_hash",
+          "attachments",
+          "warnings",
+          "estimated_cost_cents",
+          "spent_today_cents",
+          "remaining_after_cents",
+          "can_generate"
+        ],
+        "title": "ScenePreview",
+        "type": "object"
+      },
+      "SceneSummary": {
+        "description": "Lightweight scene reference used where a full scene payload is overkill,\ne.g. \"which scenes use this Base Stage\".",
+        "properties": {
+          "beat_text": {
+            "title": "Beat Text",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "generation_count": {
+            "title": "Generation Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_editable": {
+            "title": "Is Editable",
+            "type": "boolean"
+          },
+          "latest_attempt_preview_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Attempt Preview Url"
+          }
+        },
+        "required": [
+          "id",
+          "beat_text",
+          "created_at",
+          "is_editable",
+          "generation_count",
+          "latest_attempt_preview_url"
+        ],
+        "title": "SceneSummary",
+        "type": "object"
+      },
       "Style": {
         "properties": {
           "archived_at": {
@@ -1912,7 +1912,7 @@
   "paths": {
     "/": {
       "get": {
-        "description": "Landing page for the library-to-panel workflow.\n\nServes the built React app (frontend/). The frontend is the only UI: when\nit has not been built, \"/\" returns a short notice pointing at `npm run\nbuild` instead of a second interface.",
+        "description": "Landing page for the library-to-scene workflow.\n\nServes the built React app (frontend/). The frontend is the only UI: when\nit has not been built, \"/\" returns a short notice pointing at `npm run\nbuild` instead of a second interface.",
         "operationId": "home__get",
         "responses": {
           "200": {
@@ -2394,54 +2394,6 @@
         ]
       }
     },
-    "/api/v1/base-stages/{base_stage_id}/panels": {
-      "get": {
-        "description": "Panels whose composition is anchored on this Base Stage.",
-        "operationId": "list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "base_stage_id",
-            "required": true,
-            "schema": {
-              "title": "Base Stage Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/PanelSummary"
-                  },
-                  "title": "Response List Base Stage Panels Api V1 Base Stages  Base Stage Id  Panels Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "List Base Stage Panels",
-        "tags": [
-          "api-v1",
-          "api-v1-base-stages"
-        ]
-      }
-    },
     "/api/v1/base-stages/{base_stage_id}/preview": {
       "get": {
         "description": "Exact no-spend preflight for a generated draft.",
@@ -2599,6 +2551,54 @@
         ]
       }
     },
+    "/api/v1/base-stages/{base_stage_id}/scenes": {
+      "get": {
+        "description": "Scenes whose composition is anchored on this Base Stage.",
+        "operationId": "list_base_stage_scenes_api_v1_base_stages__base_stage_id__scenes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "base_stage_id",
+            "required": true,
+            "schema": {
+              "title": "Base Stage Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SceneSummary"
+                  },
+                  "title": "Response List Base Stage Scenes Api V1 Base Stages  Base Stage Id  Scenes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Base Stage Scenes",
+        "tags": [
+          "api-v1",
+          "api-v1-base-stages"
+        ]
+      }
+    },
     "/api/v1/budget": {
       "get": {
         "operationId": "budget_api_v1_budget_get",
@@ -2692,7 +2692,7 @@
     },
     "/api/v1/candidates/{candidate_id}/edit": {
       "post": {
-        "description": "Create a new candidate by editing an existing one with an instruction.\n\nThe edit runs on the same provider/model that produced the source image and\nis recorded as a child generation of the source, keeping the panel's attempt\nhistory a connected chain.",
+        "description": "Create a new candidate by editing an existing one with an instruction.\n\nThe edit runs on the same provider/model that produced the source image and\nis recorded as a child generation of the source, keeping the scene's attempt\nhistory a connected chain.",
         "operationId": "edit_candidate_api_v1_candidates__candidate_id__edit_post",
         "parameters": [
           {
@@ -2907,7 +2907,7 @@
     },
     "/api/v1/characters/{character_id}": {
       "delete": {
-        "description": "Archive (soft-delete) a character. Existing panels keep referencing it.",
+        "description": "Archive (soft-delete) a character. Existing scenes keep referencing it.",
         "operationId": "archive_character_api_v1_characters__character_id__delete",
         "parameters": [
           {
@@ -3284,472 +3284,6 @@
         ]
       }
     },
-    "/api/v1/panels": {
-      "get": {
-        "operationId": "list_panels_api_v1_panels_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/Panel"
-                  },
-                  "title": "Response List Panels Api V1 Panels Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "List Panels",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      },
-      "post": {
-        "operationId": "create_panel_api_v1_panels_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PanelInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Panel"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Create Panel",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      }
-    },
-    "/api/v1/panels/{panel_id}": {
-      "delete": {
-        "description": "Permanently delete a panel and its full generation history.",
-        "operationId": "delete_panel_api_v1_panels__panel_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Delete Panel",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      },
-      "get": {
-        "operationId": "get_panel_api_v1_panels__panel_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Panel"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Panel",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      },
-      "put": {
-        "operationId": "update_panel_api_v1_panels__panel_id__put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PanelInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Panel"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Update Panel",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      }
-    },
-    "/api/v1/panels/{panel_id}/duplicate": {
-      "post": {
-        "operationId": "duplicate_panel_api_v1_panels__panel_id__duplicate_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Panel"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Duplicate Panel",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      }
-    },
-    "/api/v1/panels/{panel_id}/generate": {
-      "post": {
-        "operationId": "generate_panel_api_v1_panels__panel_id__generate_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "header",
-            "name": "Idempotency-Key",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenerationCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Generation"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Generate Panel",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      }
-    },
-    "/api/v1/panels/{panel_id}/generations": {
-      "get": {
-        "operationId": "list_panel_generations_api_v1_panels__panel_id__generations_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GenerationSummary"
-                  },
-                  "title": "Response List Panel Generations Api V1 Panels  Panel Id  Generations Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "List Panel Generations",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      }
-    },
-    "/api/v1/panels/{panel_id}/model": {
-      "patch": {
-        "operationId": "update_panel_model_api_v1_panels__panel_id__model_patch",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PanelModelInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Panel"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Update Panel Model",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      }
-    },
-    "/api/v1/panels/{panel_id}/preview": {
-      "get": {
-        "operationId": "preview_panel_api_v1_panels__panel_id__preview_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "panel_id",
-            "required": true,
-            "schema": {
-              "title": "Panel Id",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Timezone",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Timezone"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PanelPreview"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Preview Panel",
-        "tags": [
-          "api-v1",
-          "api-v1-panels"
-        ]
-      }
-    },
     "/api/v1/ref-images/{image_id}/content": {
       "get": {
         "operationId": "ref_image_content_api_v1_ref_images__image_id__content_get",
@@ -4078,6 +3612,472 @@
         ]
       }
     },
+    "/api/v1/scenes": {
+      "get": {
+        "operationId": "list_scenes_api_v1_scenes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Scene"
+                  },
+                  "title": "Response List Scenes Api V1 Scenes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Scenes",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      },
+      "post": {
+        "operationId": "create_scene_api_v1_scenes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scene"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Scene",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      }
+    },
+    "/api/v1/scenes/{scene_id}": {
+      "delete": {
+        "description": "Permanently delete a scene and its full generation history.",
+        "operationId": "delete_scene_api_v1_scenes__scene_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Scene",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      },
+      "get": {
+        "operationId": "get_scene_api_v1_scenes__scene_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scene"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Scene",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      },
+      "put": {
+        "operationId": "update_scene_api_v1_scenes__scene_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scene"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Scene",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      }
+    },
+    "/api/v1/scenes/{scene_id}/duplicate": {
+      "post": {
+        "operationId": "duplicate_scene_api_v1_scenes__scene_id__duplicate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scene"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Duplicate Scene",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      }
+    },
+    "/api/v1/scenes/{scene_id}/generate": {
+      "post": {
+        "operationId": "generate_scene_api_v1_scenes__scene_id__generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Generation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Scene",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      }
+    },
+    "/api/v1/scenes/{scene_id}/generations": {
+      "get": {
+        "operationId": "list_scene_generations_api_v1_scenes__scene_id__generations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GenerationSummary"
+                  },
+                  "title": "Response List Scene Generations Api V1 Scenes  Scene Id  Generations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Scene Generations",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      }
+    },
+    "/api/v1/scenes/{scene_id}/model": {
+      "patch": {
+        "operationId": "update_scene_model_api_v1_scenes__scene_id__model_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneModelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scene"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Scene Model",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      }
+    },
+    "/api/v1/scenes/{scene_id}/preview": {
+      "get": {
+        "operationId": "preview_scene_api_v1_scenes__scene_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Timezone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Timezone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Scene",
+        "tags": [
+          "api-v1",
+          "api-v1-scenes"
+        ]
+      }
+    },
     "/api/v1/styles": {
       "get": {
         "operationId": "list_styles_api_v1_styles_get",
@@ -4172,7 +4172,7 @@
     },
     "/api/v1/styles/{style_id}": {
       "delete": {
-        "description": "Archive (soft-delete) a style. Existing panels keep referencing it.",
+        "description": "Archive (soft-delete) a style. Existing scenes keep referencing it.",
         "operationId": "archive_style_api_v1_styles__style_id__delete",
         "parameters": [
           {

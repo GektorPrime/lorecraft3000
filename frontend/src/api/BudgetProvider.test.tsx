@@ -36,7 +36,7 @@ const OPTIONS: OptionsSummary = {
   remaining_today_cents: 293,
   ref_image_weight_explanation: '',
   ref_set_immutability_explanation: '',
-  panel_immutability_explanation: '',
+  scene_immutability_explanation: '',
 }
 
 function renderHeader() {

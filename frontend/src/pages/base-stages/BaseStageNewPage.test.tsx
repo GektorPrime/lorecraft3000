@@ -67,7 +67,7 @@ const OPTIONS: OptionsSummary = {
   remaining_today_cents: 300,
   ref_image_weight_explanation: '',
   ref_set_immutability_explanation: '',
-  panel_immutability_explanation: '',
+  scene_immutability_explanation: '',
 }
 
 function renderPage(path = '/base-stages/new') {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, generatePanel, getCharacter, listCharacters, uploadBaseStage } from './client'
+import { ApiError, generateScene, getCharacter, listCharacters, uploadBaseStage } from './client'
 
 const originalFetch = globalThis.fetch
 
@@ -82,14 +82,14 @@ describe('api client', () => {
   it('sends generation requests with reviewed prompt and idempotency protection', async () => {
     vi.mocked(globalThis.fetch).mockImplementation(async () => jsonResponse({ id: 7 }, 201))
 
-    await generatePanel(3, 'reviewed-prompt-hash')
-    await generatePanel(3, 'reviewed-prompt-hash')
+    await generateScene(3, 'reviewed-prompt-hash')
+    await generateScene(3, 'reviewed-prompt-hash')
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(2)
     const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0]
     const headers = new Headers(init?.headers)
     const secondHeaders = new Headers(vi.mocked(globalThis.fetch).mock.calls[1][1]?.headers)
-    expect(url).toBe('/api/v1/panels/3/generate')
+    expect(url).toBe('/api/v1/scenes/3/generate')
     expect(init?.method).toBe('POST')
     expect(init?.signal).toBeInstanceOf(AbortSignal)
     expect(headers.get('Idempotency-Key')).toBeTruthy()

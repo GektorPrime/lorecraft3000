@@ -1,6 +1,6 @@
 """Candidate identity-score column (Phase: identity scoring).
 
-Stores per-detected-face scores for the panel's cast as JSON:
+Stores per-detected-face scores for the scene's cast as JSON:
     {"cast": {"<character_id>": <best similarity>}, "faces_detected": <n>}
 
 The column is advisory-only — nothing in the review/generation flow reads it

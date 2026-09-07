@@ -4,7 +4,7 @@ Serves every OpenAI GPT image model the app offers (gpt-image-1, gpt-image-1.5,
 gpt-image-2); they share the same generate/edit request surface, so one adapter
 covers all three. The public shape mirrors GeminiProvider: ``generate`` and
 ``edit`` both accept the provider-neutral request dataclasses and return a
-``ProviderResult``. The panel's aspect ratio is mapped onto the model's concrete
+``ProviderResult``. The scene's aspect ratio is mapped onto the model's concrete
 request sizes here so the model respects the requested framing, and generation
 uses the best quality tier. These models always return base64 in
 ``data[0].b64_json`` (never a URL), so there is no URL code path.
@@ -24,7 +24,7 @@ from app.providers.base import (
 
 # The GPT image models support exactly three standard request sizes: a square, a
 # landscape, and a portrait (per the OpenAI Images API `size` parameter). The
-# panel's aspect ratio picks which one, so a wide/tall panel is generated in that
+# scene's aspect ratio picks which one, so a wide/tall scene is generated in that
 # orientation instead of being forced into a square (which both loses detail and
 # distorts composition). The UI's 1K/2K/4K selector only reflects cost tiers for
 # Gemini; the GPT models have no larger tier, so size is driven by aspect ratio
@@ -87,7 +87,7 @@ class OpenAIProvider:
 
     @staticmethod
     def _size_for(aspect_ratio: str, model: str = "gpt-image-1", image_size: str = "1K") -> str:
-        """Pick the GPT image request size from panel aspect + tier.
+        """Pick the GPT image request size from scene aspect + tier.
 
         gpt-image-1/1.5 only support the 1K trio, so image_size is ignored
         and orientation decides. gpt-image-2 supports 1K/2K/4K tiers and
@@ -129,7 +129,7 @@ class OpenAIProvider:
         # identity-anchored generation (see /v1/images/edits – GPT image models
         # accept up to 16 input images). Without refs we fall back to pure
         # text-to-image via generations.
-        # For panel 7: refs are face_front only (no outfit). A high fidelity
+        # For scene 7: refs are face_front only (no outfit). A high fidelity
         # generate copies clothing from those face crops (e.g. watch chain)
         # to every character and makes distinct textual outfit descriptions
         # collapse into one uniform + deterministic output. Use low fidelity

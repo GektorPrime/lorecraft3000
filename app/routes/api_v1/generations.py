@@ -32,7 +32,7 @@ def list_gallery(conn=Depends(get_conn)) -> list[GalleryItem]:
         GalleryItem(
             candidate_id=row["candidate_id"],
             content_url=f"/api/v1/candidates/{row['candidate_id']}/content",
-            panel_id=row["panel_id"],
+            scene_id=row["scene_id"],
             beat_text=row["beat_text"],
             aspect_ratio=row["aspect_ratio"],
             created_at=row["created_at"],
@@ -81,7 +81,7 @@ def edit_candidate(
     """Create a new candidate by editing an existing one with an instruction.
 
     The edit runs on the same provider/model that produced the source image and
-    is recorded as a child generation of the source, keeping the panel's attempt
+    is recorded as a child generation of the source, keeping the scene's attempt
     history a connected chain.
     """
     service = GenerationService(conn, storage, settings, provider)

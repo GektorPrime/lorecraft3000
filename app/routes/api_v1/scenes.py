@@ -1,4 +1,4 @@
-"""Panel (scene) endpoints for the /api/v1 JSON API."""
+"""Scene endpoints for the /api/v1 JSON API."""
 
 from __future__ import annotations
 
@@ -11,24 +11,24 @@ from app.routes.api_v1._common import (
     _attachment_out,
     _candidate_out,
     _generation_out,
-    _panel_out,
+    _scene_out,
     _raise_for,
 )
 from app.schemas import (
     Generation,
     GenerationCreate,
     GenerationSummary,
-    Panel,
-    PanelInput,
-    PanelModelInput,
-    PanelPreview,
+    Scene,
+    SceneInput,
+    SceneModelInput,
+    ScenePreview,
 )
 from app.services.costs import CostError, CostLedger
 from app.services.generation import GenerationError, GenerationService
 from app.services.scenes import SceneError, SceneNotFoundError, SceneService
 from app.storage import ImageStorageError
 
-router = APIRouter(prefix="/api/v1", tags=["api-v1-panels"])
+router = APIRouter(prefix="/api/v1", tags=["api-v1-scenes"])
 
 
 def _cast_to_dicts(cast) -> list[dict]:
@@ -43,13 +43,13 @@ def _cast_to_dicts(cast) -> list[dict]:
     ]
 
 
-@router.get("/panels", response_model=list[Panel])
-def list_panels(conn=Depends(get_conn), storage=Depends(get_storage)):
-    return [_panel_out(conn, storage, s) for s in SceneService(conn, settings).list()]
+@router.get("/scenes", response_model=list[Scene])
+def list_scenes(conn=Depends(get_conn), storage=Depends(get_storage)):
+    return [_scene_out(conn, storage, s) for s in SceneService(conn, settings).list()]
 
 
-@router.post("/panels", response_model=Panel, status_code=201)
-def create_panel(payload: PanelInput, conn=Depends(get_conn), storage=Depends(get_storage)):
+@router.post("/scenes", response_model=Scene, status_code=201)
+def create_scene(payload: SceneInput, conn=Depends(get_conn), storage=Depends(get_storage)):
     try:
         scene = SceneService(conn, settings).create(
             beat_text=payload.beat_text,
@@ -65,23 +65,23 @@ def create_panel(payload: PanelInput, conn=Depends(get_conn), storage=Depends(ge
         )
     except SceneError as exc:
         _raise_for(exc)
-    return _panel_out(conn, storage, scene)
+    return _scene_out(conn, storage, scene)
 
 
-@router.get("/panels/{panel_id}", response_model=Panel)
-def get_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
+@router.get("/scenes/{scene_id}", response_model=Scene)
+def get_scene(scene_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
     try:
-        scene = SceneService(conn, settings).get(panel_id)
+        scene = SceneService(conn, settings).get(scene_id)
     except SceneNotFoundError as exc:
         _raise_for(exc)
-    return _panel_out(conn, storage, scene)
+    return _scene_out(conn, storage, scene)
 
 
-@router.put("/panels/{panel_id}", response_model=Panel)
-def update_panel(panel_id: int, payload: PanelInput, conn=Depends(get_conn), storage=Depends(get_storage)):
+@router.put("/scenes/{scene_id}", response_model=Scene)
+def update_scene(scene_id: int, payload: SceneInput, conn=Depends(get_conn), storage=Depends(get_storage)):
     try:
         scene = SceneService(conn, settings).update(
-            panel_id,
+            scene_id,
             beat_text=payload.beat_text,
             camera=payload.camera,
             framing=payload.framing,
@@ -95,64 +95,64 @@ def update_panel(panel_id: int, payload: PanelInput, conn=Depends(get_conn), sto
         )
     except SceneError as exc:
         _raise_for(exc)
-    return _panel_out(conn, storage, scene)
+    return _scene_out(conn, storage, scene)
 
 
-@router.patch("/panels/{panel_id}/model", response_model=Panel)
-def update_panel_model(
-    panel_id: int,
-    payload: PanelModelInput,
+@router.patch("/scenes/{scene_id}/model", response_model=Scene)
+def update_scene_model(
+    scene_id: int,
+    payload: SceneModelInput,
     conn=Depends(get_conn),
     storage=Depends(get_storage),
 ):
     try:
-        scene = SceneService(conn, settings).update_model(panel_id, model=payload.model)
+        scene = SceneService(conn, settings).update_model(scene_id, model=payload.model)
     except SceneError as exc:
         _raise_for(exc)
-    return _panel_out(conn, storage, scene)
+    return _scene_out(conn, storage, scene)
 
 
-@router.post("/panels/{panel_id}/duplicate", response_model=Panel, status_code=201)
-def duplicate_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
+@router.post("/scenes/{scene_id}/duplicate", response_model=Scene, status_code=201)
+def duplicate_scene(scene_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
     try:
-        scene = SceneService(conn, settings).duplicate(panel_id)
+        scene = SceneService(conn, settings).duplicate(scene_id)
     except SceneError as exc:
         _raise_for(exc)
-    return _panel_out(conn, storage, scene)
+    return _scene_out(conn, storage, scene)
 
 
-@router.delete("/panels/{panel_id}", status_code=204)
-def delete_panel(panel_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
-    """Permanently delete a panel and its full generation history."""
+@router.delete("/scenes/{scene_id}", status_code=204)
+def delete_scene(scene_id: int, conn=Depends(get_conn), storage=Depends(get_storage)):
+    """Permanently delete a scene and its full generation history."""
     try:
-        SceneService(conn, settings).delete(panel_id)
+        SceneService(conn, settings).delete(scene_id)
     except SceneError as exc:
         _raise_for(exc)
     return Response(status_code=204)
 
 
-@router.get("/panels/{panel_id}/preview", response_model=PanelPreview)
-def preview_panel(
-    panel_id: int,
+@router.get("/scenes/{scene_id}/preview", response_model=ScenePreview)
+def preview_scene(
+    scene_id: int,
     conn=Depends(get_conn),
     storage=Depends(get_storage),
     timezone_name: str | None = Header(default=None, alias=TIMEZONE_HEADER),
 ):
     scenes = SceneService(conn, settings)
     try:
-        scene = scenes.get(panel_id)
+        scene = scenes.get(scene_id)
     except SceneNotFoundError as exc:
         _raise_for(exc)
     try:
         preview = GenerationService(conn, storage, settings, None).preview(
-            panel_id,
+            scene_id,
             model=scene.model,
             image_size=scene.image_size,
             tz_name=timezone_name,
         )
     except (GenerationError, CostError, ImageStorageError) as exc:
-        return PanelPreview(
-            scene_id=panel_id,
+        return ScenePreview(
+            scene_id=scene_id,
             model=scene.model,
             image_size=scene.image_size,
             prompt="",
@@ -171,7 +171,7 @@ def preview_panel(
                 else None
             ),
         )
-    return PanelPreview(
+    return ScenePreview(
         scene_id=preview.scene_id,
         model=preview.model,
         image_size=preview.image_size,
@@ -193,14 +193,14 @@ def preview_panel(
     )
 
 
-@router.get("/panels/{panel_id}/generations", response_model=list[GenerationSummary])
-def list_panel_generations(panel_id: int, conn=Depends(get_conn)) -> list[GenerationSummary]:
+@router.get("/scenes/{scene_id}/generations", response_model=list[GenerationSummary])
+def list_scene_generations(scene_id: int, conn=Depends(get_conn)) -> list[GenerationSummary]:
     try:
-        SceneService(conn, settings).get(panel_id)
+        SceneService(conn, settings).get(scene_id)
     except SceneNotFoundError as exc:
         _raise_for(exc)
     service = GenerationService(conn, None, settings, None)
-    rows_with_candidates = service.list_for_scene_with_candidates(panel_id)
+    rows_with_candidates = service.list_for_scene_with_candidates(scene_id)
     return [
         GenerationSummary(
             id=row["id"],
@@ -219,9 +219,9 @@ def list_panel_generations(panel_id: int, conn=Depends(get_conn)) -> list[Genera
     ]
 
 
-@router.post("/panels/{panel_id}/generate", response_model=Generation, status_code=201)
-def generate_panel(
-    panel_id: int,
+@router.post("/scenes/{scene_id}/generate", response_model=Generation, status_code=201)
+def generate_scene(
+    scene_id: int,
     payload: GenerationCreate,
     response: Response,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
@@ -230,9 +230,9 @@ def generate_panel(
     provider: ImageProvider = Depends(get_provider),
 ):
     try:
-        SceneService(conn, settings).get(panel_id)
+        SceneService(conn, settings).get(scene_id)
         outcome = GenerationService(conn, storage, settings, provider).generate(
-            panel_id,
+            scene_id,
             idempotency_key=idempotency_key,
             expected_prompt_hash=payload.expected_prompt_hash,
         )

@@ -106,7 +106,7 @@ def test_three_character_flash_warns_about_pro():
         scene=_scene(),
         style_contract="style",
     )
-    assert result.warnings == ("Pro is recommended for panels with 3 or more characters",)
+    assert result.warnings == ("Pro is recommended for scenes with 3 or more characters",)
 
 
 def test_prompt_contains_constraints_but_no_unprovided_lore():

@@ -149,7 +149,7 @@ def test_archive_hides_from_list_but_get_still_resolves(conn):
     c = service.create(name="Alice", slug="alice")
     service.archive(c.id)
     assert all(x.slug != "alice" for x in service.list())
-    # Existing panels reference characters by id, so archived characters must
+    # Existing scenes reference characters by id, so archived characters must
     # still resolve — the display slug is preserved.
     fetched = service.get(c.id)
     assert fetched.slug == "alice"

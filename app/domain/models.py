@@ -26,7 +26,7 @@ class Character:
     negative_traits: str
     default_style_id: int | None
     created_at: str
-    # NULL == active. Archived characters stay in the DB (so panels that
+    # NULL == active. Archived characters stay in the DB (so scenes that
     # reference them keep working) but are hidden from every list/picker.
     archived_at: str | None = None
 

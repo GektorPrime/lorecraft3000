@@ -69,6 +69,19 @@
   --dur-base: 200ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
+  /* Icons: one canonical size set so the same glyph never renders at
+     different weights in adjacent chrome. Icon.tsx maps these by name. */
+  --icon-xs: 0.875rem;
+  --icon-sm: 1rem;
+  --icon-md: 1.125rem;
+  --icon-lg: 1.25rem;
+  --icon-xl: 1.375rem;
+
+  /* Controls: the heights every clickable chrome element shares, so a
+     sidebar toggle, a dialog close and a button never disagree about size. */
+  --control-height: 2.5rem;
+  --control-height-sm: 2.25rem;
+
   /* Layout */
   --content-max: 1100px;
   --sidebar-width: 260px;
