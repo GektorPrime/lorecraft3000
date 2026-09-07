@@ -24,7 +24,7 @@ def _image(storage: ImageStorage, sha256: str):
 
 
 def _owned_generation(conn) -> int:
-    """A generation must belong to exactly one panel or base stage."""
+    """A generation must belong to exactly one scene or base stage."""
     style_id = conn.execute("SELECT id FROM style LIMIT 1").fetchone()["id"]
     scene_id = conn.execute(
         "INSERT INTO scene (style_id) VALUES (?)", (style_id,)

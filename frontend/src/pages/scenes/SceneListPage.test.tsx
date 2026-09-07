@@ -3,15 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../../api/client'
-import type { Panel } from '../../api/types'
-import { PanelListPage } from './PanelListPage'
+import type { Scene } from '../../api/types'
+import { SceneListPage } from './SceneListPage'
 
 vi.mock('../../api/client', async () => {
   const actual = await vi.importActual<typeof import('../../api/client')>('../../api/client')
   return {
     ...actual,
-    listPanels: vi.fn(),
-    deletePanel: vi.fn(),
+    listScenes: vi.fn(),
+    deleteScene: vi.fn(),
   }
 })
 
@@ -21,7 +21,7 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-const LOCKED_PANEL: Panel = {
+const LOCKED_PANEL: Scene = {
   id: 7,
   beat_text: 'Elias draws his sword.',
   camera: 'low angle',
@@ -40,7 +40,7 @@ const LOCKED_PANEL: Panel = {
   base_stage: null,
 }
 
-const EDITABLE_PANEL: Panel = {
+const EDITABLE_PANEL: Scene = {
   ...LOCKED_PANEL,
   id: 3,
   beat_text: 'A quiet dawn over the harbor.',
@@ -49,10 +49,10 @@ const EDITABLE_PANEL: Panel = {
   latest_attempt_preview_url: null,
 }
 
-describe('PanelListPage — locked panel actions', () => {
+describe('SceneListPage — locked scene actions', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
-    vi.mocked(client.listPanels).mockReset().mockResolvedValue([LOCKED_PANEL])
+    vi.mocked(client.listScenes).mockReset().mockResolvedValue([LOCKED_PANEL])
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -61,7 +61,7 @@ describe('PanelListPage — locked panel actions', () => {
   it('does not offer Duplicate & edit on the listing page', async () => {
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
 
@@ -69,17 +69,17 @@ describe('PanelListPage — locked panel actions', () => {
     expect(screen.queryByRole('button', { name: /Duplicate & edit/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
-    expect(screen.getByAltText('Latest generation attempt for panel #7')).toHaveAttribute(
+    expect(screen.getByAltText('Latest generation attempt for scene #7')).toHaveAttribute(
       'src',
       '/api/v1/candidates/44/content',
     )
   })
 })
 
-describe('PanelListPage — preview via tile click', () => {
+describe('SceneListPage — preview via tile click', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
-    vi.mocked(client.listPanels).mockReset().mockResolvedValue([EDITABLE_PANEL])
+    vi.mocked(client.listScenes).mockReset().mockResolvedValue([EDITABLE_PANEL])
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -88,7 +88,7 @@ describe('PanelListPage — preview via tile click', () => {
   it('no longer renders a separate Preview button', async () => {
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
     await screen.findByText('A quiet dawn over the harbor.')
@@ -99,30 +99,30 @@ describe('PanelListPage — preview via tile click', () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
-    const tile = await screen.findByRole('button', { name: /Preview panel #3/ })
+    const tile = await screen.findByRole('button', { name: /Preview scene #3/ })
     await user.click(tile)
-    expect(mockNavigate).toHaveBeenCalledWith('/panels/3/preview')
+    expect(mockNavigate).toHaveBeenCalledWith('/scenes/3/preview')
   })
 
   it('does not open the preview when an action button is clicked', async () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
     await screen.findByText('A quiet dawn over the harbor.')
     await user.click(screen.getByRole('button', { name: /Delete/ }))
-    expect(mockNavigate).not.toHaveBeenCalledWith('/panels/3/preview')
+    expect(mockNavigate).not.toHaveBeenCalledWith('/scenes/3/preview')
   })
 
-  it('does not expose Edit on editable panel cards', async () => {
+  it('does not expose Edit on editable scene cards', async () => {
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
     await screen.findByText('A quiet dawn over the harbor.')
@@ -132,7 +132,7 @@ describe('PanelListPage — preview via tile click', () => {
   it('places the status badge first in the metadata row', async () => {
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
     await screen.findByText('A quiet dawn over the harbor.')
@@ -140,11 +140,11 @@ describe('PanelListPage — preview via tile click', () => {
     expect(metadata?.firstElementChild).toHaveTextContent('Editable')
   })
 
-  it('marks panels composed from a Base Stage with a navigable badge', async () => {
-    vi.mocked(client.listPanels).mockResolvedValue([{ ...EDITABLE_PANEL, base_stage_id: 4 }])
+  it('marks scenes composed from a Base Stage with a navigable badge', async () => {
+    vi.mocked(client.listScenes).mockResolvedValue([{ ...EDITABLE_PANEL, base_stage_id: 4 }])
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
 
@@ -154,51 +154,51 @@ describe('PanelListPage — preview via tile click', () => {
   })
 })
 
-describe('PanelListPage — delete', () => {
+describe('SceneListPage — delete', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
-    vi.mocked(client.listPanels).mockReset().mockResolvedValue([EDITABLE_PANEL])
-    vi.mocked(client.deletePanel).mockReset().mockResolvedValue(undefined)
+    vi.mocked(client.listScenes).mockReset().mockResolvedValue([EDITABLE_PANEL])
+    vi.mocked(client.deleteScene).mockReset().mockResolvedValue(undefined)
   })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('confirms then permanently deletes the panel and reloads', async () => {
+  it('confirms then permanently deletes the scene and reloads', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.listPanels)
+    vi.mocked(client.listScenes)
       .mockResolvedValueOnce([EDITABLE_PANEL])
       .mockResolvedValueOnce([])
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
 
     await user.click(await screen.findByRole('button', { name: /Delete/ }))
-    await user.click(await screen.findByRole('button', { name: 'Delete panel' }))
+    await user.click(await screen.findByRole('button', { name: 'Delete scene' }))
 
-    await waitFor(() => expect(client.deletePanel).toHaveBeenCalledWith(3))
+    await waitFor(() => expect(client.deleteScene).toHaveBeenCalledWith(3))
     await waitFor(() =>
       expect(screen.queryByText('A quiet dawn over the harbor.')).not.toBeInTheDocument(),
     )
-    // Deleting a panel must not navigate to its (now gone) preview.
+    // Deleting a scene must not navigate to its (now gone) preview.
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
-  it('surfaces an error and keeps the panel when deletion fails', async () => {
+  it('surfaces an error and keeps the scene when deletion fails', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.deletePanel).mockRejectedValue(new Error('offline'))
+    vi.mocked(client.deleteScene).mockRejectedValue(new Error('offline'))
     render(
       <MemoryRouter>
-        <PanelListPage />
+        <SceneListPage />
       </MemoryRouter>,
     )
 
     await user.click(await screen.findByRole('button', { name: /Delete/ }))
-    await user.click(await screen.findByRole('button', { name: 'Delete panel' }))
+    await user.click(await screen.findByRole('button', { name: 'Delete scene' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete panel: Error: offline')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete scene: Error: offline')
     expect(screen.getByText('A quiet dawn over the harbor.')).toBeInTheDocument()
   })
 })

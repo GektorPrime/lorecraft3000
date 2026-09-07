@@ -86,7 +86,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  min-height: 2.25rem;
+  min-height: var(--control-height-sm);
 }
 
 .app-sidebar__title {
@@ -101,11 +101,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-}
-
-.app-sidebar__cta {
-  width: 100%;
-  justify-content: center;
 }
 
 .app-sidebar__command {
@@ -128,10 +123,8 @@
   color: var(--text-heading);
 }
 
-.app-sidebar__command kbd {
+.app-sidebar__command .kbd {
   margin-left: auto;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
 }
 
 .app-sidebar__group-label {
@@ -188,25 +181,9 @@
   border-top: 1px solid var(--border);
 }
 
-/* Drawer dismiss button: only meaningful while the drawer is open. */
-.app-sidebar__dismiss {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.app-sidebar__dismiss:hover {
-  background: var(--bg-subtle);
-  color: var(--text-heading);
-}
+/* Drawer dismiss button: only meaningful while the drawer is open. Uses the
+   shared icon-button primitive (ghost variant) so it stays quiet against the
+   brand row; the media block below hides it on desktop. */
 
 @media (min-width: 1024px) {
   .app-sidebar {
@@ -280,24 +257,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.app-topbar__toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-heading);
-  cursor: pointer;
-}
-
-.app-topbar__toggle:hover {
-  background: var(--bg-subtle);
-}
-
 .app-topbar__title {
   color: var(--text-heading);
   font-size: var(--text-sm);
@@ -309,11 +268,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: var(--control-height-sm);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-muted);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -322,8 +283,8 @@
   color: var(--text-heading);
 }
 
-.app-topbar__command kbd {
-  font-size: var(--text-xs);
+.app-topbar__command .kbd {
+  margin-left: var(--space-1);
 }
 
 @media (min-width: 1024px) {
@@ -432,7 +393,15 @@
     margin-bottom: var(--space-5);
   }
 
+  /* Page and section headers collapse identically so the whole app stacks
+     with the same anatomy on mobile. */
   .section-header {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .section-header__actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }

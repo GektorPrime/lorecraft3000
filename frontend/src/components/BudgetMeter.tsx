@@ -32,7 +32,7 @@ export function BudgetMeter() {
   return (
     <div className={level ? `budget-meter budget-meter--${level}` : 'budget-meter'}>
       <span className="budget-meter__label">
-        <Icon name="budget" size={14} />
+        <Icon name="budget" size="xs" />
         Daily budget
       </span>
       <div

@@ -1,6 +1,6 @@
 """Concurrency and crash-recovery tests at the database boundary.
 
-Phase 1 guarantees "one pending paid generation per panel" and stale-pending
+Phase 1 guarantees "one pending paid generation per scene" and stale-pending
 recovery. Other suites verify those guarantees through single-connection
 service calls. These tests exercise the same guarantees under real concurrent
 execution against one on-disk SQLite database (WAL + busy timeout), where the
@@ -28,7 +28,7 @@ class _BlockingProvider:
     """Provider that blocks inside generate() until released.
 
     Lets a test hold one generation "in flight" (pending, provider call
-    started) while a second concurrent request tries to reserve the same panel.
+    started) while a second concurrent request tries to reserve the same scene.
     """
 
     def __init__(self, release: threading.Event, entered: threading.Event) -> None:
@@ -105,10 +105,10 @@ def _connect(settings: Settings):
 
 
 def test_concurrent_generation_yields_one_provider_call(tmp_path):
-    """Two overlapping generation requests for one panel: exactly one paid call.
+    """Two overlapping generation requests for one scene: exactly one paid call.
 
     The first request holds a pending generation open inside the provider; the
-    second must be rejected by the one-pending-per-panel guarantee rather than
+    second must be rejected by the one-pending-per-scene guarantee rather than
     starting a second provider call or a second reservation.
     """
     settings = _settings(tmp_path)
@@ -136,7 +136,7 @@ def test_concurrent_generation_yields_one_provider_call(tmp_path):
 
     def second() -> None:
         # Wait until the first request is inside the provider (pending row
-        # committed), then attempt to reserve the same panel.
+        # committed), then attempt to reserve the same scene.
         entered.wait(timeout=5)
         conn = _connect(settings)
         try:
@@ -184,7 +184,7 @@ def test_startup_recovers_stale_pending_generation(tmp_path):
     Simulates a process that reserved a generation and then died before the
     provider returned: the row stays pending with its reservation. Recovery
     (which runs at startup in app.main lifespan) must fail the stale attempt,
-    releasing the reservation and unlocking the panel.
+    releasing the reservation and unlocking the scene.
     """
     settings = _settings(tmp_path)
     scene_id = _seed_scene(settings)
@@ -219,7 +219,7 @@ def test_startup_recovers_stale_pending_generation(tmp_path):
             "SELECT state FROM generation WHERE scene_id = ?", (scene_id,)
         ).fetchone()
         assert row["state"] == "failed"
-        # Panel is unlocked: a new reservation succeeds.
+        # Scene is unlocked: a new reservation succeeds.
         new_reservation = CostLedger(conn, settings).reserve(
             scene_id=scene_id,
             model=settings.default_model,

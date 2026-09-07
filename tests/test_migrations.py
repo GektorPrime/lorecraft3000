@@ -774,7 +774,7 @@ def test_base_stage_checks_and_target_cascade(conn):
 
 
 def test_generation_ownership_is_exclusive_immutable_and_scoped(conn):
-    """Every generation belongs to exactly one panel or base stage, forever."""
+    """Every generation belongs to exactly one scene or base stage, forever."""
     generation_columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(generation)")
     }
@@ -832,7 +832,7 @@ def test_generation_ownership_is_exclusive_immutable_and_scoped(conn):
         )
     conn.rollback()
 
-    # A pending stage attempt never blocks a panel attempt.
+    # A pending stage attempt never blocks a scene attempt.
     conn.execute(
         "INSERT INTO generation (scene_id, model, state) VALUES (?, 'm', 'pending')",
         (scene_id,),

@@ -10,7 +10,7 @@ service exceptions to a consistent error envelope
 (``{"detail": {"message": ..., "type": ...}}``).
 
 The former single module (app/routes/api_v1.py) was split by resource:
-options, characters, styles, ref_sets, panels, and generations, with shared
+options, characters, styles, ref_sets, scenes, and generations, with shared
 helpers in _common.py. Paths, methods, status codes, response bodies, and the
 error envelope are unchanged.
 """
@@ -24,7 +24,7 @@ from app.routes.api_v1 import (
     characters,
     generations,
     options,
-    panels,
+    scenes,
     ref_sets,
     styles,
 )
@@ -36,5 +36,5 @@ router.include_router(base_stages.router)
 router.include_router(characters.router)
 router.include_router(styles.router)
 router.include_router(ref_sets.router)
-router.include_router(panels.router)
+router.include_router(scenes.router)
 router.include_router(generations.router)

@@ -310,7 +310,7 @@ def test_actual_cost_over_cap_is_recorded_and_blocks_more_spend(conn, tmp_path):
         )
 
 
-def test_reservation_rejects_a_panel_changed_after_preview(conn, tmp_path):
+def test_reservation_rejects_a_scene_changed_after_preview(conn, tmp_path):
     scene_id = _scene(conn)
     conn.execute("UPDATE scene SET revision = revision + 1 WHERE id = ?", (scene_id,))
     conn.commit()
@@ -396,7 +396,7 @@ def test_reserve_requires_exactly_one_owner(conn, tmp_path):
         {},
         {"scene_id": scene_id, "base_stage_id": base_stage_id},
     ):
-        with pytest.raises(CostError, match="exactly one panel or base stage"):
+        with pytest.raises(CostError, match="exactly one scene or base stage"):
             ledger.reserve(
                 model="gemini-3.1-flash-image",
                 image_size="1K",
@@ -407,7 +407,7 @@ def test_reserve_requires_exactly_one_owner(conn, tmp_path):
 
 
 def test_base_stage_owner_scopes_pending_idempotency_and_revision(conn, tmp_path):
-    """Owner-scoped rules must apply to base stages exactly as to panels."""
+    """Owner-scoped rules must apply to base stages exactly as to scenes."""
     ledger = CostLedger(conn, _settings(tmp_path, cap=1.0))
     base_stage_id = _base_stage(conn)
     scene_id = _scene(conn)
@@ -440,7 +440,7 @@ def test_base_stage_owner_scopes_pending_idempotency_and_revision(conn, tmp_path
     assert replay.created is False
     assert replay.generation_id == reservation.generation_id
 
-    # A pending stage attempt blocks only that stage, never a panel.
+    # A pending stage attempt blocks only that stage, never a scene.
     with pytest.raises(GenerationPendingError, match="base stage"):
         ledger.reserve(
             base_stage_id=base_stage_id,

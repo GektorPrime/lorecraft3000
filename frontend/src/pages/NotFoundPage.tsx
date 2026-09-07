@@ -11,7 +11,7 @@ export function NotFoundPage() {
       <p>
         Return <Link to="/">Home</Link>, or browse the{' '}
         <Link to="/characters">character collection</Link>,{' '}
-        <Link to="/styles">style collection</Link>, or <Link to="/panels">panel collection</Link>.
+        <Link to="/styles">style collection</Link>, or <Link to="/scenes">scene collection</Link>.
       </p>
     </section>
   )

@@ -125,7 +125,7 @@ class FaceEmbedder:
         vectors, bboxes, _ = self._faces(image_bytes)
         if not vectors:
             return None
-        # Largest by bbox area — the subject of a single-character panel.
+        # Largest by bbox area — the subject of a single-character scene.
         best_idx = max(
             range(len(bboxes)),
             key=lambda i: (bboxes[i][2] - bboxes[i][0]) * (bboxes[i][3] - bboxes[i][1]),

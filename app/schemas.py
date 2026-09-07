@@ -41,7 +41,7 @@ class OptionsSummary(BaseModel):
     remaining_today_cents: int
     ref_image_weight_explanation: str
     ref_set_immutability_explanation: str
-    panel_immutability_explanation: str
+    scene_immutability_explanation: str
 
 
 class Budget(BaseModel):
@@ -135,7 +135,7 @@ class RefSetSummary(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# panels (scenes)
+# scenes (scenes)
 # ---------------------------------------------------------------------------
 
 
@@ -156,24 +156,24 @@ class CastMember(BaseModel):
     base_stage_target_id: int | None = None
 
 
-class PanelBaseStageTarget(BaseModel):
+class SceneBaseStageTarget(BaseModel):
     id: int
     position: int
     description: str
 
 
-class PanelBaseStage(BaseModel):
+class SceneBaseStage(BaseModel):
     id: int
     state: str
     description: str
     aspect_ratio: str
     style_id: int | None
     content_url: str
-    targets: list[PanelBaseStageTarget]
+    targets: list[SceneBaseStageTarget]
     archived_at: str | None
 
 
-class PanelInput(BaseModel):
+class SceneInput(BaseModel):
     beat_text: str | None = None
     camera: str | None = None
     framing: str | None = None
@@ -186,11 +186,11 @@ class PanelInput(BaseModel):
     base_stage_id: int | None = None
 
 
-class PanelModelInput(BaseModel):
+class SceneModelInput(BaseModel):
     model: str
 
 
-class Panel(BaseModel):
+class Scene(BaseModel):
     id: int
     beat_text: str
     camera: str
@@ -200,7 +200,7 @@ class Panel(BaseModel):
     cast: list[CastMember]
     style_id: int | None
     base_stage_id: int | None
-    base_stage: PanelBaseStage | None
+    base_stage: SceneBaseStage | None
     model: str
     image_size: str
     created_at: str
@@ -209,9 +209,9 @@ class Panel(BaseModel):
     latest_attempt_preview_url: str | None
 
 
-class PanelSummary(BaseModel):
-    """Lightweight panel reference used where a full panel payload is overkill,
-    e.g. "which panels use this Base Stage"."""
+class SceneSummary(BaseModel):
+    """Lightweight scene reference used where a full scene payload is overkill,
+    e.g. "which scenes use this Base Stage"."""
 
     id: int
     beat_text: str
@@ -235,7 +235,7 @@ class GenerationAttachment(BaseModel):
     role: str
 
 
-class PanelPreview(BaseModel):
+class ScenePreview(BaseModel):
     scene_id: int
     model: str
     image_size: str
@@ -276,7 +276,7 @@ class CandidateEditIn(BaseModel):
 
 class Generation(BaseModel):
     id: int
-    # Exactly one owner is set: a panel (scene_id) or a Base Stage.
+    # Exactly one owner is set: a scene (scene_id) or a Base Stage.
     scene_id: int | None = None
     base_stage_id: int | None = None
     model: str
@@ -315,7 +315,7 @@ class GenerationSummary(BaseModel):
 class GalleryItem(BaseModel):
     candidate_id: int
     content_url: str
-    panel_id: int
+    scene_id: int
     beat_text: str
     aspect_ratio: str
     created_at: str
@@ -366,7 +366,7 @@ class BaseStageGeneratedInput(BaseModel):
     """Composition for a generated Base Stage draft.
 
     Identity targets are required: they are injected into the prompt and are
-    what a panel later maps its cast onto.
+    what a scene later maps its cast onto.
     """
 
     description: str

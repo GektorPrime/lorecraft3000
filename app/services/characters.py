@@ -81,7 +81,7 @@ class CharacterService:
     def get(self, character_id: int) -> Character:
         """Resolve any character, archived or not.
 
-        Archived characters must still resolve so panels whose cast includes
+        Archived characters must still resolve so scenes whose cast includes
         them keep rendering and previewing — archiving hides a character from new
         work, it does not break existing dependencies.
         """
@@ -190,9 +190,9 @@ class CharacterService:
     # ------------------------------------------------------------------
 
     def archive(self, character_id: int) -> Character:
-        """Archive a character: hide it from lists while keeping panels intact.
+        """Archive a character: hide it from lists while keeping scenes intact.
 
-        Panels whose cast already includes this character continue to resolve it
+        Scenes whose cast already includes this character continue to resolve it
         (see :meth:`get`). Archiving frees the character's slug for reuse by
         renaming the unique ``slug`` column to an archived sentinel and
         preserving the original in ``display_slug``. Idempotent.

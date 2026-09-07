@@ -72,7 +72,7 @@ SCHEMA_VERSION = 2
 
 @dataclass(frozen=True)
 class GenerationPreview:
-    """A no-spend preflight for one attempt owned by a panel or a Base Stage.
+    """A no-spend preflight for one attempt owned by a scene or a Base Stage.
 
     Exactly one of ``scene_id``/``base_stage_id`` is set; the matching revision
     is what the ledger checks so a composition edited after preview cannot be
@@ -178,8 +178,9 @@ class GenerationService:
                     for entry in raw_cast
                 }
                 style_contract = ""
-                if stage.style_id is not None:
-                    style_contract = StyleService(self.conn).get(stage.style_id).style_contract
+                selected_style_id = scene_row["style_id"] or stage.style_id
+                if selected_style_id is not None:
+                    style_contract = StyleService(self.conn).get(selected_style_id).style_contract
                 assembled = assemble_staged_prompt(
                     model=selected_model,
                     image_size=selected_size,
@@ -286,7 +287,7 @@ class GenerationService:
             )
         request_capture = {
             "schema_version": SCHEMA_VERSION,
-            "operation": "direct_panel_generate",
+            "operation": "direct_scene_generate",
             "model": selected_model,
             "image_size": selected_size,
             "aspect_ratio": scene_row["aspect_ratio"],
@@ -318,8 +319,8 @@ class GenerationService:
         if staged:
             request_capture.update(
                 {
-                    "operation": "base_stage_panel_generate",
-                    "kind": "base_stage_panel_generate",
+                    "operation": "base_stage_scene_generate",
+                    "kind": "base_stage_scene_generate",
                     "base_stage": {
                         "id": stage.id,
                         "origin": stage.origin,
@@ -403,7 +404,7 @@ class GenerationService:
     ) -> GenerationOutcome:
         """Run one reviewed preview as a single paid attempt.
 
-        Shared by panel and Base Stage generation so both owners get identical
+        Shared by scene and Base Stage generation so both owners get identical
         drift protection, reservation, provenance, and failure accounting.
         """
         scene_id = preview.scene_id
@@ -446,7 +447,7 @@ class GenerationService:
             )
             provenance = {
                 "schema_version": SCHEMA_VERSION,
-                "operation": preview.request_capture.get("operation", "direct_panel_generate"),
+                "operation": preview.request_capture.get("operation", "direct_scene_generate"),
                 "generation_id": generation_id,
                 "scene_id": scene_id,
                 "base_stage_id": preview.base_stage_id,
@@ -557,7 +558,7 @@ class GenerationService:
 
         A Base Stage has no cast, so no canonical references are attached and
         the request goes through the plain text-to-image path. Identities are
-        applied later, when a panel uses the published image as its source.
+        applied later, when a scene uses the published image as its source.
         """
         stages = BaseStageService(self.conn, self.storage, self.settings)
         stage = stages.get(base_stage_id)
@@ -611,7 +612,7 @@ class GenerationService:
             },
             "prompt": assembled.text,
             "prompt_hash": assembled.prompt_hash,
-            # No cast: identity is applied later by a panel, so nothing here is
+            # No cast: identity is applied later by a scene, so nothing here is
             # identity-bearing and the candidate is never identity-scored.
             "cast": [],
             "attachments": [],
@@ -689,9 +690,9 @@ class GenerationService:
         """Produce a new candidate by editing an existing one in place.
 
         The edit runs on the same provider/model that produced the source image
-        and stays anchored to the panel's canonical character references. The
+        and stays anchored to the scene's canonical character references. The
         new attempt is a child generation (``parent_generation_id`` points at
-        the source's generation), so provenance and the panel's attempt history
+        the source's generation), so provenance and the scene's attempt history
         remain a connected chain. Cost is reserved and billed exactly like a
         fresh generation, under the same daily budget gate.
         """
@@ -719,7 +720,7 @@ class GenerationService:
 
         scene_id = source["scene_id"]
         if scene_id is None:
-            raise EditError("candidate has no panel to edit against")
+            raise EditError("candidate has no scene to edit against")
         capture = json.loads(source["request_json"] or "{}")
         model = source["model"]
         image_size = capture.get("image_size") or self.settings.default_image_size
@@ -933,7 +934,7 @@ class GenerationService:
     ) -> None:
         """Advisory identity scoring shared by every candidate path.
 
-        Used by direct panel generation, Base Stage panel generation, and
+        Used by direct scene generation, Base Stage scene generation, and
         candidate edits so all three produce ``candidate.identity_scores``
         through the same code path. The gallery is resolved from the reference
         images actually captured for the request (``attachments`` carrying
@@ -964,7 +965,7 @@ class GenerationService:
                 )
 
     def list_for_scene(self, scene_id: int) -> list[sqlite3.Row]:
-        """All generation rows for a panel, newest first."""
+        """All generation rows for a scene, newest first."""
         return self.conn.execute(
             "SELECT * FROM generation WHERE scene_id = ? ORDER BY id DESC",
             (scene_id,),
@@ -973,7 +974,7 @@ class GenerationService:
     def list_for_scene_with_candidates(
         self, scene_id: int
     ) -> list[tuple[sqlite3.Row, list[sqlite3.Row]]]:
-        """Every generation for a panel, newest first, each paired with its
+        """Every generation for a scene, newest first, each paired with its
         candidate rows so callers can render previews and review status for all
         attempts without an N+1 query."""
         rows = self.conn.execute(

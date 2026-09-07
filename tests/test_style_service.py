@@ -135,7 +135,7 @@ def test_archive_hides_from_list_but_get_still_resolves(conn):
     s = service.create(name="Ink Wash", style_contract="x")
     service.archive(s.id)
     assert all(x.name != "Ink Wash" for x in service.list())
-    # Existing panels reference styles by id, so archived styles must still
+    # Existing scenes reference styles by id, so archived styles must still
     # resolve — the display name is preserved.
     fetched = service.get(s.id)
     assert fetched.name == "Ink Wash"

@@ -1,7 +1,7 @@
 [project]
 name = "lorecraft3000"
 version = "0.1.0"
-description = "Locally hosted comic-panel generator with persistent character identity."
+description = "Locally hosted comic-scene generator with persistent character identity."
 requires-python = ">=3.11"
 dependencies = [
     "google-genai>=2.20.0",

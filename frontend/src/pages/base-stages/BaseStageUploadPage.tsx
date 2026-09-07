@@ -94,12 +94,12 @@ export function BaseStageUploadPage() {
                 <input id={`base-stage-target-${index}`} type="text" value={target} onChange={(event) => setTargets((current) => current.map((value, targetIndex) => targetIndex === index ? event.target.value : value))} />
               </div>
               <button type="button" className="btn" disabled={submitting} aria-label={`Remove target ${index + 1}`} onClick={() => setTargets((current) => current.filter((_, targetIndex) => targetIndex !== index))}>
-                <Icon name="trash" size={15} /> Remove
+                <Icon name="trash" size="sm" /> Remove
               </button>
             </div>
           ))}
           <button type="button" className="btn" disabled={submitting} onClick={() => setTargets((current) => [...current, ''])}>
-            <Icon name="plus" size={15} /> Add target
+            <Icon name="plus" size="sm" /> Add target
           </button>
         </fieldset>
         <div className="form-actions">

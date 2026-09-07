@@ -31,7 +31,7 @@ export function ThemeToggle() {
           title={option.label}
           onClick={() => setPreference(option.value)}
         >
-          <Icon name={option.icon} size={16} />
+          <Icon name={option.icon} size="sm" />
         </button>
       ))}
     </div>

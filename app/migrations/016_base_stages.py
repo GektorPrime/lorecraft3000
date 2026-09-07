@@ -1,4 +1,4 @@
-"""Base Stage persistence and future panel association."""
+"""Base Stage persistence and future scene association."""
 
 from __future__ import annotations
 

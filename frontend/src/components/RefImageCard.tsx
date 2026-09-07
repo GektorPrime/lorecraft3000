@@ -69,7 +69,7 @@ export function RefImageCard({
               disabled={disabled}
               onClick={() => onRemove?.(image.id)}
             >
-              <Icon name="trash" size={15} />
+              <Icon name="trash" size="sm" />
               Remove
             </button>
           </div>

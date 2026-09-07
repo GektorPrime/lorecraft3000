@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../../api/client'
-import type { Generation, GenerationSummary, Panel, PanelPreview } from '../../api/types'
-import { PanelPreviewPage } from './PanelPreviewPage'
+import type { Generation, GenerationSummary, Scene, ScenePreview } from '../../api/types'
+import { ScenePreviewPage } from './ScenePreviewPage'
 
 const { refreshBudget } = vi.hoisted(() => ({ refreshBudget: vi.fn() }))
 
@@ -22,15 +22,15 @@ vi.mock('../../api/client', async () => {
   const actual = await vi.importActual<typeof import('../../api/client')>('../../api/client')
   return {
     ...actual,
-    getPanel: vi.fn(),
-    previewPanel: vi.fn(),
-    listPanelGenerations: vi.fn(),
-    duplicatePanel: vi.fn(),
-    deletePanel: vi.fn(),
-    generatePanel: vi.fn(),
+    getScene: vi.fn(),
+    previewScene: vi.fn(),
+    listSceneGenerations: vi.fn(),
+    duplicateScene: vi.fn(),
+    deleteScene: vi.fn(),
+    generateScene: vi.fn(),
     reviewCandidate: vi.fn(),
     editCandidate: vi.fn(),
-    updatePanelModel: vi.fn(),
+    updateSceneModel: vi.fn(),
   }
 })
 
@@ -40,7 +40,7 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-const LOCKED_PANEL: Panel = {
+const LOCKED_PANEL: Scene = {
   id: 3,
   beat_text: 'Mara backs toward the door.',
   camera: 'eye level',
@@ -59,7 +59,7 @@ const LOCKED_PANEL: Panel = {
   base_stage: null,
 }
 
-const BLOCKED_PREVIEW: PanelPreview = {
+const BLOCKED_PREVIEW: ScenePreview = {
   scene_id: 3,
   model: 'gemini-3.1-flash-image',
   image_size: '1K',
@@ -74,7 +74,7 @@ const BLOCKED_PREVIEW: PanelPreview = {
   blocked_reason: 'no canonical reference set',
 }
 
-const READY_PREVIEW: PanelPreview = {
+const READY_PREVIEW: ScenePreview = {
   ...BLOCKED_PREVIEW,
   prompt: 'REFERENCE IMAGE DECLARATIONS\nImage 1 is Elias.\n\nSCENE\nElias opens the door.',
   prompt_hash: 'reviewed-prompt-hash',
@@ -158,28 +158,28 @@ const GENERATED: Generation = {
   candidates: [],
 }
 
-function renderPreview(path = '/panels/3/preview') {
+function renderPreview(path = '/scenes/3/preview') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/panels/:id/preview" element={<PanelPreviewPage />} />
+        <Route path="/scenes/:id/preview" element={<ScenePreviewPage />} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
-describe('PanelPreviewPage — locked panel duplicate & edit', () => {
+describe('ScenePreviewPage — locked scene duplicate & edit', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
-    vi.mocked(client.getPanel).mockReset().mockResolvedValue(LOCKED_PANEL)
-    vi.mocked(client.previewPanel).mockReset().mockResolvedValue(BLOCKED_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockReset().mockResolvedValue([])
-    vi.mocked(client.duplicatePanel).mockReset()
-    vi.mocked(client.deletePanel).mockReset().mockResolvedValue(undefined)
-    vi.mocked(client.generatePanel).mockReset()
+    vi.mocked(client.getScene).mockReset().mockResolvedValue(LOCKED_PANEL)
+    vi.mocked(client.previewScene).mockReset().mockResolvedValue(BLOCKED_PREVIEW)
+    vi.mocked(client.listSceneGenerations).mockReset().mockResolvedValue([])
+    vi.mocked(client.duplicateScene).mockReset()
+    vi.mocked(client.deleteScene).mockReset().mockResolvedValue(undefined)
+    vi.mocked(client.generateScene).mockReset()
     vi.mocked(client.reviewCandidate).mockReset()
     vi.mocked(client.editCandidate).mockReset()
-    vi.mocked(client.updatePanelModel).mockReset()
+    vi.mocked(client.updateSceneModel).mockReset()
     refreshBudget.mockReset().mockResolvedValue(undefined)
   })
   afterEach(() => {
@@ -187,16 +187,16 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     vi.restoreAllMocks()
   })
 
-  it('offers Duplicate & edit instead of an Edit link once a panel is locked', async () => {
+  it('offers Duplicate & edit instead of an Edit link once a scene is locked', async () => {
     renderPreview()
     await screen.findByText(/Mara backs toward the door\./)
 
-    expect(screen.queryByRole('link', { name: 'Edit panel' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit scene' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Duplicate & edit/ })).toBeInTheDocument()
   })
 
   it('shows each candidate review status on its generation attempt', async () => {
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([
       { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
       {
         ...SUCCEEDED_ATTEMPT,
@@ -225,8 +225,8 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
   it('edits a successful candidate with an instruction and refreshes history', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listSceneGenerations)
       .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
       .mockResolvedValue([
         { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
@@ -260,8 +260,8 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
 
   it('disables submit until an edit instruction is entered', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([
       { ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] },
     ])
     renderPreview()
@@ -277,29 +277,29 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     expect(screen.getByRole('button', { name: 'Submit edit' })).toBeEnabled()
   })
 
-  it('puts the purple Back to panels button in the page header', async () => {
+  it('puts the purple Back to scenes button in the page header', async () => {
     renderPreview()
     await screen.findByText(/Mara backs toward the door\./)
 
-    const back = screen.getByRole('link', { name: 'Back to panels' })
+    const back = screen.getByRole('link', { name: 'Back to scenes' })
     expect(back).toHaveClass('btn--primary')
     expect(back.closest('.page-header__actions')).not.toBeNull()
   })
 
-  it('deletes the panel from the action block after confirmation', async () => {
+  it('deletes the scene from the action block after confirmation', async () => {
     const user = userEvent.setup()
     renderPreview()
 
     await user.click(await screen.findByRole('button', { name: 'Delete' }))
-    await user.click(screen.getByRole('button', { name: 'Delete panel' }))
+    await user.click(screen.getByRole('button', { name: 'Delete scene' }))
 
-    await waitFor(() => expect(client.deletePanel).toHaveBeenCalledWith(3))
-    expect(mockNavigate).toHaveBeenCalledWith('/panels')
+    await waitFor(() => expect(client.deleteScene).toHaveBeenCalledWith(3))
+    expect(mockNavigate).toHaveBeenCalledWith('/scenes')
   })
 
-  it('duplicates and navigates straight to editing the new panel', async () => {
+  it('duplicates and navigates straight to editing the new scene', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.duplicatePanel).mockResolvedValue({
+    vi.mocked(client.duplicateScene).mockResolvedValue({
       ...LOCKED_PANEL,
       id: 99,
       is_editable: true,
@@ -310,57 +310,57 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     const button = await screen.findByRole('button', { name: /Duplicate & edit/ })
     await user.click(button)
 
-    await waitFor(() => expect(client.duplicatePanel).toHaveBeenCalledWith(3))
-    expect(mockNavigate).toHaveBeenCalledWith('/panels/99/edit')
+    await waitFor(() => expect(client.duplicateScene).toHaveBeenCalledWith(3))
+    expect(mockNavigate).toHaveBeenCalledWith('/scenes/99/edit')
   })
 
-  it('keeps the panel preview and history visible when duplication fails', async () => {
+  it('keeps the scene preview and history visible when duplication fails', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([FAILED_ATTEMPT])
-    vi.mocked(client.duplicatePanel).mockRejectedValue(new Error('offline'))
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([FAILED_ATTEMPT])
+    vi.mocked(client.duplicateScene).mockRejectedValue(new Error('offline'))
     renderPreview()
 
     await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
 
-    expect(await screen.findByText('Could not duplicate panel: Error: offline')).toHaveAttribute('role', 'alert')
+    expect(await screen.findByText('Could not duplicate scene: Error: offline')).toHaveAttribute('role', 'alert')
     expect(screen.getByText('Mara backs toward the door.')).toBeInTheDocument()
     expect(screen.getByText('Attempt #5')).toBeInTheDocument()
   })
 
-  it('still shows Edit panel (not duplicate) for an editable panel', async () => {
-    vi.mocked(client.getPanel).mockResolvedValue({ ...LOCKED_PANEL, is_editable: true, generation_count: 0 })
-    vi.mocked(client.previewPanel).mockResolvedValue({
+  it('still shows Edit scene (not duplicate) for an editable scene', async () => {
+    vi.mocked(client.getScene).mockResolvedValue({ ...LOCKED_PANEL, is_editable: true, generation_count: 0 })
+    vi.mocked(client.previewScene).mockResolvedValue({
       ...BLOCKED_PREVIEW,
       can_generate: true,
       blocked_reason: null,
     })
     renderPreview()
     await screen.findByText(/Mara backs toward the door\./)
-    expect(screen.getByRole('link', { name: 'Edit panel' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit scene' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Duplicate & edit/ })).not.toBeInTheDocument()
   })
 
-  it('changes the model for the whole editable panel and refreshes its preview', async () => {
+  it('changes the model for the whole editable scene and refreshes its preview', async () => {
     const user = userEvent.setup()
-    const editablePanel = { ...LOCKED_PANEL, is_editable: true, generation_count: 0 }
-    const updatedPanel = { ...editablePanel, model: 'gemini-3-pro-image' }
-    vi.mocked(client.getPanel)
-      .mockResolvedValueOnce(editablePanel)
-      .mockResolvedValueOnce(updatedPanel)
-    vi.mocked(client.previewPanel)
+    const editableScene = { ...LOCKED_PANEL, is_editable: true, generation_count: 0 }
+    const updatedScene = { ...editableScene, model: 'gemini-3-pro-image' }
+    vi.mocked(client.getScene)
+      .mockResolvedValueOnce(editableScene)
+      .mockResolvedValueOnce(updatedScene)
+    vi.mocked(client.previewScene)
       .mockResolvedValueOnce(READY_PREVIEW)
       .mockResolvedValueOnce({ ...READY_PREVIEW, model: 'gemini-3-pro-image' })
-    vi.mocked(client.updatePanelModel).mockResolvedValue(updatedPanel)
+    vi.mocked(client.updateSceneModel).mockResolvedValue(updatedScene)
 
     renderPreview()
     const model = await screen.findByRole('combobox', { name: 'Generation model' })
     await user.selectOptions(model, 'gemini-3-pro-image')
 
-    await waitFor(() => expect(client.updatePanelModel).toHaveBeenCalledWith(
+    await waitFor(() => expect(client.updateSceneModel).toHaveBeenCalledWith(
       3,
       'gemini-3-pro-image',
     ))
-    await waitFor(() => expect(client.previewPanel).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(client.previewScene).toHaveBeenCalledTimes(2))
     expect(model).toHaveValue('gemini-3-pro-image')
   })
 
@@ -374,12 +374,12 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
   })
 
   it('shows the complete exact prompt before the paid generation button', async () => {
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 0,
     })
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
 
     renderPreview()
 
@@ -389,8 +389,8 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     if (!(prompt instanceof HTMLElement)) throw new Error('prompt preview was not rendered')
     expect(prompt.tagName).toBe('PRE')
     expect(prompt).toHaveTextContent(READY_PREVIEW.prompt, { normalizeWhitespace: false })
-    expect(prompt.closest('.panel-preview__content')).not.toBeNull()
-    expect(button.closest('.panel-preview__sidebar')).not.toBeNull()
+    expect(prompt.closest('.scene-preview__content')).not.toBeNull()
+    expect(button.closest('.scene-preview__sidebar')).not.toBeNull()
     expect(
       prompt.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
@@ -400,12 +400,12 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
     const user = userEvent.setup()
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.spyOn(navigator, 'clipboard', 'get').mockReturnValue({ writeText } as unknown as Clipboard)
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 0,
     })
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
 
     renderPreview()
 
@@ -417,12 +417,12 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
   })
 
   it('states that reference images are uploaded to Gemini before generating', async () => {
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 0,
     })
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
 
     renderPreview()
 
@@ -436,7 +436,7 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
   })
 
   it('shows the Base Stage source, ordered mapping, reference numbering, and expanded privacy disclosure', async () => {
-    const stagedPanel: Panel = {
+    const stagedScene: Scene = {
       ...LOCKED_PANEL,
       base_stage_id: 4,
       cast: [
@@ -461,8 +461,8 @@ describe('PanelPreviewPage — locked panel duplicate & edit', () => {
         targets: [{ id: 41, position: 1, description: 'traveler beside the train' }],
       },
     }
-    vi.mocked(client.getPanel).mockResolvedValue(stagedPanel)
-    vi.mocked(client.previewPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue(stagedScene)
+    vi.mocked(client.previewScene).mockResolvedValue({
       ...READY_PREVIEW,
       base_stage_id: 4,
       source_content_url: '/api/v1/base-stages/4/content',
@@ -499,12 +499,12 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
   })
 
   it('shows preserved failed generation attempts with error details', async () => {
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 1,
     })
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([FAILED_ATTEMPT])
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([FAILED_ATTEMPT])
 
     renderPreview()
 
@@ -514,19 +514,19 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     expect(timestamp).toHaveAttribute('title')
     expect(screen.getByText('Media resolution is not supported')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'View details' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Edit panel' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit scene' })).toBeInTheDocument()
   })
 
-  it('summarizes high-demand errors and retries from current panel settings', async () => {
+  it('summarizes high-demand errors and retries from current scene settings', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 1,
     })
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([HIGH_DEMAND_ATTEMPT])
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.generatePanel).mockResolvedValue(GENERATED)
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([HIGH_DEMAND_ATTEMPT])
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.generateScene).mockResolvedValue(GENERATED)
 
     renderPreview()
 
@@ -537,19 +537,19 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     refreshBudget.mockClear()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(client.generatePanel).toHaveBeenCalledWith(3, READY_PREVIEW.prompt_hash)
+    expect(client.generateScene).toHaveBeenCalledWith(3, READY_PREVIEW.prompt_hash)
     expect(refreshBudget).toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
   it('shows a carousel and reviews candidates from their attempt controls', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 1,
     })
-    vi.mocked(client.listPanelGenerations)
+    vi.mocked(client.listSceneGenerations)
       .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
       .mockResolvedValue([
         {
@@ -557,7 +557,7 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
           candidates: [{ ...CANDIDATE, review_status: 'accepted' }],
         },
       ])
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
     vi.mocked(client.reviewCandidate).mockResolvedValue({
       ...CANDIDATE,
       review_status: 'accepted',
@@ -570,7 +570,7 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
 
     // Carousel sits immediately after the page header, before the beat text
     // and prompt/preview sections.
-    const heading = screen.getByRole('heading', { name: 'Preview panel' })
+    const heading = screen.getByRole('heading', { name: 'Preview scene' })
     const carousel = screen.getByLabelText('Generated candidate across attempts')
     const beat = screen.getByText('Mara backs toward the door.')
     const allocationHeading = screen.getByRole('heading', { name: 'Reference-slot allocation' })
@@ -600,12 +600,12 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
 
   it('accepts and rejects the shown candidate from the carousel controls', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 1,
     })
-    vi.mocked(client.listPanelGenerations)
+    vi.mocked(client.listSceneGenerations)
       .mockResolvedValueOnce([{ ...SUCCEEDED_ATTEMPT, candidates: [CANDIDATE] }])
       .mockResolvedValue([
         {
@@ -613,7 +613,7 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
           candidates: [{ ...CANDIDATE, review_status: 'accepted' }],
         },
       ])
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
     vi.mocked(client.reviewCandidate).mockResolvedValue({
       ...CANDIDATE,
       review_status: 'accepted',
@@ -638,12 +638,12 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
   })
 
   it('uses the newest attempt with an image in the carousel', async () => {
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 2,
     })
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([
       { ...SUCCEEDED_ATTEMPT, id: 10, candidates: [{ ...CANDIDATE, id: 901, generation_id: 10 }] },
       { ...FAILED_ATTEMPT, candidates: [] },
     ])
@@ -659,11 +659,11 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
 
   it('cycles carousel images with arrow keys while the dialog stays open', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       generation_count: 2,
     })
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([
       {
         ...SUCCEEDED_ATTEMPT,
         id: 10,
@@ -708,13 +708,13 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
 
   it('reloads and explains when the reviewed prompt changed', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       is_editable: true,
       generation_count: 0,
     })
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.generatePanel).mockRejectedValue(
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.generateScene).mockRejectedValue(
       new client.ApiError(
         'the assembled prompt changed after preview; review the updated prompt before generating',
         'PreviewChangedError',
@@ -728,24 +728,24 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     expect(
       await screen.findByText(/inputs changed.*review the updated prompt/i),
     ).toBeInTheDocument()
-    expect(client.previewPanel).toHaveBeenCalledTimes(2)
+    expect(client.previewScene).toHaveBeenCalledTimes(2)
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
-  it('keeps panel, prompt, and history when generation and its reload fail', async () => {
+  it('keeps scene, prompt, and history when generation and its reload fail', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel)
+    vi.mocked(client.getScene)
       .mockResolvedValueOnce(LOCKED_PANEL)
       .mockRejectedValueOnce(new Error('reload offline'))
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([FAILED_ATTEMPT])
-    vi.mocked(client.generatePanel).mockRejectedValue(new Error('provider offline'))
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([FAILED_ATTEMPT])
+    vi.mocked(client.generateScene).mockRejectedValue(new Error('provider offline'))
     renderPreview()
 
     await user.click(await screen.findByRole('button', { name: /Generate one candidate/ }))
 
     expect(await screen.findByText(/Could not start generation/)).toHaveAttribute('role', 'alert')
-    expect(screen.getByText(/Could not refresh panel: Error: reload offline/)).toHaveAttribute(
+    expect(screen.getByText(/Could not refresh scene: Error: reload offline/)).toHaveAttribute(
       'role',
       'alert',
     )
@@ -757,12 +757,12 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
   })
 
   it('disables paid generation while an attempt is pending', async () => {
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...LOCKED_PANEL,
       generation_count: 1,
     })
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([PENDING_ATTEMPT])
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([PENDING_ATTEMPT])
 
     renderPreview()
 
@@ -777,8 +777,8 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
   it('accepts a poll slower than two seconds without starting an overlapping request', async () => {
     vi.useFakeTimers()
     const slowHistory = deferred<GenerationSummary[]>()
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listSceneGenerations)
       .mockResolvedValueOnce([PENDING_ATTEMPT])
       .mockImplementationOnce(() => slowHistory.promise)
 
@@ -790,12 +790,12 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000)
     })
-    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+    expect(client.listSceneGenerations).toHaveBeenCalledTimes(2)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4000)
     })
-    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+    expect(client.listSceneGenerations).toHaveBeenCalledTimes(2)
 
     await act(async () => {
       slowHistory.resolve([SUCCEEDED_ATTEMPT])
@@ -808,13 +808,13 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4000)
     })
-    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+    expect(client.listSceneGenerations).toHaveBeenCalledTimes(2)
   })
 
   it('announces a pending-to-failed transition once and stops polling', async () => {
     vi.useFakeTimers()
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations)
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listSceneGenerations)
       .mockResolvedValueOnce([PENDING_ATTEMPT])
       .mockResolvedValueOnce([{
         ...PENDING_ATTEMPT,
@@ -836,15 +836,15 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4000)
     })
-    expect(client.listPanelGenerations).toHaveBeenCalledTimes(2)
+    expect(client.listSceneGenerations).toHaveBeenCalledTimes(2)
   })
 
   it('does not navigate when generation completes after unmount', async () => {
     const generation = deferred<Generation>()
     const user = userEvent.setup()
-    vi.mocked(client.getPanel).mockResolvedValue({ ...LOCKED_PANEL, is_editable: true })
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.generatePanel).mockImplementation(() => generation.promise)
+    vi.mocked(client.getScene).mockResolvedValue({ ...LOCKED_PANEL, is_editable: true })
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.generateScene).mockImplementation(() => generation.promise)
     const page = renderPreview()
 
     await user.click(await screen.findByRole('button', { name: /Generate one candidate/ }))
@@ -858,9 +858,9 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
   })
 
   it('does not navigate when duplication completes after unmount', async () => {
-    const duplicate = deferred<Panel>()
+    const duplicate = deferred<Scene>()
     const user = userEvent.setup()
-    vi.mocked(client.duplicatePanel).mockImplementation(() => duplicate.promise)
+    vi.mocked(client.duplicateScene).mockImplementation(() => duplicate.promise)
     const page = renderPreview()
 
     await user.click(await screen.findByRole('button', { name: /Duplicate & edit/ }))
@@ -873,12 +873,12 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
-  it('shows panel and history when the initial preview request fails, then retries it', async () => {
+  it('shows scene and history when the initial preview request fails, then retries it', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.previewPanel)
+    vi.mocked(client.previewScene)
       .mockRejectedValueOnce(new Error('preview offline'))
       .mockResolvedValueOnce(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockResolvedValue([FAILED_ATTEMPT])
+    vi.mocked(client.listSceneGenerations).mockResolvedValue([FAILED_ATTEMPT])
     renderPreview()
 
     expect(await screen.findByText('Mara backs toward the door.')).toBeInTheDocument()
@@ -892,9 +892,9 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     expect(await screen.findByRole('heading', { name: 'Exact generation prompt' })).toBeInTheDocument()
   })
 
-  it('shows panel and preview when the initial history request fails with a section retry', async () => {
-    vi.mocked(client.previewPanel).mockResolvedValue(READY_PREVIEW)
-    vi.mocked(client.listPanelGenerations).mockRejectedValue(new Error('history offline'))
+  it('shows scene and preview when the initial history request fails with a section retry', async () => {
+    vi.mocked(client.previewScene).mockResolvedValue(READY_PREVIEW)
+    vi.mocked(client.listSceneGenerations).mockRejectedValue(new Error('history offline'))
     renderPreview()
 
     expect(await screen.findByText('Mara backs toward the door.')).toBeInTheDocument()
@@ -906,17 +906,17 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
     expect(screen.getByRole('button', { name: 'Retry generation history' })).toBeInTheDocument()
   })
 
-  it('rejects malformed panel IDs without resource calls', async () => {
-    renderPreview('/panels/bad/preview')
+  it('rejects malformed scene IDs without resource calls', async () => {
+    renderPreview('/scenes/bad/preview')
 
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
-    expect(client.getPanel).not.toHaveBeenCalled()
-    expect(client.previewPanel).not.toHaveBeenCalled()
-    expect(client.listPanelGenerations).not.toHaveBeenCalled()
+    expect(client.getScene).not.toHaveBeenCalled()
+    expect(client.previewScene).not.toHaveBeenCalled()
+    expect(client.listSceneGenerations).not.toHaveBeenCalled()
   })
 
-  it('renders not found when the initial panel request returns 404', async () => {
-    vi.mocked(client.getPanel).mockRejectedValue(
+  it('renders not found when the initial scene request returns 404', async () => {
+    vi.mocked(client.getScene).mockRejectedValue(
       new client.ApiError('missing', 'NotFoundError', 404),
     )
     renderPreview()
@@ -926,14 +926,14 @@ expect(screen.getByRole('link', { name: 'Open Base Stage #4' })).toHaveAttribute
 
   it('retries an initial failure and updates the loaded title', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel)
+    vi.mocked(client.getScene)
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(LOCKED_PANEL)
     renderPreview()
 
-    await waitFor(() => expect(document.title).toBe('Loading Panel Preview | LoreCraft3000'))
+    await waitFor(() => expect(document.title).toBe('Loading Scene Preview | LoreCraft3000'))
     await user.click(await screen.findByRole('button', { name: 'Retry' }))
     expect(await screen.findByText(/Mara backs toward the door/)).toBeInTheDocument()
-    await waitFor(() => expect(document.title).toBe('Panel #3 Preview | LoreCraft3000'))
+    await waitFor(() => expect(document.title).toBe('Scene #3 Preview | LoreCraft3000'))
   })
 })

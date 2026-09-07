@@ -6,11 +6,11 @@ import {
   generateBaseStage,
   getBaseStage,
   listBaseStageGenerations,
-  listBaseStagePanels,
+  listBaseStageScenes,
   previewBaseStage,
   publishBaseStage,
 } from '../../api/client'
-import type { BaseStage, BaseStagePreview, GenerationSummary, PanelSummary } from '../../api/types'
+import type { BaseStage, BaseStagePreview, GenerationSummary, SceneSummary } from '../../api/types'
 import { useBudget } from '../../api/useBudget'
 import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
@@ -51,7 +51,7 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
   const [stage, setStage] = useState<BaseStage | null>(null)
   const [preview, setPreview] = useState<BaseStagePreview | null>(null)
   const [attempts, setAttempts] = useState<GenerationSummary[] | null>(null)
-  const [usagePanels, setUsagePanels] = useState<PanelSummary[] | null>(null)
+  const [usageScenes, setUsageScenes] = useState<SceneSummary[] | null>(null)
   const [usageError, setUsageError] = useState<string | null>(null)
   const [stageError, setStageError] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -65,6 +65,7 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
   const [duplicating, setDuplicating] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [notFound, setNotFound] = useState(false)
+  const [previewSlot, setPreviewSlot] = useState<number | null>(null)
   const requestVersion = useRef(0)
   const hasLoadedStage = useRef(false)
   const attemptsRef = useRef<GenerationSummary[] | null>(null)
@@ -130,10 +131,10 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
           setAttemptsError(err instanceof ApiError ? err.message : String(err))
         },
       )
-      const usageRequest = listBaseStagePanels(stageId).then(
-        (panels) => {
+      const usageRequest = listBaseStageScenes(stageId).then(
+        (scenes) => {
           if (!mounted.current || version !== requestVersion.current) return
-          setUsagePanels(panels)
+          setUsageScenes(scenes)
           setUsageError(null)
         },
         (err: unknown) => {
@@ -244,7 +245,7 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
   }
 
   return (
-    <section className="panel-preview" aria-busy={generating || duplicating || publishing || undefined}>
+    <section className="scene-preview" aria-busy={generating || duplicating || publishing || undefined}>
       <PageHeader
         title={stage.state === 'ready' ? `Base stage #${stage.id} — Ready` : `Base stage #${stage.id} — Draft`}
         actions={<Link to="/base-stages" className="btn btn--primary">Back to base stages</Link>}
@@ -258,8 +259,8 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
         </AsyncMessage>
       )}
 
-      <div className="panel-preview__workspace">
-        <div className="panel-preview__content">
+      <div className="scene-preview__workspace">
+        <div className="scene-preview__content">
           {!preview && previewError && (
             <div>
               <AsyncMessage kind="error">Could not load generation preview: {previewError}</AsyncMessage>
@@ -270,8 +271,8 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
           {preview && (
             <>
               {stage.content_url && (
-                <section className="panel-preview__base-stage">
-                  <SectionHeader title="Current image" className="panel-preview__section-header" />
+                <section className="scene-preview__base-stage">
+                  <SectionHeader title="Current image" className="scene-preview__section-header" />
                   <ImageDialog
                     src={stage.content_url}
                     thumbnailAlt={`Base stage #${stage.id}`}
@@ -283,32 +284,32 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
               )}
 
               {stage.state === 'ready' && (
-                <section className="panel-preview__base-stage">
+                <section className="scene-preview__base-stage">
                   <SectionHeader
-                    title={usagePanels
-                      ? `Used by ${usagePanels.length} panel${usagePanels.length === 1 ? '' : 's'}`
-                      : 'Used by panels'}
-                    className="panel-preview__section-header"
+                    title={usageScenes
+                      ? `Used by ${usageScenes.length} scene${usageScenes.length === 1 ? '' : 's'}`
+                      : 'Used by scenes'}
+                    className="scene-preview__section-header"
                   />
                   {usageError && (
                     <AsyncMessage kind="error" className="field__hint">
-                      Could not load panels using this Base Stage: {usageError}
+                      Could not load scenes using this Base Stage: {usageError}
                     </AsyncMessage>
                   )}
-                  {usagePanels && usagePanels.length === 0 && (
-                    <p className="field__hint">No panels are currently anchored on this Base Stage.</p>
+                  {usageScenes && usageScenes.length === 0 && (
+                    <p className="field__hint">No scenes are currently anchored on this Base Stage.</p>
                   )}
-                  {usagePanels && usagePanels.length > 0 && (
+                  {usageScenes && usageScenes.length > 0 && (
                     <ul className="base-stage-usage">
-                      {usagePanels.map((panel) => (
-                        <li key={panel.id}>
-                          <Link to={`/panels/${panel.id}/preview`}>
-                            Panel #{panel.id}
+                      {usageScenes.map((scene) => (
+                        <li key={scene.id}>
+                          <Link to={`/scenes/${scene.id}/preview`}>
+                            Scene #{scene.id}
                           </Link>
                           <span className="field__hint">
-                            {panel.beat_text} · {panel.generation_count} attempt
-                            {panel.generation_count === 1 ? '' : 's'}
-                            {panel.latest_attempt_preview_url && ' · has preview'}
+                            {scene.beat_text} · {scene.generation_count} attempt
+                            {scene.generation_count === 1 ? '' : 's'}
+                            {scene.latest_attempt_preview_url && ' · has preview'}
                           </span>
                         </li>
                       ))}
@@ -318,11 +319,11 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
               )}
 
               {stage.targets.length > 0 && (
-                <section className="panel-preview__base-stage">
+                <section className="scene-preview__base-stage">
                   <SectionHeader
                     title="Identity targets"
-                    description="Ordered figure placeholders that can be mapped to characters when staging a panel."
-                    className="panel-preview__section-header"
+                    description="Ordered figure placeholders that can be mapped to characters when staging a scene."
+                    className="scene-preview__section-header"
                   />
                   <ol className="base-stage-target-list" aria-label="Identity targets">
                     {[...stage.targets].sort((a, b) => a.position - b.position).map((target, index) => (
@@ -358,94 +359,16 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
               />
               <pre className="prompt-preview">{preview.prompt}</pre>
 
-              <p className="panel-preview__cost">
+              <p className="scene-preview__cost">
                 Estimated cost: <strong>{formatCents(preview.estimated_cost_cents)}</strong>
               </p>
-            </>
+</>
           )}
 
-          {attemptsError && (
-            <div>
-              <AsyncMessage kind="error">Could not load generation history: {attemptsError}</AsyncMessage>
-              <button type="button" className="btn" onClick={() => void reload()}>Retry generation history</button>
-            </div>
-          )}
-
-          {attempts && attempts.length > 0 && (
-            <>
-              <SectionHeader title="Generation attempts" />
-              <div className="attempt-list">
-                {attempts.map((attempt) => (
-                  <article className="attempt-row" key={attempt.id}>
-                    <div className="attempt-row__summary">
-                      <strong>Attempt #{attempt.id}</strong>
-                      <span className="field__hint">
-                        {attempt.model} · cost {formatCents(attempt.cost_usd_cents)} ·{' '}
-                        <DateTime value={attempt.created_at} />
-                      </span>
-                      <div className="attempt-row__badges">
-                        <span className={`badge badge--attempt-${attempt.state}`}>
-                          {attempt.state.charAt(0).toUpperCase() + attempt.state.slice(1)}
-                        </span>
-                      </div>
-                    </div>
-                    {(attempt.candidates.length > 0 || attempt.error_text) && (
-                      <div className="attempt-row__detail">
-                        {attempt.candidates.length > 0 && (
-                          <div className="attempt-row__preview">
-                            <ImageDialog
-                              src={attempt.candidates[0].content_url}
-                              thumbnailAlt={`Preview from attempt ${attempt.id}`}
-                              previewAlt={`Image from attempt ${attempt.id}, full size`}
-                              triggerLabel={`Preview attempt ${attempt.id}`}
-                              dialogLabel={`Attempt ${attempt.id} full preview`}
-                            />
-                          </div>
-                        )}
-                        {attempt.error_text && (
-                          <div className="attempt-error">
-                            <p>{friendlyGenerationError(attempt.error_text)}</p>
-                            <details>
-                              <summary>Technical details</summary>
-                              <pre>{attempt.error_text}</pre>
-                            </details>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {attempt.state === 'succeeded' && attempt.candidates.length > 0 && !stage.selected_candidate_id && (
-                      <div className="attempt-row__actions">
-                        <button
-                          type="button"
-                          className="btn btn--primary"
-                          disabled={publishing || hasPendingAttempt}
-                          onClick={() => void handlePublish(attempt.candidates[0].id)}
-                        >
-                          {publishing ? 'Publishing…' : 'Publish as base stage image'}
-                        </button>
-                      </div>
-                    )}
-                    {attempt.state === 'failed' && (
-                      <div className="attempt-row__actions">
-                        <button
-                          type="button"
-                          className="btn btn--primary"
-                          disabled={generating || hasPendingAttempt}
-                          onClick={() => void handleGenerate()}
-                        >
-                          Try again
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                ))}
-              </div>
-            </>
-          )}
         </div>
 
-        <aside className="panel-preview__sidebar" aria-label="Base stage actions">
-          <div className="action-bar panel-preview__actions">
+        <aside className="scene-preview__sidebar" aria-label="Base stage actions">
+          <div className="card action-bar scene-preview__actions">
             {(stage.is_editable || stage.origin === 'generated') && (
               <div className="action-bar__group action-bar__group--start">
                 {stage.is_editable ? (
@@ -480,13 +403,120 @@ function BaseStagePreview({ stageId }: { stageId: number }) {
             )}
           </div>
           {stage.state === 'ready' && (
-            <p className="field__hint" style={{ marginTop: '0.5rem' }}>
-              This base stage is published and can be used by panels.
+            <p className="field__hint scene-preview__aside-hint">
+              This base stage is published and can be used by scenes.
               Duplicate to create a new editable variant.
             </p>
           )}
         </aside>
       </div>
+
+      {attemptsError && (
+        <div>
+          <AsyncMessage kind="error">Could not load generation history: {attemptsError}</AsyncMessage>
+          <button type="button" className="btn" onClick={() => void reload()}>Retry generation history</button>
+        </div>
+      )}
+
+      {attempts && attempts.length > 0 && (
+        <>
+          <SectionHeader title="Generation attempts" className="scene-preview__attempts-heading" />
+          {(() => {
+            const slots = attempts
+              .filter((attempt) => attempt.state === 'succeeded' && attempt.candidates.length > 0)
+              .map((attempt) => ({ attempt, candidate: attempt.candidates[0] }))
+            const previewSlotIndex = previewSlot !== null ? previewSlot % slots.length : null
+            const previewItem = previewSlotIndex !== null ? slots[previewSlotIndex] : null
+            return (
+              <div className="attempt-list">
+                {attempts.map((attempt) => {
+                  const slotIndex = slots.findIndex((slot) => slot.attempt.id === attempt.id)
+                  return (
+                    <article className="card attempt-row" key={attempt.id}>
+                      <div className="attempt-row__summary">
+                        <strong>Attempt #{attempt.id}</strong>
+                        <span className="field__hint">
+                          <span>{attempt.model}</span>
+                          <span>accounted cost {formatCents(attempt.cost_usd_cents)}</span>
+                          <span>
+                            <DateTime value={attempt.created_at} />
+                          </span>
+                        </span>
+                        <div className="attempt-row__badges">
+                          <span className={`badge badge--attempt-${attempt.state}`}>
+                            {attempt.state.charAt(0).toUpperCase() + attempt.state.slice(1)}
+                          </span>
+                          {attempt.candidates.length > 0 && (
+                            <span
+                              className={`badge badge--attempt-${stage.selected_candidate_id === attempt.candidates[0].id ? 'accepted' : 'pending'}`}
+                            >
+                              {stage.selected_candidate_id === attempt.candidates[0].id
+                                ? 'Selected'
+                                : 'Waiting'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {(attempt.candidates.length > 0 || attempt.error_text) && (
+                        <div className="attempt-row__detail">
+                          {attempt.candidates.length > 0 && slotIndex >= 0 && (
+                            <div className="attempt-row__preview">
+                              <ImageDialog
+                                src={attempt.candidates[0].content_url}
+                                previewSrc={previewItem?.candidate.content_url ?? attempt.candidates[0].content_url}
+                                thumbnailAlt={`Preview from attempt ${attempt.id}`}
+                                previewAlt={`Image from attempt ${previewItem?.attempt.id ?? attempt.id}, full size`}
+                                triggerLabel={`Preview attempt ${attempt.id}`}
+                                dialogLabel={`Attempt ${previewItem?.attempt.id ?? attempt.id} full preview`}
+                                onPrevious={() => setPreviewSlot((current) => ((current ?? slotIndex) - 1 + slots.length) % slots.length)}
+                                onNext={() => setPreviewSlot((current) => ((current ?? slotIndex) + 1) % slots.length)}
+                                onOpenChange={(open) => setPreviewSlot(open ? slotIndex : null)}
+                              />
+                            </div>
+                          )}
+                          {attempt.error_text && (
+                            <div className="attempt-error">
+                              <p>{friendlyGenerationError(attempt.error_text)}</p>
+                              <details>
+                                <summary>Technical details</summary>
+                                <pre>{attempt.error_text}</pre>
+                              </details>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {attempt.state === 'succeeded' && attempt.candidates.length > 0 && !stage.selected_candidate_id && (
+                        <div className="attempt-row__actions">
+                          <button
+                            type="button"
+                            className="btn btn--primary"
+                            disabled={publishing || hasPendingAttempt}
+                            onClick={() => void handlePublish(attempt.candidates[0].id)}
+                          >
+                            {publishing ? 'Publishing…' : 'Publish as base stage image'}
+                          </button>
+                        </div>
+                      )}
+                      {attempt.state === 'failed' && (
+                        <div className="attempt-row__actions">
+                          <button
+                            type="button"
+                            className="btn btn--primary"
+                            disabled={generating || hasPendingAttempt}
+                            onClick={() => void handleGenerate()}
+                          >
+                            Try again
+                          </button>
+                        </div>
+                      )}
+                    </article>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </>
+      )}
     </section>
   )
 }

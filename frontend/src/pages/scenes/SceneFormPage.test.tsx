@@ -3,20 +3,20 @@ import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../../api/client'
-import type { BaseStage, Character, OptionsSummary, Panel, Style } from '../../api/types'
-import { PanelFormPage } from './PanelFormPage'
+import type { BaseStage, Character, OptionsSummary, Scene, Style } from '../../api/types'
+import { SceneFormPage } from './SceneFormPage'
 
 vi.mock('../../api/client', async () => {
   const actual = await vi.importActual<typeof import('../../api/client')>('../../api/client')
   return {
     ...actual,
-    createPanel: vi.fn(),
-    duplicatePanel: vi.fn(),
-    getPanel: vi.fn(),
+    createScene: vi.fn(),
+    duplicateScene: vi.fn(),
+    getScene: vi.fn(),
     listBaseStages: vi.fn(),
     listCharacters: vi.fn(),
     listStyles: vi.fn(),
-    updatePanel: vi.fn(),
+    updateScene: vi.fn(),
   }
 })
 
@@ -32,7 +32,7 @@ const OPTIONS: OptionsSummary = {
   remaining_today_cents: 300,
   ref_image_weight_explanation: 'x',
   ref_set_immutability_explanation: 'y',
-  panel_immutability_explanation: 'z',
+  scene_immutability_explanation: 'z',
 }
 
 const READY_CHARACTER: Character = {
@@ -96,7 +96,7 @@ const BASE_STAGE: BaseStage = {
   created_at: '',
 }
 
-const EDITABLE_PANEL: Panel = {
+const EDITABLE_PANEL: Scene = {
   id: 12,
   beat_text: 'Mara opens the door',
   camera: 'eye level',
@@ -128,27 +128,27 @@ vi.mock('../../api/useOptions', () => ({
   useOptions: () => OPTIONS,
 }))
 
-describe('PanelFormPage — field descriptions', () => {
+describe('SceneFormPage — field descriptions', () => {
   beforeEach(() => {
-    vi.mocked(client.getPanel).mockReset().mockResolvedValue(EDITABLE_PANEL)
+    vi.mocked(client.getScene).mockReset().mockResolvedValue(EDITABLE_PANEL)
     vi.mocked(client.listCharacters).mockReset().mockResolvedValue([READY_CHARACTER])
     vi.mocked(client.listStyles).mockReset().mockResolvedValue(STYLES)
     vi.mocked(client.listBaseStages).mockReset().mockResolvedValue([])
-    vi.mocked(client.createPanel).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
-    vi.mocked(client.duplicatePanel).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
-    vi.mocked(client.updatePanel).mockReset().mockResolvedValue(EDITABLE_PANEL)
+    vi.mocked(client.createScene).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
+    vi.mocked(client.duplicateScene).mockReset().mockResolvedValue({ ...EDITABLE_PANEL, id: 20 })
+    vi.mocked(client.updateScene).mockReset().mockResolvedValue(EDITABLE_PANEL)
   })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  function renderForm(path = '/panels/new') {
+  function renderForm(path = '/scenes/new') {
     const router = createMemoryRouter(
       [
-        { path: '/panels/new', element: <PanelFormPage /> },
-        { path: '/panels/:id/edit', element: <PanelFormPage /> },
-        { path: '/panels/:id/preview', element: <h1>Panel preview</h1> },
-        { path: '/panels', element: <h1>Panels</h1> },
+        { path: '/scenes/new', element: <SceneFormPage /> },
+        { path: '/scenes/:id/edit', element: <SceneFormPage /> },
+        { path: '/scenes/:id/preview', element: <h1>Scene preview</h1> },
+        { path: '/scenes', element: <h1>Scenes</h1> },
         { path: '/styles/new', element: <h1>New style</h1> },
         { path: '/characters/new', element: <h1>New character</h1> },
         { path: '/characters', element: <h1>Characters</h1> },
@@ -224,7 +224,7 @@ describe('PanelFormPage — field descriptions', () => {
 
     renderForm()
 
-    expect(screen.getByText('Loading panel prerequisites...')).toBeInTheDocument()
+    expect(screen.getByText('Loading scene prerequisites...')).toBeInTheDocument()
     expect(screen.queryByLabelText('Action')).not.toBeInTheDocument()
   })
 
@@ -238,7 +238,7 @@ describe('PanelFormPage — field descriptions', () => {
 
     expect(await screen.findByText(/characters unavailable/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Action')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Retry panel prerequisites' }))
+    await user.click(screen.getByRole('button', { name: 'Retry scene prerequisites' }))
 
     expect(await screen.findByLabelText('Action')).toBeInTheDocument()
     expect(client.listCharacters).toHaveBeenCalledTimes(2)
@@ -251,7 +251,7 @@ describe('PanelFormPage — field descriptions', () => {
     renderForm()
 
     expect(await screen.findByText(/styles unavailable/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Retry panel prerequisites' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry scene prerequisites' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Action')).not.toBeInTheDocument()
   })
 
@@ -292,67 +292,67 @@ describe('PanelFormPage — field descriptions', () => {
     expect(await screen.findByLabelText('Style')).toHaveValue('7')
   })
 
-  it('keeps panel-detail loading separate from loaded prerequisites', async () => {
-    vi.mocked(client.getPanel).mockReturnValue(new Promise(() => {}))
-    renderForm('/panels/12/edit')
+  it('keeps scene-detail loading separate from loaded prerequisites', async () => {
+    vi.mocked(client.getScene).mockReturnValue(new Promise(() => {}))
+    renderForm('/scenes/12/edit')
 
-    expect(await screen.findByText('Loading panel details...')).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByText('Loading panel prerequisites...')).not.toBeInTheDocument())
+    expect(await screen.findByText('Loading scene details...')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Loading scene prerequisites...')).not.toBeInTheDocument())
     expect(screen.queryByLabelText('Action')).not.toBeInTheDocument()
   })
 
-  it('shows a panel-detail failure and retries it without reloading prerequisites', async () => {
+  it('shows a scene-detail failure and retries it without reloading prerequisites', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.getPanel)
-      .mockRejectedValueOnce(new Error('panel unavailable'))
+    vi.mocked(client.getScene)
+      .mockRejectedValueOnce(new Error('scene unavailable'))
       .mockResolvedValueOnce(EDITABLE_PANEL)
 
-    renderForm('/panels/12/edit')
+    renderForm('/scenes/12/edit')
 
-    expect(await screen.findByText(/panel unavailable/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Retry panel details' }))
+    expect(await screen.findByText(/scene unavailable/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry scene details' }))
 
     expect(await screen.findByDisplayValue('Mara opens the door')).toBeInTheDocument()
-    expect(client.getPanel).toHaveBeenCalledTimes(2)
+    expect(client.getScene).toHaveBeenCalledTimes(2)
     expect(client.listCharacters).toHaveBeenCalledTimes(1)
     expect(client.listStyles).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects a malformed edit ID without loading panel resources', async () => {
-    renderForm('/panels/bad/edit')
+  it('rejects a malformed edit ID without loading scene resources', async () => {
+    renderForm('/scenes/bad/edit')
 
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
-    expect(client.getPanel).not.toHaveBeenCalled()
+    expect(client.getScene).not.toHaveBeenCalled()
     expect(client.listCharacters).not.toHaveBeenCalled()
     expect(client.listStyles).not.toHaveBeenCalled()
   })
 
-  it('renders not found when an edit panel is missing', async () => {
-    vi.mocked(client.getPanel).mockRejectedValue(
+  it('renders not found when an edit scene is missing', async () => {
+    vi.mocked(client.getScene).mockRejectedValue(
       new client.ApiError('missing', 'NotFoundError', 404),
     )
-    renderForm('/panels/12/edit')
+    renderForm('/scenes/12/edit')
 
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
   })
 
   it('uses a static edit title while loading', async () => {
-    vi.mocked(client.getPanel).mockReturnValue(new Promise(() => {}))
-    renderForm('/panels/12/edit')
+    vi.mocked(client.getScene).mockReturnValue(new Promise(() => {}))
+    renderForm('/scenes/12/edit')
 
-    await waitFor(() => expect(document.title).toBe('Edit Panel | LoreCraft3000'))
+    await waitFor(() => expect(document.title).toBe('Edit Scene | LoreCraft3000'))
   })
 
-  it('updates the edit title after the panel loads', async () => {
-    renderForm('/panels/12/edit')
+  it('updates the edit title after the scene loads', async () => {
+    renderForm('/scenes/12/edit')
 
     await screen.findByDisplayValue('Mara opens the door')
-    await waitFor(() => expect(document.title).toBe('Edit Panel #12 | LoreCraft3000'))
+    await waitFor(() => expect(document.title).toBe('Edit Scene #12 | LoreCraft3000'))
   })
 
   it('preserves an existing noncanonical cast member while editing a mixed list', async () => {
     vi.mocked(client.listCharacters).mockResolvedValue([READY_CHARACTER, UNREADY_CHARACTER])
-    renderForm('/panels/12/edit')
+    renderForm('/scenes/12/edit')
 
     expect(await screen.findByRole('textbox', { name: 'Staging role for Mara' })).toHaveValue(
       'at the door',
@@ -362,37 +362,37 @@ describe('PanelFormPage — field descriptions', () => {
 
   it('preserves an existing cast when no listed character is generation-ready', async () => {
     vi.mocked(client.listCharacters).mockResolvedValue([UNREADY_CHARACTER])
-    renderForm('/panels/12/edit')
+    renderForm('/scenes/12/edit')
 
     expect(await screen.findByRole('textbox', { name: 'Staging role for Mara' })).toHaveValue(
       'at the door',
     )
-    expect(screen.queryByText(/before you can stage a panel/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/before you can stage a scene/)).not.toBeInTheDocument()
   })
 
-  it('captures prerequisite defaults as a clean create baseline and Cancels to panels', async () => {
+  it('captures prerequisite defaults as a clean create baseline and Cancels to scenes', async () => {
     const user = userEvent.setup()
     const router = renderForm()
 
     expect(await screen.findByLabelText('Style')).toHaveValue('7')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    expect(router.state.location.pathname).toBe('/panels')
+    expect(router.state.location.pathname).toBe('/scenes')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('captures edit hydration as clean and Cancels to preview', async () => {
     const user = userEvent.setup()
-    const router = renderForm('/panels/12/edit')
+    const router = renderForm('/scenes/12/edit')
 
     await screen.findByDisplayValue('Mara opens the door')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    expect(router.state.location.pathname).toBe('/panels/12/preview')
+    expect(router.state.location.pathname).toBe('/scenes/12/preview')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('protects material panel edits when Cancel is declined', async () => {
+  it('protects material scene edits when Cancel is declined', async () => {
     const user = userEvent.setup()
     const router = renderForm()
     const action = await screen.findByLabelText('Action')
@@ -401,13 +401,13 @@ describe('PanelFormPage — field descriptions', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
 
-    expect(router.state.location.pathname).toBe('/panels/new')
+    expect(router.state.location.pathname).toBe('/scenes/new')
     expect(action).toHaveValue('Elias enters')
   })
 
   it('keeps a failed save dirty and bypasses protection after a successful save', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.createPanel)
+    vi.mocked(client.createScene)
       .mockRejectedValueOnce(new Error('save failed'))
       .mockResolvedValueOnce({ ...EDITABLE_PANEL, id: 20 })
     const router = renderForm()
@@ -424,32 +424,32 @@ describe('PanelFormPage — field descriptions', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('save failed')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
-    expect(router.state.location.pathname).toBe('/panels/new')
+    expect(router.state.location.pathname).toBe('/scenes/new')
 
     await user.click(screen.getByRole('button', { name: 'Save and preview' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/panels/20/preview'))
-    expect(client.createPanel).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(router.state.location.pathname).toBe('/scenes/20/preview'))
+    expect(client.createScene).toHaveBeenLastCalledWith(
       expect.objectContaining({ cast: [{ character_id: 1, role: '', prominence: 1 }] }),
     )
   })
 
-  it('supports the no-style Base Stage path with visual selection and a complete ordered payload', async () => {
+  it('inherits a Base Stage style, allows an override, and submits the selected style', async () => {
     const user = userEvent.setup()
-    vi.mocked(client.listStyles).mockResolvedValue([])
     vi.mocked(client.listCharacters).mockResolvedValue([READY_CHARACTER, READY_MARA])
-    vi.mocked(client.listBaseStages).mockResolvedValue([BASE_STAGE])
+    vi.mocked(client.listBaseStages).mockResolvedValue([{ ...BASE_STAGE, style_id: 9 }])
     renderForm()
 
     const mode = await screen.findByRole('checkbox', { name: 'Use a base stage' })
-    expect(screen.getByText('A style is required')).toBeInTheDocument()
     await user.click(mode)
 
     expect(screen.queryByLabelText('Action')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Style')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Style')).toBeInTheDocument()
     expect(screen.getByLabelText('Model')).toBeInTheDocument()
     expect(screen.getByLabelText('Image size')).toBeInTheDocument()
     const stageChoice = screen.getByRole('radio', { name: /Moonlit station platform/ })
     await user.click(stageChoice)
+    expect(screen.getByLabelText('Style')).toHaveValue('9')
+    await user.selectOptions(screen.getByLabelText('Style'), '7')
     expect(screen.getByAltText('Selected base stage: Moonlit station platform')).toHaveAttribute(
       'src',
       BASE_STAGE.content_url,
@@ -470,7 +470,7 @@ describe('PanelFormPage — field descriptions', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Save and preview' }))
 
-    await waitFor(() => expect(client.createPanel).toHaveBeenCalledWith({
+    await waitFor(() => expect(client.createScene).toHaveBeenCalledWith({
       base_stage_id: 4,
       beat_text: null,
       camera: null,
@@ -481,7 +481,7 @@ describe('PanelFormPage — field descriptions', () => {
         { character_id: 1, base_stage_target_id: 41, role: '', prominence: 3 },
         { character_id: 2, base_stage_target_id: 42, role: '', prominence: 1 },
       ],
-      style_id: null,
+      style_id: 7,
       model: OPTIONS.default_model,
       image_size: OPTIONS.default_image_size,
     }))
@@ -523,7 +523,7 @@ describe('PanelFormPage — field descriptions', () => {
   it('hydrates an archived linked Base Stage and its target mappings on edit', async () => {
     vi.mocked(client.listCharacters).mockResolvedValue([READY_CHARACTER, READY_MARA])
     vi.mocked(client.listBaseStages).mockResolvedValue([])
-    vi.mocked(client.getPanel).mockResolvedValue({
+    vi.mocked(client.getScene).mockResolvedValue({
       ...EDITABLE_PANEL,
       base_stage_id: 4,
       style_id: null,
@@ -542,7 +542,7 @@ describe('PanelFormPage — field descriptions', () => {
         targets: BASE_STAGE.targets,
       },
     })
-    renderForm('/panels/12/edit')
+    renderForm('/scenes/12/edit')
 
     expect(await screen.findByRole('checkbox', { name: 'Use a base stage' })).toBeChecked()
     expect(screen.getByRole('radio', { name: /Moonlit station platform/ })).toBeChecked()
@@ -552,25 +552,25 @@ describe('PanelFormPage — field descriptions', () => {
   })
 
   it('lets duplication finish without navigating after the locked page is left', async () => {
-    let resolveDuplicate!: (panel: Panel) => void
-    vi.mocked(client.getPanel).mockResolvedValue({ ...EDITABLE_PANEL, is_editable: false })
-    vi.mocked(client.duplicatePanel).mockReturnValue(
+    let resolveDuplicate!: (scene: Scene) => void
+    vi.mocked(client.getScene).mockResolvedValue({ ...EDITABLE_PANEL, is_editable: false })
+    vi.mocked(client.duplicateScene).mockReturnValue(
       new Promise((resolve) => {
         resolveDuplicate = resolve
       }),
     )
     const user = userEvent.setup()
-    const router = renderForm('/panels/12/edit')
+    const router = renderForm('/scenes/12/edit')
 
     await user.click(await screen.findByRole('button', { name: 'Duplicate & edit' }))
     expect(screen.getByRole('button', { name: 'Duplicate & edit' })).toHaveAttribute(
       'aria-busy',
       'true',
     )
-    await router.navigate('/panels')
-    expect(await screen.findByRole('heading', { name: 'Panels' })).toBeInTheDocument()
+    await router.navigate('/scenes')
+    expect(await screen.findByRole('heading', { name: 'Scenes' })).toBeInTheDocument()
 
     await act(async () => resolveDuplicate({ ...EDITABLE_PANEL, id: 20 }))
-    expect(router.state.location.pathname).toBe('/panels')
+    expect(router.state.location.pathname).toBe('/scenes')
   })
 })

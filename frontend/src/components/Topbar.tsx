@@ -11,9 +11,10 @@ interface TopbarProps {
 
 function pageLabel(pathname: string): string {
   if (pathname === '/') return 'Dashboard'
-  if (pathname === '/panels/new') return 'Stage new panel'
-  if (pathname.startsWith('/panels/') && pathname.endsWith('/preview')) return 'Panel preview'
-  if (pathname.startsWith('/panels/') && pathname.endsWith('/edit')) return 'Edit panel'
+  if (pathname === '/scenes/new') return 'Stage new scene'
+  if (pathname.startsWith('/scenes/') && pathname.endsWith('/preview')) return 'Scene preview'
+  if (pathname.startsWith('/scenes/') && pathname.endsWith('/edit')) return 'Edit scene'
+  if (pathname === '/scenes') return 'Scenes'
   if (pathname === '/panels') return 'Panels'
   if (pathname === '/characters/new') return 'New character'
   if (pathname.startsWith('/characters/') && pathname.endsWith('/edit')) return 'Edit character'
@@ -41,13 +42,13 @@ export function Topbar({
       <button
         ref={menuButtonRef}
         type="button"
-        className="app-topbar__toggle"
+        className="icon-button app-topbar__toggle"
         aria-label="Open navigation"
         aria-controls="app-sidebar"
         aria-expanded={drawerOpen}
         onClick={onMenuClick}
       >
-        <Icon name="menu" size={19} />
+        <Icon name="menu" size="lg" />
       </button>
       <span className="app-topbar__title">{pageLabel(pathname)}</span>
       <button
@@ -56,8 +57,8 @@ export function Topbar({
         aria-label="Open command palette"
         onClick={onCommandClick}
       >
-        <Icon name="search" size={17} />
-        <kbd>Cmd K</kbd>
+        <Icon name="search" size="sm" />
+        <kbd className="kbd">Cmd K</kbd>
       </button>
     </div>
   )

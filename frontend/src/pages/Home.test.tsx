@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BaseStage, Character, GalleryItem, Panel, Style } from '../api/types'
+import type { BaseStage, Character, GalleryItem, Scene, Style } from '../api/types'
 import App from '../App'
 
 const originalFetch = globalThis.fetch
@@ -24,15 +24,15 @@ const OPTIONS_SUMMARY = {
   remaining_today_cents: 225,
   ref_image_weight_explanation: 'x',
   ref_set_immutability_explanation: 'y',
-  panel_immutability_explanation: 'z',
+  scene_immutability_explanation: 'z',
 }
 
-function panel(id: number, editable = false): Panel {
+function scene(id: number, editable = false): Scene {
   return {
     base_stage_id: null,
     base_stage: null,
     id,
-    beat_text: `Beat for panel ${id}`,
+    beat_text: `Beat for scene ${id}`,
     camera: 'eye level',
     cast: [],
     framing: 'medium',
@@ -51,7 +51,7 @@ function panel(id: number, editable = false): Panel {
 function galleryItem(id: number): GalleryItem {
   return {
     candidate_id: id,
-    panel_id: id,
+    scene_id: id,
     beat_text: `Accepted beat ${id}`,
     aspect_ratio: '3:2',
     content_url: `/api/v1/content/${id}`,
@@ -125,7 +125,7 @@ const BASE_STAGES: BaseStage[] = [
 ]
 
 describe('Dashboard', () => {
-  let panels: Panel[]
+  let scenes: Scene[]
   let gallery: GalleryItem[]
   let characters: Character[]
   let styles: Style[]
@@ -134,7 +134,7 @@ describe('Dashboard', () => {
 
   beforeEach(() => {
     window.location.hash = '#/'
-    panels = [panel(3, true), panel(2), panel(1)]
+    scenes = [scene(3, true), scene(2), scene(1)]
     gallery = [galleryItem(3), galleryItem(2), galleryItem(1)]
     characters = CHARACTERS
     styles = STYLES
@@ -144,7 +144,7 @@ describe('Dashboard', () => {
     globalThis.fetch = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/options/summary')) return Promise.resolve(jsonResponse(OPTIONS_SUMMARY))
-      if (url.endsWith('/panels')) return Promise.resolve(jsonResponse(panels))
+      if (url.endsWith('/scenes')) return Promise.resolve(jsonResponse(scenes))
       if (url.endsWith('/gallery')) {
         return Promise.resolve(
           galleryFails
@@ -180,7 +180,7 @@ describe('Dashboard', () => {
     expect(emoji.test(dashboard.textContent ?? '')).toBe(false)
   })
 
-  it('shows budget, library counts, recent panels and recent accepted output', async () => {
+  it('shows budget, library counts, recent scenes and recent accepted output', async () => {
     render(<App />)
 
     expect(await screen.findByText('$2.25')).toBeInTheDocument()
@@ -195,48 +195,48 @@ describe('Dashboard', () => {
     expect(within(library).getByRole('link', { name: '1 Base Stages' })).toBeInTheDocument()
 
     const work = screen.getByRole('region', { name: 'Continue working' })
-    expect(await within(work).findByText('Beat for panel 3')).toBeInTheDocument()
+    expect(await within(work).findByText('Beat for scene 3')).toBeInTheDocument()
     expect(within(work).getByRole('link', { name: /Continue editing/ })).toHaveAttribute(
       'href',
-      '#/panels/3/edit',
+      '#/scenes/3/edit',
     )
-    expect(within(work).getAllByText(/Beat for panel/)).toHaveLength(3)
+    expect(within(work).getAllByText(/Beat for scene/)).toHaveLength(3)
 
     const output = screen.getByRole('region', { name: 'Recent output' })
-    expect(await within(output).findByRole('img', { name: 'Accepted image from panel 3' })).toBeInTheDocument()
+    expect(await within(output).findByRole('img', { name: 'Accepted image from scene 3' })).toBeInTheDocument()
     expect(within(output).getAllByRole('img')).toHaveLength(3)
   })
 
-  it('limits the dashboard to three panels and six output images', async () => {
-    panels = [panel(9), panel(8), panel(7), panel(6)]
+  it('limits the dashboard to three scenes and six output images', async () => {
+    scenes = [scene(9), scene(8), scene(7), scene(6)]
     gallery = Array.from({ length: 7 }, (_, index) => galleryItem(20 - index))
     render(<App />)
 
     await screen.findByRole('heading', { level: 1, name: 'Dashboard' })
     const work = screen.getByRole('region', { name: 'Continue working' })
-    expect(await within(work).findByText('Beat for panel 9')).toBeInTheDocument()
-    expect(within(work).queryByText('Beat for panel 6')).not.toBeInTheDocument()
+    expect(await within(work).findByText('Beat for scene 9')).toBeInTheDocument()
+    expect(within(work).queryByText('Beat for scene 6')).not.toBeInTheDocument()
 
     const output = screen.getByRole('region', { name: 'Recent output' })
-    await within(output).findByRole('img', { name: 'Accepted image from panel 20' })
+    await within(output).findByRole('img', { name: 'Accepted image from scene 20' })
     expect(within(output).getAllByRole('img')).toHaveLength(6)
-    expect(within(output).queryByRole('img', { name: 'Accepted image from panel 14' })).not.toBeInTheDocument()
+    expect(within(output).queryByRole('img', { name: 'Accepted image from scene 14' })).not.toBeInTheDocument()
   })
 
   it('renders useful empty states with next actions', async () => {
-    panels = []
+    scenes = []
     gallery = []
     characters = []
     styles = []
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'No panels staged yet' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Stage first panel' })).toHaveAttribute(
+    expect(await screen.findByRole('heading', { name: 'No scenes staged yet' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Stage first scene' })).toHaveAttribute(
       'href',
-      '#/panels/new',
+      '#/scenes/new',
     )
     expect(screen.getByRole('heading', { name: 'No accepted images yet' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Review panels' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Review scenes' })).toBeInTheDocument()
   })
 
   it('keeps healthy sections visible when one dashboard request fails', async () => {
@@ -244,7 +244,7 @@ describe('Dashboard', () => {
     render(<App />)
 
     expect(await screen.findByText('Could not load gallery: gallery offline')).toBeInTheDocument()
-    expect(screen.getByText('Beat for panel 3')).toBeInTheDocument()
+    expect(screen.getByText('Beat for scene 3')).toBeInTheDocument()
     const library = screen.getByRole('region', { name: 'Library' })
     expect(await within(library).findByRole('link', { name: '2 Characters' })).toBeInTheDocument()
     expect(within(library).getByRole('link', { name: '1 Styles' })).toBeInTheDocument()

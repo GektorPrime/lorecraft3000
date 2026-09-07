@@ -14,7 +14,7 @@ vi.mock('../../api/client', async () => {
 const ACCEPTED: GalleryItem = {
   candidate_id: 900,
   content_url: '/api/v1/candidates/900/content',
-  panel_id: 3,
+  scene_id: 3,
   beat_text: 'Mara backs toward the door.',
   aspect_ratio: '3:2',
   created_at: '2026-09-02T00:00:00Z',
@@ -24,7 +24,7 @@ const SECOND_ACCEPTED: GalleryItem = {
   ...ACCEPTED,
   candidate_id: 901,
   content_url: '/api/v1/candidates/901/content',
-  panel_id: 4,
+  scene_id: 4,
   beat_text: 'Elias reaches for the lantern.',
 }
 
@@ -54,11 +54,11 @@ describe('GalleryPage', () => {
     await waitFor(() => expect(screen.getByText('Mara backs toward the door.')).toBeInTheDocument())
     expect(screen.getByRole('heading', { name: 'Gallery' })).toBeInTheDocument()
     expect(
-      screen.getByLabelText('Preview accepted image from panel 3'),
+      screen.getByLabelText('Preview accepted image from scene 3'),
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open panel' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open scene' })).toHaveAttribute(
       'href',
-      '/panels/3/preview',
+      '/scenes/3/preview',
     )
   })
 
@@ -75,23 +75,23 @@ describe('GalleryPage', () => {
     renderGallery()
 
     await user.click(
-      await screen.findByRole('button', { name: 'Preview accepted image from panel 3' }),
+      await screen.findByRole('button', { name: 'Preview accepted image from scene 3' }),
     )
     let dialog = screen.getByRole('dialog')
-    expect(screen.getByRole('img', { name: /panel 3, full-size preview/ })).toHaveAttribute(
+    expect(screen.getByRole('img', { name: /scene 3, full-size preview/ })).toHaveAttribute(
       'src',
       ACCEPTED.content_url,
     )
 
     fireEvent.keyDown(dialog, { key: 'ArrowRight' })
     dialog = screen.getByRole('dialog')
-    expect(screen.getByRole('img', { name: /panel 4, full-size preview/ })).toHaveAttribute(
+    expect(screen.getByRole('img', { name: /scene 4, full-size preview/ })).toHaveAttribute(
       'src',
       SECOND_ACCEPTED.content_url,
     )
 
     fireEvent.keyDown(dialog, { key: 'ArrowLeft' })
-    expect(screen.getByRole('img', { name: /panel 3, full-size preview/ })).toHaveAttribute(
+    expect(screen.getByRole('img', { name: /scene 3, full-size preview/ })).toHaveAttribute(
       'src',
       ACCEPTED.content_url,
     )

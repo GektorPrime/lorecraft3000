@@ -41,7 +41,7 @@ class ProviderRegistry:
     """Resolve the concrete image provider for a model.
 
     Selection keys on the model string (see app/config.py::MODEL_PROVIDERS) so a
-    panel may freely choose a Gemini or OpenAI model, and an edit stays on the
+    scene may freely choose a Gemini or OpenAI model, and an edit stays on the
     same provider that produced the source image. Providers are constructed
     lazily and memoized so an unused vendor's SDK/client is never initialized.
     """

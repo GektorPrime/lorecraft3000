@@ -73,8 +73,12 @@ export function ConfirmDialog({
       }}
     >
       <div className="confirm-dialog__surface">
-        <span className={`confirm-dialog__icon confirm-dialog__icon--${tone}`}>
-          <Icon name={tone === 'danger' ? 'alert' : 'info'} size={22} />
+        <span
+          className={tone === 'danger'
+            ? 'icon-chip icon-chip--danger confirm-dialog__icon'
+            : 'icon-chip confirm-dialog__icon'}
+        >
+          <Icon name={tone === 'danger' ? 'alert' : 'info'} size="xl" />
         </span>
         <div className="confirm-dialog__copy">
           <h2 id={titleId}>{title}</h2>

@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Home
-         * @description Landing page for the library-to-panel workflow.
+         * @description Landing page for the library-to-scene workflow.
          *
          *     Serves the built React app (frontend/). The frontend is the only UI: when
          *     it has not been built, "/" returns a short notice pointing at `npm run
@@ -186,26 +186,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/base-stages/{base_stage_id}/panels": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Base Stage Panels
-         * @description Panels whose composition is anchored on this Base Stage.
-         */
-        get: operations["list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/base-stages/{base_stage_id}/preview": {
         parameters: {
             query?: never;
@@ -263,6 +243,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/base-stages/{base_stage_id}/scenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Base Stage Scenes
+         * @description Scenes whose composition is anchored on this Base Stage.
+         */
+        get: operations["list_base_stage_scenes_api_v1_base_stages__base_stage_id__scenes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/budget": {
         parameters: {
             query?: never;
@@ -311,7 +311,7 @@ export interface paths {
          * @description Create a new candidate by editing an existing one with an instruction.
          *
          *     The edit runs on the same provider/model that produced the source image and
-         *     is recorded as a child generation of the source, keeping the panel's attempt
+         *     is recorded as a child generation of the source, keeping the scene's attempt
          *     history a connected chain.
          */
         post: operations["edit_candidate_api_v1_candidates__candidate_id__edit_post"];
@@ -387,7 +387,7 @@ export interface paths {
         post?: never;
         /**
          * Archive Character
-         * @description Archive (soft-delete) a character. Existing panels keep referencing it.
+         * @description Archive (soft-delete) a character. Existing scenes keep referencing it.
          */
         delete: operations["archive_character_api_v1_characters__character_id__delete"];
         options?: never;
@@ -473,131 +473,6 @@ export interface paths {
         };
         /** Options Summary */
         get: operations["options_summary_api_v1_options_summary_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/panels": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Panels */
-        get: operations["list_panels_api_v1_panels_get"];
-        put?: never;
-        /** Create Panel */
-        post: operations["create_panel_api_v1_panels_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/panels/{panel_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Panel */
-        get: operations["get_panel_api_v1_panels__panel_id__get"];
-        /** Update Panel */
-        put: operations["update_panel_api_v1_panels__panel_id__put"];
-        post?: never;
-        /**
-         * Delete Panel
-         * @description Permanently delete a panel and its full generation history.
-         */
-        delete: operations["delete_panel_api_v1_panels__panel_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/panels/{panel_id}/duplicate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Duplicate Panel */
-        post: operations["duplicate_panel_api_v1_panels__panel_id__duplicate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/panels/{panel_id}/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Generate Panel */
-        post: operations["generate_panel_api_v1_panels__panel_id__generate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/panels/{panel_id}/generations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Panel Generations */
-        get: operations["list_panel_generations_api_v1_panels__panel_id__generations_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/panels/{panel_id}/model": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Panel Model */
-        patch: operations["update_panel_model_api_v1_panels__panel_id__model_patch"];
-        trace?: never;
-    };
-    "/api/v1/panels/{panel_id}/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Preview Panel */
-        get: operations["preview_panel_api_v1_panels__panel_id__preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -709,6 +584,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scenes */
+        get: operations["list_scenes_api_v1_scenes_get"];
+        put?: never;
+        /** Create Scene */
+        post: operations["create_scene_api_v1_scenes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scenes/{scene_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Scene */
+        get: operations["get_scene_api_v1_scenes__scene_id__get"];
+        /** Update Scene */
+        put: operations["update_scene_api_v1_scenes__scene_id__put"];
+        post?: never;
+        /**
+         * Delete Scene
+         * @description Permanently delete a scene and its full generation history.
+         */
+        delete: operations["delete_scene_api_v1_scenes__scene_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scenes/{scene_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Scene */
+        post: operations["duplicate_scene_api_v1_scenes__scene_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scenes/{scene_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Scene */
+        post: operations["generate_scene_api_v1_scenes__scene_id__generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scenes/{scene_id}/generations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scene Generations */
+        get: operations["list_scene_generations_api_v1_scenes__scene_id__generations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scenes/{scene_id}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Scene Model */
+        patch: operations["update_scene_model_api_v1_scenes__scene_id__model_patch"];
+        trace?: never;
+    };
+    "/api/v1/scenes/{scene_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Scene */
+        get: operations["preview_scene_api_v1_scenes__scene_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/styles": {
         parameters: {
             query?: never;
@@ -758,7 +758,7 @@ export interface paths {
         post?: never;
         /**
          * Archive Style
-         * @description Archive (soft-delete) a style. Existing panels keep referencing it.
+         * @description Archive (soft-delete) a style. Existing scenes keep referencing it.
          */
         delete: operations["archive_style_api_v1_styles__style_id__delete"];
         options?: never;
@@ -888,7 +888,7 @@ export interface components {
          * @description Composition for a generated Base Stage draft.
          *
          *     Identity targets are required: they are injected into the prompt and are
-         *     what a panel later maps its cast onto.
+         *     what a scene later maps its cast onto.
          */
         BaseStageGeneratedInput: {
             /**
@@ -1110,8 +1110,8 @@ export interface components {
             content_url: string;
             /** Created At */
             created_at: string;
-            /** Panel Id */
-            panel_id: number;
+            /** Scene Id */
+            scene_id: number;
         };
         /** Generation */
         Generation: {
@@ -1230,8 +1230,6 @@ export interface components {
             image_sizes: string[];
             /** Models */
             models: string[];
-            /** Panel Immutability Explanation */
-            panel_immutability_explanation: string;
             /** Ref Image Roles */
             ref_image_roles: string[];
             /** Ref Image Weight Explanation */
@@ -1240,151 +1238,10 @@ export interface components {
             ref_set_immutability_explanation: string;
             /** Remaining Today Cents */
             remaining_today_cents: number;
+            /** Scene Immutability Explanation */
+            scene_immutability_explanation: string;
             /** Spent Today Cents */
             spent_today_cents: number;
-        };
-        /** Panel */
-        Panel: {
-            /** Aspect Ratio */
-            aspect_ratio: string;
-            base_stage: components["schemas"]["PanelBaseStage"] | null;
-            /** Base Stage Id */
-            base_stage_id: number | null;
-            /** Beat Text */
-            beat_text: string;
-            /** Camera */
-            camera: string;
-            /** Cast */
-            cast: components["schemas"]["CastMember"][];
-            /** Created At */
-            created_at: string;
-            /** Framing */
-            framing: string;
-            /** Generation Count */
-            generation_count: number;
-            /** Id */
-            id: number;
-            /** Image Size */
-            image_size: string;
-            /** Is Editable */
-            is_editable: boolean;
-            /** Latest Attempt Preview Url */
-            latest_attempt_preview_url: string | null;
-            /** Model */
-            model: string;
-            /** Mood */
-            mood: string;
-            /** Style Id */
-            style_id: number | null;
-        };
-        /** PanelBaseStage */
-        PanelBaseStage: {
-            /** Archived At */
-            archived_at: string | null;
-            /** Aspect Ratio */
-            aspect_ratio: string;
-            /** Content Url */
-            content_url: string;
-            /** Description */
-            description: string;
-            /** Id */
-            id: number;
-            /** State */
-            state: string;
-            /** Style Id */
-            style_id: number | null;
-            /** Targets */
-            targets: components["schemas"]["PanelBaseStageTarget"][];
-        };
-        /** PanelBaseStageTarget */
-        PanelBaseStageTarget: {
-            /** Description */
-            description: string;
-            /** Id */
-            id: number;
-            /** Position */
-            position: number;
-        };
-        /** PanelInput */
-        PanelInput: {
-            /**
-             * Aspect Ratio
-             * @default 3:2
-             */
-            aspect_ratio: string;
-            /** Base Stage Id */
-            base_stage_id?: number | null;
-            /** Beat Text */
-            beat_text?: string | null;
-            /** Camera */
-            camera?: string | null;
-            /** Cast */
-            cast: components["schemas"]["CastMemberInput"][];
-            /** Framing */
-            framing?: string | null;
-            /** Image Size */
-            image_size: string;
-            /** Model */
-            model: string;
-            /** Mood */
-            mood?: string | null;
-            /** Style Id */
-            style_id?: number | null;
-        };
-        /** PanelModelInput */
-        PanelModelInput: {
-            /** Model */
-            model: string;
-        };
-        /** PanelPreview */
-        PanelPreview: {
-            /** Attachments */
-            attachments: components["schemas"]["GenerationAttachment"][];
-            /** Base Stage Id */
-            base_stage_id?: number | null;
-            /** Blocked Reason */
-            blocked_reason?: string | null;
-            /** Can Generate */
-            can_generate: boolean;
-            /** Estimated Cost Cents */
-            estimated_cost_cents: number;
-            /** Image Size */
-            image_size: string;
-            /** Model */
-            model: string;
-            /** Prompt */
-            prompt: string;
-            /** Prompt Hash */
-            prompt_hash: string;
-            /** Remaining After Cents */
-            remaining_after_cents: number;
-            /** Scene Id */
-            scene_id: number;
-            /** Source Content Url */
-            source_content_url?: string | null;
-            /** Spent Today Cents */
-            spent_today_cents: number;
-            /** Warnings */
-            warnings: string[];
-        };
-        /**
-         * PanelSummary
-         * @description Lightweight panel reference used where a full panel payload is overkill,
-         *     e.g. "which panels use this Base Stage".
-         */
-        PanelSummary: {
-            /** Beat Text */
-            beat_text: string;
-            /** Created At */
-            created_at: string;
-            /** Generation Count */
-            generation_count: number;
-            /** Id */
-            id: number;
-            /** Is Editable */
-            is_editable: boolean;
-            /** Latest Attempt Preview Url */
-            latest_attempt_preview_url: string | null;
         };
         /** RefImage */
         RefImage: {
@@ -1437,6 +1294,149 @@ export interface components {
             status: string;
             /** Version */
             version: number;
+        };
+        /** Scene */
+        Scene: {
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            base_stage: components["schemas"]["SceneBaseStage"] | null;
+            /** Base Stage Id */
+            base_stage_id: number | null;
+            /** Beat Text */
+            beat_text: string;
+            /** Camera */
+            camera: string;
+            /** Cast */
+            cast: components["schemas"]["CastMember"][];
+            /** Created At */
+            created_at: string;
+            /** Framing */
+            framing: string;
+            /** Generation Count */
+            generation_count: number;
+            /** Id */
+            id: number;
+            /** Image Size */
+            image_size: string;
+            /** Is Editable */
+            is_editable: boolean;
+            /** Latest Attempt Preview Url */
+            latest_attempt_preview_url: string | null;
+            /** Model */
+            model: string;
+            /** Mood */
+            mood: string;
+            /** Style Id */
+            style_id: number | null;
+        };
+        /** SceneBaseStage */
+        SceneBaseStage: {
+            /** Archived At */
+            archived_at: string | null;
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            /** Content Url */
+            content_url: string;
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** State */
+            state: string;
+            /** Style Id */
+            style_id: number | null;
+            /** Targets */
+            targets: components["schemas"]["SceneBaseStageTarget"][];
+        };
+        /** SceneBaseStageTarget */
+        SceneBaseStageTarget: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
+        };
+        /** SceneInput */
+        SceneInput: {
+            /**
+             * Aspect Ratio
+             * @default 3:2
+             */
+            aspect_ratio: string;
+            /** Base Stage Id */
+            base_stage_id?: number | null;
+            /** Beat Text */
+            beat_text?: string | null;
+            /** Camera */
+            camera?: string | null;
+            /** Cast */
+            cast: components["schemas"]["CastMemberInput"][];
+            /** Framing */
+            framing?: string | null;
+            /** Image Size */
+            image_size: string;
+            /** Model */
+            model: string;
+            /** Mood */
+            mood?: string | null;
+            /** Style Id */
+            style_id?: number | null;
+        };
+        /** SceneModelInput */
+        SceneModelInput: {
+            /** Model */
+            model: string;
+        };
+        /** ScenePreview */
+        ScenePreview: {
+            /** Attachments */
+            attachments: components["schemas"]["GenerationAttachment"][];
+            /** Base Stage Id */
+            base_stage_id?: number | null;
+            /** Blocked Reason */
+            blocked_reason?: string | null;
+            /** Can Generate */
+            can_generate: boolean;
+            /** Estimated Cost Cents */
+            estimated_cost_cents: number;
+            /** Image Size */
+            image_size: string;
+            /** Model */
+            model: string;
+            /** Prompt */
+            prompt: string;
+            /** Prompt Hash */
+            prompt_hash: string;
+            /** Remaining After Cents */
+            remaining_after_cents: number;
+            /** Scene Id */
+            scene_id: number;
+            /** Source Content Url */
+            source_content_url?: string | null;
+            /** Spent Today Cents */
+            spent_today_cents: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /**
+         * SceneSummary
+         * @description Lightweight scene reference used where a full scene payload is overkill,
+         *     e.g. "which scenes use this Base Stage".
+         */
+        SceneSummary: {
+            /** Beat Text */
+            beat_text: string;
+            /** Created At */
+            created_at: string;
+            /** Generation Count */
+            generation_count: number;
+            /** Id */
+            id: number;
+            /** Is Editable */
+            is_editable: boolean;
+            /** Latest Attempt Preview Url */
+            latest_attempt_preview_url: string | null;
         };
         /** Style */
         Style: {
@@ -1834,37 +1834,6 @@ export interface operations {
             };
         };
     };
-    list_base_stage_panels_api_v1_base_stages__base_stage_id__panels_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                base_stage_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PanelSummary"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     preview_base_stage_api_v1_base_stages__base_stage_id__preview_get: {
         parameters: {
             query?: never;
@@ -1951,6 +1920,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BaseStage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_base_stage_scenes_api_v1_base_stages__base_stage_id__scenes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_stage_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SceneSummary"][];
                 };
             };
             /** @description Validation Error */
@@ -2441,321 +2441,6 @@ export interface operations {
             };
         };
     };
-    list_panels_api_v1_panels_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Panel"][];
-                };
-            };
-        };
-    };
-    create_panel_api_v1_panels_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PanelInput"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Panel"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_panel_api_v1_panels__panel_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Panel"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_panel_api_v1_panels__panel_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PanelInput"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Panel"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_panel_api_v1_panels__panel_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    duplicate_panel_api_v1_panels__panel_id__duplicate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Panel"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    generate_panel_api_v1_panels__panel_id__generate_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "Idempotency-Key"?: string | null;
-            };
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GenerationCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Generation"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_panel_generations_api_v1_panels__panel_id__generations_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GenerationSummary"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_panel_model_api_v1_panels__panel_id__model_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PanelModelInput"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Panel"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    preview_panel_api_v1_panels__panel_id__preview_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Timezone"?: string | null;
-            };
-            path: {
-                panel_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PanelPreview"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     ref_image_content_api_v1_ref_images__image_id__content_get: {
         parameters: {
             query?: never;
@@ -2968,6 +2653,321 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scenes_api_v1_scenes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scene"][];
+                };
+            };
+        };
+    };
+    create_scene_api_v1_scenes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scene"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scene_api_v1_scenes__scene_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scene"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_scene_api_v1_scenes__scene_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scene"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_scene_api_v1_scenes__scene_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_scene_api_v1_scenes__scene_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scene"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_scene_api_v1_scenes__scene_id__generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Generation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scene_generations_api_v1_scenes__scene_id__generations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_scene_model_api_v1_scenes__scene_id__model_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneModelInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scene"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_scene_api_v1_scenes__scene_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Timezone"?: string | null;
+            };
+            path: {
+                scene_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenePreview"];
                 };
             };
             /** @description Validation Error */

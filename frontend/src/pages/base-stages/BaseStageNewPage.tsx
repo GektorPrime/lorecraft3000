@@ -288,7 +288,7 @@ function BaseStageForm({ stageId }: { stageId: number | null }) {
           <legend>Identity targets</legend>
           <p className="field__hint base-stage-upload__target-hint">
             Describe each visible person in order. These targets will be mapped to
-            characters when panels reference this base stage.
+            characters when scenes reference this base stage.
           </p>
           {targets.map((target, index) => (
             <div className="base-stage-upload__target" key={index}>
@@ -308,12 +308,12 @@ function BaseStageForm({ stageId }: { stageId: number | null }) {
                 aria-label={`Remove target ${index + 1}`}
                 onClick={() => setTargets((current) => current.filter((_, i) => i !== index))}
               >
-                <Icon name="trash" size={15} /> Remove
+                <Icon name="trash" size="sm" /> Remove
               </button>
             </div>
           ))}
           <button type="button" className="btn" disabled={submitting} onClick={() => setTargets((current) => [...current, ''])}>
-            <Icon name="plus" size={15} /> Add target
+            <Icon name="plus" size="sm" /> Add target
           </button>
         </fieldset>
         <div className="form-actions">

@@ -21,9 +21,9 @@ describe('NotFoundPage', () => {
       'href',
       '/styles',
     )
-    expect(screen.getByRole('link', { name: 'panel collection' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'scene collection' })).toHaveAttribute(
       'href',
-      '/panels',
+      '/scenes',
     )
   })
 })

@@ -2,11 +2,11 @@ import type {
   BaseStage,
   CastMemberInput,
   Character,
-  PanelBaseStage,
+  SceneBaseStage,
 } from '../api/types'
 import { ProminenceInput } from './ProminenceInput'
 
-type StageChoice = BaseStage | PanelBaseStage
+type StageChoice = BaseStage | SceneBaseStage
 
 interface BaseStageCastMapperProps {
   stages: StageChoice[]

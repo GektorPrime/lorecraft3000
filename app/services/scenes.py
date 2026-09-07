@@ -1,4 +1,4 @@
-"""Scene/panel persistence and form validation."""
+"""Scene/scene persistence and form validation."""
 
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ class SceneNotFoundError(SceneError):
 
 
 class SceneImmutableError(SceneError):
-    """Raised when editing a panel with an active or successful generation.
+    """Raised when editing a scene with an active or successful generation.
 
     Failed generations preserve their own request snapshot and do not lock the
-    panel. Pending and successful generations lock it so an in-flight request
-    or accepted provenance cannot diverge from the panel definition.
+    scene. Pending and successful generations lock it so an in-flight request
+    or accepted provenance cannot diverge from the scene definition.
     """
 
 
@@ -143,7 +143,7 @@ class SceneService:
         image_size: str,
         base_stage_id: int | None = None,
     ) -> Scene:
-        """Update a panel unless a generation is pending or has succeeded.
+        """Update a scene unless a generation is pending or has succeeded.
 
         The backend is the enforcement point (not just the UI): even a
         request that bypasses a disabled form control is rejected here.
@@ -190,7 +190,7 @@ class SceneService:
             ).fetchone() is None:
                 raise SceneNotFoundError(f"scene {scene_id} not found")
             raise SceneImmutableError(
-                f"panel {scene_id} has a pending or successful generation and can "
+                f"scene {scene_id} has a pending or successful generation and can "
                 "no longer be edited; duplicate it instead"
             )
         self.conn.commit()
@@ -215,16 +215,16 @@ class SceneService:
         if cursor.rowcount != 1:
             self.conn.rollback()
             raise SceneImmutableError(
-                f"panel {scene_id} has a generation in progress; its model cannot be changed"
+                f"scene {scene_id} has a generation in progress; its model cannot be changed"
             )
         self.conn.commit()
         return self.get(scene_id)
 
     def duplicate(self, scene_id: int) -> Scene:
-        """Create a new panel prefilled from an existing one (new ID).
+        """Create a new scene prefilled from an existing one (new ID).
 
-        The source panel — including its full generation history — is left
-        untouched; this only inserts a new row. Used to let a panel with
+        The source scene — including its full generation history — is left
+        untouched; this only inserts a new row. Used to let a scene with
         generations be "edited" without losing provenance: duplicate, then
         edit the fresh (zero-generation) copy.
         """
@@ -247,9 +247,9 @@ class SceneService:
         return self.get(int(cursor.lastrowid))
 
     def delete(self, scene_id: int) -> None:
-        """Permanently delete a panel and its full generation history.
+        """Permanently delete a scene and its full generation history.
 
-        Panels are hard-deleted (unlike characters/styles, which archive): the
+        Scenes are hard-deleted (unlike characters/styles, which archive): the
         scene row plus every ``generation`` and its ``candidate`` rows are
         removed together in one transaction so no orphaned provenance is left
         behind. Content-addressed image blobs are shared and are not touched
@@ -270,7 +270,7 @@ class SceneService:
                 (scene_id,),
             )
             # image_provenance also references generation(id). It is otherwise
-            # append-only, but a hard panel delete removes the panel's entire
+            # append-only, but a hard scene delete removes the scene's entire
             # history, provenance included, so nothing is left dangling.
             self.conn.execute(
                 """
@@ -313,7 +313,7 @@ class SceneService:
     ) -> dict:
         staged = base_stage_id is not None
         if not staged and (not isinstance(beat_text, str) or not beat_text.strip()):
-            raise SceneError("panel action/beat is required")
+            raise SceneError("scene action/beat is required")
         if not staged and (
             not isinstance(camera, str)
             or not camera.strip()
@@ -332,17 +332,13 @@ class SceneService:
         ):
             raise SceneError("every cast entry requires a character")
         if len(character_ids) != len(set(character_ids)):
-            raise SceneError("a character may appear only once in a panel")
+            raise SceneError("a character may appear only once in a scene")
         normalized_cast = self._normalize_cast(cast)
         if not staged and aspect_ratio not in ASPECT_RATIOS:
             raise SceneError(f"unsupported aspect ratio: {aspect_ratio}")
         self._validate_model_and_size(model, image_size)
         if not staged and style_id is None:
             raise SceneError("style is required")
-        if not staged and style_id is not None and self.conn.execute(
-            "SELECT 1 FROM style WHERE id = ?", (style_id,)
-        ).fetchone() is None:
-            raise SceneError(f"style {style_id} not found")
         existing = {
             row["id"]
             for row in self.conn.execute(
@@ -369,7 +365,7 @@ class SceneService:
             ).fetchall()
             target_ids = {int(row["id"]) for row in targets}
             if not target_ids:
-                raise SceneError("a base stage panel requires at least one target")
+                raise SceneError("a base stage scene requires at least one target")
             mapped_ids = [entry.get("base_stage_target_id") for entry in normalized_cast]
             if len(mapped_ids) != len(target_ids):
                 raise SceneError("cast count must equal base stage target count")
@@ -385,7 +381,12 @@ class SceneService:
             beat_text = stage["description"]
             camera = framing = mood = ""
             aspect_ratio = stage["aspect_ratio"]
-            style_id = stage["style_id"]
+            if style_id is None:
+                style_id = stage["style_id"]
+        if style_id is not None and self.conn.execute(
+            "SELECT 1 FROM style WHERE id = ?", (style_id,)
+        ).fetchone() is None:
+            raise SceneError(f"style {style_id} not found")
         return {
             "beat_text": beat_text.strip(),
             "camera": camera.strip(),

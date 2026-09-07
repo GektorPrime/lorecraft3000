@@ -15,7 +15,7 @@ interface IdentityScores {
 
 interface CandidateCarouselProps {
   attempts: GenerationSummary[]
-  /** Panel cast, used to label identity-score chips with character names. */
+  /** Scene cast, used to label identity-score chips with character names. */
   cast?: CastMemberRef[]
   /** When provided, Accept/Reject review buttons are shown for the current candidate. */
   onReview?: (candidateId: number, verdict: 'accepted' | 'rejected') => void
@@ -51,9 +51,10 @@ function parseIdentityScores(value: unknown): IdentityScores | null {
 }
 
 /** Carousel that cycles through the generated images of each attempt (an
- * attempt stores exactly one candidate image). When `onReview` is provided,
- * Accept/Reject buttons act on the candidate currently shown; the matching
- * review controls remain available on each attempt below. */
+ * attempt stores exactly one candidate image). The stage reserves one fixed
+ * box, so images never reflow the page between candidates. When `onReview`
+ * is provided, Accept/Reject buttons act on the candidate currently shown;
+ * the matching review controls remain available on each attempt below. */
 export function CandidateCarousel({
   attempts,
   cast,
@@ -86,8 +87,10 @@ export function CandidateCarousel({
       )]
   })
 
+  const canNavigate = count > 1
+
   return (
-    <div className="carousel" aria-label="Generated candidate across attempts">
+    <div className="carousel card" aria-label="Generated candidate across attempts">
       <div className="carousel__stage">
         <ImageDialog
           src={candidate.content_url}
@@ -95,10 +98,30 @@ export function CandidateCarousel({
           previewAlt={`Generated image from attempt ${attempt.id}, full-size preview`}
           triggerLabel={`Preview image from attempt ${attempt.id}`}
           dialogLabel={`Generated image from attempt ${attempt.id}, larger preview`}
-          onPrevious={count > 1 ? showPrevious : undefined}
-          onNext={count > 1 ? showNext : undefined}
+          onPrevious={canNavigate ? showPrevious : undefined}
+          onNext={canNavigate ? showNext : undefined}
         />
         <span className="carousel__counter">{index + 1} / {count}</span>
+        <button
+          type="button"
+          className="carousel__nav carousel__nav--prev"
+          aria-label="Previous attempt"
+          disabled={!canNavigate}
+          onClick={showPrevious}
+        >
+          <Icon name="chevronLeft" size="lg" />
+          <span className="sr-only">Previous</span>
+        </button>
+        <button
+          type="button"
+          className="carousel__nav carousel__nav--next"
+          aria-label="Next attempt"
+          disabled={!canNavigate}
+          onClick={showNext}
+        >
+          <Icon name="chevronRight" size="lg" />
+          <span className="sr-only">Next</span>
+        </button>
       </div>
       <div className="carousel__meta">
         <span className={`badge badge--attempt-${candidate.review_status}`}>
@@ -116,53 +139,33 @@ export function CandidateCarousel({
           )}
         </div>
       )}
-      <div className="action-bar carousel__controls">
-        <div className="action-bar__group action-bar__group--start">
-          <button
-            type="button"
-            className="btn"
-            disabled={count <= 1}
-            onClick={showPrevious}
-            aria-label="Previous attempt"
-          >
-            <Icon name="chevronLeft" size={16} />
-            Previous
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={count <= 1}
-            onClick={showNext}
-            aria-label="Next attempt"
-          >
-            Next
-            <Icon name="chevronRight" size={16} />
-          </button>
+      <div className="carousel__controls">
+        <div className="carousel__controls-group">
+          {onReview && (
+            <>
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={reviewingCandidateId !== null}
+                onClick={() => onReview(candidate.id, 'accepted')}
+              >
+                <Icon name="check" size="sm" />
+                Accept
+              </button>
+              <button
+                type="button"
+                className="btn btn--danger"
+                disabled={reviewingCandidateId !== null}
+                onClick={() => onReview(candidate.id, 'rejected')}
+              >
+                Reject
+              </button>
+            </>
+          )}
+          {reviewingCandidateId === candidate.id && (
+            <span className="field__hint">Reviewing image…</span>
+          )}
         </div>
-        {onReview && (
-          <div className="action-bar__group action-bar__group--end">
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={reviewingCandidateId !== null}
-              onClick={() => onReview(candidate.id, 'accepted')}
-            >
-              <Icon name="check" size={16} />
-              Accept
-            </button>
-            <button
-              type="button"
-              className="btn btn--danger"
-              disabled={reviewingCandidateId !== null}
-              onClick={() => onReview(candidate.id, 'rejected')}
-            >
-              Reject
-            </button>
-            {reviewingCandidateId === candidate.id && (
-              <span className="field__hint">Reviewing image…</span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )

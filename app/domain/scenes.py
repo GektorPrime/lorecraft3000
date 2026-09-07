@@ -1,4 +1,4 @@
-"""Scene/panel domain values."""
+"""Scene/scene domain values."""
 
 from __future__ import annotations
 

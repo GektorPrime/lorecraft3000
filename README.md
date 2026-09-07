@@ -1,19 +1,19 @@
 # LoreCraft3000
 
-A local tool for generating comic panels while keeping multiple characters
+A local tool for generating comic scenes while keeping multiple characters
 recognizable across scenes. Visual styles are editable.
 
 ## Features
 
 - Character library with immutable, versioned canonical reference sets
-- Multi-character panels with explicit reference-slot allocation
+- Multi-character scenes with explicit reference-slot allocation
 - Exact prompt and cost preview before any paid request
 - Gemini and OpenAI (gpt-image-1) image generation behind provider adapters,
-  selected per panel by model
+  selected per scene by model
 - Multi-turn image editing: refine a generated candidate with a natural-language
   instruction on the same provider, keeping character identity anchored
 - Hard, configurable daily spending limit (`$3` by default)
-- Advisory identity scoring: every candidate is matched against the panel
+- Advisory identity scoring: every candidate is matched against the scene
   cast's canonical reference gallery and scored per character, surfaced only
   in the UI (it never gates or auto-rejects) — see
   [docs/OPERATIONS.md](docs/OPERATIONS.md) for the one-time model setup
@@ -26,7 +26,7 @@ recognizable across scenes. Visual styles are editable.
 
 Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), Node.js 20+, npm, and a
 billed Gemini API key. An OpenAI API key is additionally required only if a
-panel uses an OpenAI model (e.g. `gpt-image-1`).
+scene uses an OpenAI model (e.g. `gpt-image-1`).
 
 ```bash
 uv sync

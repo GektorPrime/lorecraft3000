@@ -1,13 +1,13 @@
 ---
-name: stage-new-panel
-description: Use when the user asks for the text artifacts to fill the "Stage new panel" form in LoreCraft3000 (also triggered by "new panel", "panel text", "stage a panel", "create a panel for <character>"). Produces ready-to-paste text for Action, Camera, Shot framing, Mood, and a recommended aspect ratio / style / model / image size / cast, after verifying which characters and styles already exist so the artifacts reference real data.
+name: stage-new-scene
+description: Use when the user asks for the text artifacts to fill the "Stage new scene" form in LoreCraft3000 (also triggered by "new scene", "scene text", "stage a scene", "create a scene for <character>"). Produces ready-to-paste text for Action, Camera, Shot framing, Mood, and a recommended aspect ratio / style / model / image size / cast, after verifying which characters and styles already exist so the artifacts reference real data.
 ---
 
-# Stage new panel — text artifacts
+# Stage new scene - text artifacts
 
-Produce the per-field copy a user can paste into the **Stage new panel** form
-(`frontend/src/pages/panels/PanelFormPage.tsx`) so the panel can be generated.
-The output is TEXT ARTIFACTS — never a route call, never a DB write. The user
+Produce the per-field copy a user can paste into the **Stage new scene** form
+(`frontend/src/pages/scenes/SceneFormPage.tsx`) so the scene can be generated.
+The output is TEXT ARTIFACTS - never a route call, never a DB write. The user
 pastes each block into the matching form field themselves.
 
 ## Field semantics (fixed by the form, do not deviate)
@@ -38,7 +38,7 @@ pastes each block into the matching form field themselves.
    only offers existing characters, and each character needs its ref-set
    portrait upload before generation. Do not silently invent a cast member.
 3. Generate the artifacts. For a **portrait**, recommend `3:4`; for a wide
-   cinematic beat recommend `16:9`; for a typical panel keep the current aspect.
+   cinematic beat recommend `16:9`; for a typical scene keep the current aspect.
 4. Ask nothing unless truly ambiguous (e.g. unnamed characters). Prefer
    proceeding with sensible defaults the user can tweak.
 
@@ -75,10 +75,10 @@ label followed by a paste-ready block. Keep prose to a minimum.
 ## Constraints
 
 - Never fabricate API endpoints or field names; they are fixed in
-  `PanelFormPage.tsx` and `PanelInput` in `app/schemas.py`.
+  `SceneFormPage.tsx` and `SceneInput` in `app/schemas.py`.
 - The character's dress/face contract lives on the Character (`visual_contract`,
-  hard-capped at ≤ 60 words) — do NOT re-inject appearance into `beat_text`
-  unless the user asks. The panel text is action + camera + framing + mood.
+  hard-capped at <= 60 words) - do NOT re-inject appearance into `beat_text`
+  unless the user asks. The scene text is action + camera + framing + mood.
 - `beat_text` is action, `camera` is position/angle, `framing` is crop; mixing
   these up is the most common failure mode.
 - Suggest `model`/`image_size` from `options/summary` defaults unless the cast

@@ -188,9 +188,9 @@ class BaseStageService:
     ) -> BaseStage:
         """Edit a generated draft, bumping its revision so previews cannot drift.
 
-        Mirrors panel immutability: a pending or successful attempt locks the
+        Mirrors scene immutability: a pending or successful attempt locks the
         composition, and a published stage is permanently immutable because
-        panels already reference its image. Duplicate to make a variant.
+        scenes already reference its image. Duplicate to make a variant.
         """
         stage = self.get(base_stage_id)
         self._require_editable(stage)
@@ -262,7 +262,7 @@ class BaseStageService:
         """Promote one succeeded candidate to be this stage's permanent image.
 
         Promotion is explicit and one-way: once ready the source image is
-        immutable, so any number of panels can reference it without a later
+        immutable, so any number of scenes can reference it without a later
         edit silently changing what they generate from.
         """
         stage = self.get(base_stage_id)

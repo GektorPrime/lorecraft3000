@@ -5,6 +5,25 @@
 /* ======================================================================== */
 
 /* ------------------------------------------------------------------------ */
+/* Accessibility                                                              */
+/* ------------------------------------------------------------------------ */
+
+/* Visually hidden but present for AT: keeps a descriptive label in a control
+   while letting the icon do the visual work (used by carousel arrows). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------------ */
 /* Surfaces                                                                  */
 /* ------------------------------------------------------------------------ */
 
@@ -14,6 +33,13 @@
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--elev-1);
+}
+
+/* Full-bleed media variant: no padding, corners clipped by overflow so a
+   cover image rounds cleanly while content below owns its own rhythm. */
+.card--flush {
+  padding: 0;
+  overflow: hidden;
 }
 
 .content-stack {
@@ -26,7 +52,7 @@
   margin-bottom: 0;
 }
 
-/* Resource cards share one anatomy across character, style and panel lists.
+/* Resource cards share one anatomy across character, style and scene lists.
    Grid/list choice belongs to the page; internal rhythm does not. */
 .resource-grid {
   display: grid;
@@ -71,7 +97,7 @@
   transform: translateY(-2px);
 }
 
-/* A card whose whole surface is a click target (e.g. panel tiles open the
+/* A card whose whole surface is a click target (e.g. scene tiles open the
    preview). Action buttons inside stop propagation so they act independently. */
 .resource-card--clickable {
   cursor: pointer;
@@ -176,13 +202,7 @@
   padding: var(--space-6);
 }
 
-.empty-state__icon {
-  display: inline-flex;
-  padding: var(--space-3);
-  border-radius: var(--radius-lg);
-  background: var(--accent-subtle);
-  color: var(--accent-text);
-}
+/* The tinted chip anatomy lives on the shared .icon-chip. */
 
 .empty-state__copy h3 {
   margin-bottom: var(--space-1);
@@ -201,17 +221,22 @@
 /* ------------------------------------------------------------------------ */
 /* Buttons                                                                   */
 /* ------------------------------------------------------------------------ */
+/* One control height everywhere, so buttons never disagree about size just
+   because their label text differs. Sizes cover intent, not context. */
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  min-height: var(--control-height);
   padding: var(--space-2) var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-heading);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
   text-decoration: none;
   cursor: pointer;
   transition:
@@ -228,6 +253,19 @@
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.btn--sm {
+  min-height: var(--control-height-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+/* Icons inside a button always follow the button's type scale, overriding
+   whatever box the call site passed so adjacent buttons match. */
+.btn .icon {
+  inline-size: 1.25em;
+  block-size: 1.25em;
 }
 
 .btn--primary {
@@ -267,6 +305,74 @@
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-top: var(--space-4);
+}
+
+/* Square icon-only control (drawer toggles, dismiss buttons). One shared
+   definition so chrome never re-implements its own 2.25rem box. */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-heading);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+}
+
+.icon-button--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.icon-button--ghost:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--bg-subtle);
+  color: var(--text-heading);
+}
+
+/* Tinted rounded icon chip (empty-states, dialog alert icons). */
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+
+.icon-chip--danger {
+  background: var(--danger-subtle);
+  color: var(--danger-text);
+}
+
+/* Keyboard-shortcut pill (search bars, palettes). */
+.kbd {
+  display: inline-block;
+  padding: var(--space-0) var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
 }
 
 /* Archived (soft-deleted) resources: a collapsible section under the active
@@ -527,6 +633,13 @@
   gap: 0 var(--space-4);
 }
 
+/* Denser three-across field grouping, used by the base-stage forms. */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 var(--space-4);
+}
+
 .form-actions {
   display: flex;
   align-items: center;
@@ -604,6 +717,10 @@
   }
 
   .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-row {
     grid-template-columns: minmax(0, 1fr);
   }
 

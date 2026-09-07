@@ -11,7 +11,7 @@ LoreCraft3000 keeps its state in two places:
 
 - **The database** — a single SQLite file, `data/lorecraft.db` by default
   (override with `LORECRAFT_DB_PATH`). It holds characters, styles, reference
-  sets, panels, generations, candidates, and image provenance rows.
+  sets, scenes, generations, candidates, and image provenance rows.
 - **The image store** — a content-addressed directory tree, `store/` by
   default (override with `LORECRAFT_STORE_ROOT`). It holds every image file and
   its JSON sidecar, named by the SHA-256 of the image bytes.
@@ -84,13 +84,13 @@ Never restore only one of the two stores.
 
 A paid Gemini request may be in flight when the process stops. When that
 happens the affected generation row is left in the `pending` state with its
-budget reservation still held, and its panel stays locked (only one pending
-generation is allowed per panel).
+budget reservation still held, and its scene stays locked (only one pending
+generation is allowed per scene).
 
 Recovery is automatic. On the next startup, the app runs stale-pending
 recovery: any generation that has been `pending` longer than
 `LORECRAFT_PENDING_STALE_SECONDS` (default 600s) is marked `failed`, which
-releases the panel lock and stops the reservation from blocking new work.
+releases the scene lock and stops the reservation from blocking new work.
 
 - The reserved cost is retained on the failed row on purpose: after a process
   interruption the app cannot know whether the provider actually charged, so it
@@ -157,7 +157,7 @@ anything and never blocks startup.
 ## Character identity scoring
 
 Every generated candidate is checked against the canonical reference gallery
-for its panel's cast, and the best per-character similarity is stored as an
+for its scene's cast, and the best per-character similarity is stored as an
 advisory score on the candidate (shown in the UI; it never blocks promotion).
 Scoring needs InsightFace's `buffalo_l` model pack present locally. The pip
 dependencies are installed normally by `uv sync`, but the ~320MB model pack is

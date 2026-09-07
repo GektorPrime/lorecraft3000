@@ -57,12 +57,12 @@ def allocate_references(
 ) -> tuple[AllocatedReference, ...]:
     """Allocate at least one ref per character, then extras by prominence."""
     if not cast:
-        raise AssemblyError("a panel must have at least one character")
+        raise AssemblyError("a scene must have at least one character")
     if len(cast) > capabilities.max_character_references:
         raise AssemblyError(
             f"{capabilities.model} has a budget of "
             f"{capabilities.max_character_references} character references, but the "
-            f"panel has {len(cast)} characters; switch to Pro or split the panel"
+            f"scene has {len(cast)} characters; switch to Pro or split the scene"
         )
     for member in cast:
         if not member.references:
@@ -172,7 +172,7 @@ def assemble_prompt(
 
     warnings: list[str] = []
     if len(cast) >= 3 and model != "gemini-3-pro-image":
-        warnings.append("Pro is recommended for panels with 3 or more characters")
+        warnings.append("Pro is recommended for scenes with 3 or more characters")
 
     distinct = len(cast)
     text = "\n\n".join(
@@ -231,10 +231,10 @@ def assemble_base_stage_prompt(
 
     A Base Stage deliberately carries no cast: it is generated before any
     identity is applied, so there are no canonical references to allocate and
-    the prompt must never name a character. Panels later apply identities to
+    the prompt must never name a character. Scenes later apply identities to
     this image via assemble_staged_prompt(), which anchors it as Image 1.
 
-    Targets are the ordered textual placeholders a panel maps characters onto,
+    Targets are the ordered textual placeholders a scene maps characters onto,
     so they are part of the composition contract and of the prompt hash.
     """
     capabilities_for(model)  # reject unsupported models before any spend
@@ -295,7 +295,7 @@ def assemble_staged_prompt(
     target_ids: dict[int, int],
     style_contract: str = "",
 ) -> AssembledPrompt:
-    """Assemble a source-anchored panel without changing direct assembly."""
+    """Assemble a source-anchored scene without changing direct assembly."""
     capabilities = capabilities_for(model)
     attachments = allocate_references(cast, capabilities, start_ordinal=2)
     by_character: dict[int, list[AllocatedReference]] = {}
@@ -335,7 +335,7 @@ def assemble_staged_prompt(
 
     warnings: list[str] = []
     if len(cast) >= 3 and model != "gemini-3-pro-image":
-        warnings.append("Pro is recommended for panels with 3 or more characters")
+        warnings.append("Pro is recommended for scenes with 3 or more characters")
 
     sections = [
         "REFERENCE DECLARATION\n" + "\n".join(declarations),

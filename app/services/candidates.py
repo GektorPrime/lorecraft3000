@@ -60,14 +60,14 @@ class CandidateService:
         return row["sha256"]
 
     def list_accepted(self) -> list[sqlite3.Row]:
-        """Every accepted candidate across all panels, newest first, joined
-        with its panel (scene) so callers can render a gallery grid."""
+        """Every accepted candidate across all scenes, newest first, joined
+        with its scene (scene) so callers can render a gallery grid."""
         return self.conn.execute(
             """
             SELECT c.id               AS candidate_id,
                    c.generation_id    AS generation_id,
                    c.created_at       AS created_at,
-                   s.id               AS panel_id,
+                   s.id               AS scene_id,
                    s.beat_text        AS beat_text,
                    s.aspect_ratio     AS aspect_ratio
             FROM candidate c

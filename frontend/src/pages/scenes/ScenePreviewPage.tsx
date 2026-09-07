@@ -2,17 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ApiError,
-  deletePanel,
-  duplicatePanel,
+  deleteScene,
+  duplicateScene,
   editCandidate,
-  generatePanel,
-  getPanel,
-  listPanelGenerations,
-  previewPanel,
+  generateScene,
+  getScene,
+  listSceneGenerations,
+  previewScene,
   reviewCandidate,
-  updatePanelModel,
+  updateSceneModel,
 } from '../../api/client'
-import type { GenerationSummary, Panel, PanelPreview } from '../../api/types'
+import type { GenerationSummary, Scene, ScenePreview } from '../../api/types'
 import { useBudget } from '../../api/useBudget'
 import { useOptions } from '../../api/useOptions'
 import { RouteIdGuard } from '../../routing/routeId'
@@ -54,21 +54,21 @@ function friendlyGenerationError(error: string): string {
   return 'Generation failed before an image was produced. Open the technical details for the provider response.'
 }
 
-export function PanelPreviewPage() {
+export function ScenePreviewPage() {
   return (
-    <RouteIdGuard>{(panelId) => <PanelPreview key={panelId} panelId={panelId} />}</RouteIdGuard>
+    <RouteIdGuard>{(sceneId) => <ScenePreview key={sceneId} sceneId={sceneId} />}</RouteIdGuard>
   )
 }
 
-function PanelPreview({ panelId }: { panelId: number }) {
+function ScenePreview({ sceneId }: { sceneId: number }) {
   const navigate = useNavigate()
   const { refreshBudget } = useBudget()
   const options = useOptions()
 
-  const [panel, setPanel] = useState<Panel | null>(null)
-  const [preview, setPreview] = useState<PanelPreview | null>(null)
+  const [scene, setScene] = useState<Scene | null>(null)
+  const [preview, setPreview] = useState<ScenePreview | null>(null)
   const [attempts, setAttempts] = useState<GenerationSummary[] | null>(null)
-  const [panelError, setPanelError] = useState<string | null>(null)
+  const [sceneError, setSceneError] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [attemptsError, setAttemptsError] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
@@ -86,13 +86,14 @@ function PanelPreview({ panelId }: { panelId: number }) {
   const [editInstruction, setEditInstruction] = useState('')
   const [submittingEdit, setSubmittingEdit] = useState(false)
   const [notFound, setNotFound] = useState(false)
+  const [previewSlot, setPreviewSlot] = useState<number | null>(null)
   const requestVersion = useRef(0)
-  const hasLoadedPanel = useRef(false)
+  const hasLoadedScene = useRef(false)
   const attemptsRef = useRef<GenerationSummary[] | null>(null)
   const reloadInFlight = useRef<Promise<void> | null>(null)
   const mounted = useRef(true)
 
-  usePageTitle(panel ? `Panel #${panel.id} Preview` : 'Loading Panel Preview')
+  usePageTitle(scene ? `Scene #${scene.id} Preview` : 'Loading Scene Preview')
 
   const reload = useCallback(async () => {
     if (reloadInFlight.current) return reloadInFlight.current
@@ -105,22 +106,22 @@ function PanelPreview({ panelId }: { panelId: number }) {
 
     try {
       const version = ++requestVersion.current
-      const panelRequest = getPanel(panelId).then(
-        (nextPanel) => {
+      const sceneRequest = getScene(sceneId).then(
+        (nextScene) => {
           if (!mounted.current || version !== requestVersion.current) return
-          setPanel(nextPanel)
-          hasLoadedPanel.current = true
-          setPanelError(null)
+          setScene(nextScene)
+          hasLoadedScene.current = true
+          setSceneError(null)
         },
         (err: unknown) => {
           if (!mounted.current || version !== requestVersion.current) return
-          if (err instanceof ApiError && err.status === 404 && !hasLoadedPanel.current) {
+          if (err instanceof ApiError && err.status === 404 && !hasLoadedScene.current) {
             setNotFound(true)
           }
-          setPanelError(err instanceof ApiError ? err.message : String(err))
+          setSceneError(err instanceof ApiError ? err.message : String(err))
         },
       )
-      const previewRequest = previewPanel(panelId).then(
+      const previewRequest = previewScene(sceneId).then(
         (nextPreview) => {
           if (!mounted.current || version !== requestVersion.current) return
           setPreview(nextPreview)
@@ -131,7 +132,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
           setPreviewError(err instanceof ApiError ? err.message : String(err))
         },
       )
-      const attemptsRequest = listPanelGenerations(panelId).then(
+      const attemptsRequest = listSceneGenerations(sceneId).then(
         (history) => {
           if (!mounted.current || version !== requestVersion.current) return
           const completed = attemptsRef.current?.find((previous) =>
@@ -156,13 +157,13 @@ function PanelPreview({ panelId }: { panelId: number }) {
         },
       )
 
-      await Promise.all([panelRequest, previewRequest, attemptsRequest])
+      await Promise.all([sceneRequest, previewRequest, attemptsRequest])
       if (mounted.current && version === requestVersion.current) await refreshBudget()
     } finally {
       if (reloadInFlight.current === inFlight) reloadInFlight.current = null
       release()
     }
-  }, [panelId, refreshBudget])
+  }, [sceneId, refreshBudget])
 
   useEffect(() => {
     mounted.current = true
@@ -212,7 +213,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
     setActionMessage(null)
     try {
       if (!preview) return
-      await generatePanel(panelId, preview.prompt_hash)
+      await generateScene(sceneId, preview.prompt_hash)
       await refreshBudget()
       if (!mounted.current) return
       // Stay on this page so the new attempt and its candidates appear in place;
@@ -229,16 +230,16 @@ function PanelPreview({ panelId }: { panelId: number }) {
   }
 
   const handleModelChange = async (model: string) => {
-    if (!panel || changingModel || hasPendingAttempt || model === panel.model) return
+    if (!scene || changingModel || hasPendingAttempt || model === scene.model) return
     setChangingModel(true)
     setActionMessage(null)
     // Prevent an older page load from restoring the model and preview that
     // were current before this mutation.
     requestVersion.current += 1
     try {
-      const nextPanel = await updatePanelModel(panel.id, model)
+      const nextScene = await updateSceneModel(scene.id, model)
       if (!mounted.current) return
-      setPanel(nextPanel)
+      setScene(nextScene)
       setPreview(null)
       await reloadInFlight.current
       await reload()
@@ -254,20 +255,20 @@ function PanelPreview({ panelId }: { panelId: number }) {
     }
   }
 
-  // Pending or successful generations lock a panel. Failed attempts remain
+  // Pending or successful generations lock a scene. Failed attempts remain
   // editable because their exact request is preserved on the attempt itself.
-  // A locked panel can be duplicated into a fresh editable copy.
+  // A locked scene can be duplicated into a fresh editable copy.
   const handleDuplicateAndEdit = async () => {
     if (duplicating) return
     setDuplicating(true)
     setActionMessage(null)
     try {
-      const copy = await duplicatePanel(panelId)
+      const copy = await duplicateScene(sceneId)
       if (!mounted.current) return
-      navigate(`/panels/${copy.id}/edit`)
+      navigate(`/scenes/${copy.id}/edit`)
     } catch (err) {
       if (!mounted.current) return
-      setActionMessage(`Could not duplicate panel: ${err instanceof ApiError ? err.message : String(err)}`)
+      setActionMessage(`Could not duplicate scene: ${err instanceof ApiError ? err.message : String(err)}`)
     } finally {
       if (mounted.current) setDuplicating(false)
     }
@@ -279,12 +280,12 @@ function PanelPreview({ panelId }: { panelId: number }) {
     setDeleting(true)
     setActionMessage(null)
     try {
-      await deletePanel(panelId)
+      await deleteScene(sceneId)
       if (!mounted.current) return
-      navigate('/panels')
+      navigate('/scenes')
     } catch (err) {
       if (!mounted.current) return
-      setActionMessage(`Could not delete panel: ${err instanceof ApiError ? err.message : String(err)}`)
+      setActionMessage(`Could not delete scene: ${err instanceof ApiError ? err.message : String(err)}`)
       setDeleting(false)
     }
   }
@@ -334,47 +335,47 @@ function PanelPreview({ panelId }: { panelId: number }) {
   }
 
   if (notFound) return <NotFoundPage />
-  if (!panel) {
-    return panelError ? (
+  if (!scene) {
+    return sceneError ? (
       <div>
-        <AsyncMessage kind="error">Could not load panel: {panelError}</AsyncMessage>
+        <AsyncMessage kind="error">Could not load scene: {sceneError}</AsyncMessage>
         <button
           type="button"
           className="btn"
           onClick={() => {
-            setPanelError(null)
+            setSceneError(null)
             void reload()
           }}
         >
           Retry
         </button>
       </div>
-    ) : <AsyncMessage kind="loading">Loading panel…</AsyncMessage>
+    ) : <AsyncMessage kind="loading">Loading scene…</AsyncMessage>
   }
 
   return (
     <section
-      className="panel-preview"
+      className="scene-preview"
       aria-busy={generating || changingModel || duplicating || deleting || undefined}
     >
       <PageHeader
-        title="Preview panel"
+        title="Preview scene"
         actions={(
-          <Link to="/panels" className="btn btn--primary">
-            Back to panels
+          <Link to="/scenes" className="btn btn--primary">
+            Back to scenes
           </Link>
         )}
       />
       {attempts && attempts.length > 0 && (
         <CandidateCarousel
           attempts={attempts}
-          cast={panel.cast}
+          cast={scene.cast}
           onReview={handleReview}
           reviewingCandidateId={reviewingCandidateId}
         />
       )}
-      <p className="panel-preview__beat">{panel.beat_text}</p>
-      {panelError && <AsyncMessage kind="error">Could not refresh panel: {panelError}</AsyncMessage>}
+      <p className="scene-preview__beat">{scene.beat_text}</p>
+      {sceneError && <AsyncMessage kind="error">Could not refresh scene: {sceneError}</AsyncMessage>}
       {actionMessage && <AsyncMessage kind="error">{actionMessage}</AsyncMessage>}
       {completionMessage && <AsyncMessage kind={completionMessage.kind}>{completionMessage.text}</AsyncMessage>}
       {hasPendingAttempt && (
@@ -384,8 +385,8 @@ function PanelPreview({ panelId }: { panelId: number }) {
         </AsyncMessage>
       )}
 
-      <div className="panel-preview__workspace">
-        <div className="panel-preview__content">
+      <div className="scene-preview__workspace">
+        <div className="scene-preview__content">
       {!preview && previewError && (
         <div>
           <AsyncMessage kind="error">Could not load generation preview: {previewError}</AsyncMessage>
@@ -395,34 +396,34 @@ function PanelPreview({ panelId }: { panelId: number }) {
       {!preview && !previewError && <AsyncMessage kind="loading">Loading generation preview…</AsyncMessage>}
       {preview?.can_generate ? (
         <>
-          {panel.base_stage && (
-            <section className="panel-preview__base-stage" aria-labelledby="base-stage-source-heading">
-              <SectionHeader title="Base Stage source" className="panel-preview__section-header" />
-              <div className="panel-preview__source">
+          {scene.base_stage && (
+            <section className="scene-preview__base-stage" aria-labelledby="base-stage-source-heading">
+              <SectionHeader title="Base Stage source" className="scene-preview__section-header" />
+              <div className="scene-preview__source">
                 <ImageDialog
-                  src={preview.source_content_url ?? panel.base_stage.content_url}
-                  thumbnailAlt={`Base Stage source: ${panel.base_stage.description}`}
-                  previewAlt={`Base Stage source: ${panel.base_stage.description}, full-size preview`}
+                  src={preview.source_content_url ?? scene.base_stage.content_url}
+                  thumbnailAlt={`Base Stage source: ${scene.base_stage.description}`}
+                  previewAlt={`Base Stage source: ${scene.base_stage.description}, full-size preview`}
                   triggerLabel="Preview Base Stage source image"
                   dialogLabel="Base Stage source image preview"
                 />
                 <div>
                   <h3 id="base-stage-source-heading">Image 1 is the source composition</h3>
-                  <p>{panel.base_stage.description}</p>
+                  <p>{scene.base_stage.description}</p>
                   <p className="field__hint">
                     Character canonical references begin at Image 2.
                   </p>
-                  <Link to={`/base-stages/${panel.base_stage.id}/preview`} className="field__hint">
-                    Open Base Stage #{panel.base_stage.id}
+                  <Link to={`/base-stages/${scene.base_stage.id}/preview`} className="field__hint">
+                    Open Base Stage #{scene.base_stage.id}
                   </Link>
                 </div>
               </div>
               <h3>Target-to-character mapping</h3>
-              <ol className="panel-preview__mapping">
-                {[...panel.base_stage.targets]
+              <ol className="scene-preview__mapping">
+                {[...scene.base_stage.targets]
                   .sort((a, b) => a.position - b.position)
                   .map((target) => {
-                    const member = panel.cast.find((item) => item.base_stage_target_id === target.id)
+                    const member = scene.cast.find((item) => item.base_stage_target_id === target.id)
                     return (
                       <li key={target.id}>
                         <strong>{target.description}</strong>
@@ -434,7 +435,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
               </ol>
             </section>
           )}
-          <SectionHeader title="Reference-slot allocation" className="panel-preview__section-header" />
+          <SectionHeader title="Reference-slot allocation" className="scene-preview__section-header" />
           <ul>
             {preview.attachments.map((a) => (
               <li key={a.image_number}>
@@ -444,11 +445,11 @@ function PanelPreview({ panelId }: { panelId: number }) {
           </ul>
           <Notice tone="privacy" className="privacy-note">
             <p>
-              {panel.base_stage
+              {scene.base_stage
                 ? 'The Base Stage image and character canonical references are uploaded to '
                 : 'These reference images are uploaded to '}
-              {panel.model.startsWith('gpt-') ? "OpenAI's API" : "Google's Gemini API"},
-              together with the prompt below, to generate this panel. They leave
+              {scene.model.startsWith('gpt-') ? "OpenAI's API" : "Google's Gemini API"},
+              together with the prompt below, to generate this scene. They leave
               your computer.
             </p>
           </Notice>
@@ -467,7 +468,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
           />
           <pre className="prompt-preview">{preview.prompt}</pre>
 
-          <p className="panel-preview__cost">
+          <p className="scene-preview__cost">
             Estimated cost: <strong>{formatCents(preview.estimated_cost_cents)}</strong> · Spent or
             reserved today: {formatCents(preview.spent_today_cents)} · Remaining after:{' '}
             {formatCents(preview.remaining_after_cents)}
@@ -478,13 +479,13 @@ function PanelPreview({ panelId }: { panelId: number }) {
       ) : null}
 
         </div>
-        <aside className="panel-preview__sidebar" aria-label="Panel actions">
-      <div className="action-bar panel-preview__actions">
-        <div className="field panel-preview__model">
+        <aside className="scene-preview__sidebar" aria-label="Scene actions">
+      <div className="card action-bar scene-preview__actions">
+        <div className="field scene-preview__model">
           <label htmlFor="preview-model">Generation model</label>
           <select
             id="preview-model"
-            value={panel.model}
+            value={scene.model}
             disabled={attempts === null || changingModel || generating || hasPendingAttempt}
             aria-describedby="preview-model-hint"
             onChange={(event) => void handleModelChange(event.target.value)}
@@ -500,9 +501,9 @@ function PanelPreview({ panelId }: { panelId: number }) {
           </span>
         </div>
         <div className="action-bar__group action-bar__group--start">
-          {panel.is_editable ? (
-            <Link to={`/panels/${panel.id}/edit`} className="btn">
-              Edit panel
+          {scene.is_editable ? (
+            <Link to={`/scenes/${scene.id}/edit`} className="btn">
+              Edit scene
             </Link>
           ) : (
             <button
@@ -520,7 +521,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
             disabled={deleting}
             onClick={() => setConfirmingDelete(true)}
           >
-            <Icon name="trash" size={15} />
+            <Icon name="trash" size="sm" />
             {deleting ? 'Deleting…' : 'Delete'}
           </button>
         </div>
@@ -546,7 +547,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
         </aside>
       </div>
 
-      <SectionHeader title="Generation attempts" className="panel-preview__attempts-heading" />
+      <SectionHeader title="Generation attempts" className="scene-preview__attempts-heading" />
       {attemptsError && (
         <div>
           <AsyncMessage kind="error">Could not load generation history: {attemptsError}</AsyncMessage>
@@ -558,18 +559,29 @@ function PanelPreview({ panelId }: { panelId: number }) {
         <EmptyState
           icon="sparkles"
           title="No generation attempts yet."
-          description="Generate a candidate when the panel preview is ready."
+          description="Generate a candidate when the scene preview is ready."
           compact
         />
       ) : attempts ? (
         <div className="attempt-list">
-            {attempts.map((attempt) => (
-              <article className="attempt-row" key={attempt.id}>
+          {(() => {
+            const slots = attempts
+              .filter((attempt) => attempt.candidates.length > 0)
+              .map((attempt) => ({ attempt, candidate: attempt.candidates[0]! }))
+            const previewSlotIndex = previewSlot !== null ? previewSlot % slots.length : null
+            const previewItem = previewSlotIndex !== null ? slots[previewSlotIndex] : null
+            return attempts.map((attempt) => {
+              const slotIndex = slots.findIndex((slot) => slot.attempt.id === attempt.id)
+              return (
+              <article className="card attempt-row" key={attempt.id}>
                 <div className="attempt-row__summary">
                   <strong>Attempt #{attempt.id}</strong>
                   <span className="field__hint">
-                    {attempt.model} · accounted cost {formatCents(attempt.cost_usd_cents)} ·{' '}
-                    <DateTime value={attempt.created_at} />
+                    <span>{attempt.model}</span>
+                    <span>accounted cost {formatCents(attempt.cost_usd_cents)}</span>
+                    <span>
+                      <DateTime value={attempt.created_at} />
+                    </span>
                   </span>
                   <div className="attempt-row__badges">
                     <span className={`badge badge--attempt-${attempt.state}`}>
@@ -585,14 +597,18 @@ function PanelPreview({ panelId }: { panelId: number }) {
                 </div>
                 {(attempt.candidates.length > 0 || attempt.error_text) && (
                   <div className="attempt-row__detail">
-                    {attempt.candidates.length > 0 && (
+                    {attempt.candidates.length > 0 && slotIndex >= 0 && (
                       <div className="attempt-row__preview">
                         <ImageDialog
-                          src={attempt.candidates[0].content_url}
+                          src={attempt.candidates[0]!.content_url}
+                          previewSrc={previewItem?.candidate.content_url ?? attempt.candidates[0]!.content_url}
                           thumbnailAlt={`Preview from attempt ${attempt.id}`}
-                          previewAlt={`Generated image from attempt ${attempt.id}, full-size preview`}
+                          previewAlt={`Generated image from attempt ${previewItem?.attempt.id ?? attempt.id}, full-size preview`}
                           triggerLabel={`Preview image from attempt ${attempt.id}`}
-                          dialogLabel={`Generated image from attempt ${attempt.id}, larger preview`}
+                          dialogLabel={`Generated image from attempt ${previewItem?.attempt.id ?? attempt.id}, larger preview`}
+                          onPrevious={() => setPreviewSlot((current) => ((current ?? slotIndex) - 1 + slots.length) % slots.length)}
+                          onNext={() => setPreviewSlot((current) => ((current ?? slotIndex) + 1) % slots.length)}
+                          onOpenChange={(open) => setPreviewSlot(open ? slotIndex : null)}
                         />
                       </div>
                     )}
@@ -616,7 +632,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
                       className="btn btn--primary"
                       disabled={generating || changingModel || hasPendingAttempt}
                       onClick={() => void handleGenerate()}
-                      title="Generates from the panel's current settings"
+                      title="Generates from the scene's current settings"
                     >
                       Try again
                     </button>
@@ -630,7 +646,7 @@ function PanelPreview({ panelId }: { panelId: number }) {
                       disabled={reviewingCandidateId !== null}
                       onClick={() => void handleReview(attempt.candidates[0]!.id, 'accepted')}
                     >
-                      <Icon name="check" size={16} />
+                      <Icon name="check" size="sm" />
                       Accept
                     </button>
                     <button
@@ -716,15 +732,17 @@ function PanelPreview({ panelId }: { panelId: number }) {
                   </div>
                 )}
               </article>
-            ))}
+              )
+            })
+          })()}
           </div>
       ) : null}
 
       <ConfirmDialog
         open={confirmingDelete}
-        title="Delete this panel?"
-        description="This permanently deletes the panel and its entire generation history. This cannot be undone."
-        confirmLabel="Delete panel"
+        title="Delete this scene?"
+        description="This permanently deletes the scene and its entire generation history. This cannot be undone."
+        confirmLabel="Delete scene"
         onConfirm={() => void handleDelete()}
         onCancel={() => setConfirmingDelete(false)}
       />
