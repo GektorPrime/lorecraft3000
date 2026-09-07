@@ -50,6 +50,18 @@ This starts FastAPI on <http://127.0.0.1:8000/> and the Vite frontend on
 run automatically when FastAPI starts, and Vite proxies `/api/*` requests to
 FastAPI.
 
+To use the development app from another device on a trusted home network, run:
+
+```bash
+npm run dev:lan
+```
+
+Open the Network URL printed by Vite, such as `http://192.168.1.20:5173/`.
+This exposes the unauthenticated development UI and its proxied API to devices
+on the local network; do not use it on an untrusted network or expose the port
+through the router. FastAPI remains bound to loopback and is reached through
+Vite's same-origin proxy.
+
 ## Run the tests
 
 ```bash

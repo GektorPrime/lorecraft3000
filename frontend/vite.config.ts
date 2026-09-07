@@ -12,6 +12,15 @@ function isTunnelOrigin(value: string): boolean {
   }
 }
 
+export function isTrustedProxyOrigin(origin: string, requestHost: string | undefined): boolean {
+  if (isTunnelOrigin(origin)) return true
+  try {
+    return requestHost !== undefined && new URL(origin).host === requestHost
+  } catch {
+    return false
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -40,7 +49,7 @@ export default defineConfig({
             proxyRequest.removeHeader('x-forwarded-proto')
 
             const origin = request.headers.origin
-            if (origin && isTunnelOrigin(origin)) {
+            if (origin && isTrustedProxyOrigin(origin, request.headers.host)) {
               proxyRequest.setHeader('origin', 'http://127.0.0.1:8000')
             }
           })
