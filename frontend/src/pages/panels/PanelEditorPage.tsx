@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, createPanel, getGallery, getPanel, renderPanel, updatePanel } from '../../api/client'
 import type { GalleryItem, Panel, PanelRender, PanelSlotInput, PanelUpdate } from '../../api/types'
-import { PANEL_FORMATS, addColumn, addRow, getEdgeRange, mergeSlot, moveEdge, splitSlot, type MergeDirection, type SlotEdge, type SplitDirection } from '../../panels/layout'
+import { PANEL_FORMATS, addColumn, addRow, cropImageBox, getEdgeRange, mergeSlot, moveEdge, splitSlot, type MergeDirection, type SlotEdge, type SplitDirection } from '../../panels/layout'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ImageWithFallback } from '../../components/ImageWithFallback'
@@ -152,6 +152,8 @@ function PanelEditor({ panelId }: { panelId: number }) {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [galleryQuery, setGalleryQuery] = useState('')
   const [canvasZoom, setCanvasZoom] = useState(1)
+  const [naturalSizes, setNaturalSizes] = useState<Record<number, { w: number; h: number }>>({})
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; focalX: number; focalY: number; xPerPx: number; yPerPx: number } | null>(null)
   const mounted = useRef(true)
   const dirty = values !== null && baseline !== null && snapshot(values) !== baseline
   const { confirmationProps } = useUnsavedChanges(dirty)
@@ -183,6 +185,38 @@ function PanelEditor({ panelId }: { panelId: number }) {
   }, [panelId, loadAttempt])
 
   const patchSlot = (patch: Partial<EditorSlot>) => setValues((current) => current && ({ ...current, slots: current.slots.map((slot, index) => index === selectedSlot ? { ...slot, ...patch } : slot) }))
+  const beginSlotDrag = (event: ReactPointerEvent<HTMLImageElement>, slot: EditorSlot, targetAspect: number) => {
+    if (event.button !== 0 || slot.candidate_id === null) return
+    const natural = naturalSizes[slot.candidate_id]
+    if (!natural || natural.w <= 0 || natural.h <= 0) return
+    const rect = event.currentTarget.parentElement?.getBoundingClientRect()
+    if (!rect || rect.width <= 0 || rect.height <= 0) return
+    const cropHeight = natural.w / natural.h >= targetAspect ? natural.h / slot.zoom : (natural.w / slot.zoom) / targetAspect
+    const cropWidth = natural.w / natural.h >= targetAspect ? cropHeight * targetAspect : natural.w / slot.zoom
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      focalX: slot.focal_x,
+      focalY: slot.focal_y,
+      xPerPx: -(cropWidth / natural.w) / rect.width,
+      yPerPx: -(cropHeight / natural.h) / rect.height,
+    }
+  }
+  const moveSlotDrag = (event: ReactPointerEvent<HTMLImageElement>) => {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const focalX = Math.min(1, Math.max(0, drag.focalX + (event.clientX - drag.startX) * drag.xPerPx))
+    const focalY = Math.min(1, Math.max(0, drag.focalY + (event.clientY - drag.startY) * drag.yPerPx))
+    patchSlot({ focal_x: focalX, focal_y: focalY })
+  }
+  const endSlotDrag = (event: ReactPointerEvent<HTMLImageElement>) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    dragRef.current = null
+  }
   const assign = (item: GalleryItem) => patchSlot({ candidate_id: item.candidate_id, content_url: item.content_url, focal_x: 0.5, focal_y: 0.5, zoom: 1 })
   const replaceSlots = (next: readonly EditorSlot[]) => setValues((current) => current ? { ...current, slots: [...next] } : current)
   const split = (direction: SplitDirection) => {
@@ -246,17 +280,6 @@ function PanelEditor({ panelId }: { panelId: number }) {
       <aside className="panel-editor__settings card" aria-label="Panel settings">
         <h2>Panel settings</h2>
         <div className="field"><label htmlFor="edit-title">Title</label><input id="edit-title" type="text" maxLength={120} value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></div>
-        <details className="panel-editor__page-settings" open>
-          <summary>Page settings</summary>
-          <div className="field"><label htmlFor="edit-format">Format</label><select id="edit-format" value={values.format} onChange={(event) => setValues({ ...values, format: event.target.value })}>{PANEL_FORMATS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></div>
-          <div className="field"><label htmlFor="panel-gutter">Internal gutter: {values.gutter_px}px</label><input id="panel-gutter" type="range" min="0" max="80" value={values.gutter_px} onChange={(event) => setValues({ ...values, gutter_px: Number(event.target.value) })} /></div>
-          <div className="field"><label htmlFor="panel-frame">Outer frame: {values.frame_px}px</label><input id="panel-frame" type="range" min="0" max="80" value={values.frame_px} onChange={(event) => setValues({ ...values, frame_px: Number(event.target.value) })} /></div>
-          <fieldset className="panel-background"><legend>Background color</legend>
-            <div className="panel-background__swatches">{SWATCHES.map((color) => <button key={color} type="button" aria-label={`Set background ${color}`} aria-pressed={values.background_color === color} style={{ backgroundColor: color }} onClick={() => setValues({ ...values, background_color: color })} />)}</div>
-            <div className="form-grid"><div className="field"><label htmlFor="panel-color-picker">Color palette</label><input id="panel-color-picker" type="color" value={/^#[0-9A-F]{6}$/.test(values.background_color) ? values.background_color : '#FFFFFF'} onChange={(event) => setValues({ ...values, background_color: event.target.value.toUpperCase() })} /></div>
-            <div className="field"><label htmlFor="panel-background">Hex color</label><input id="panel-background" type="text" maxLength={7} pattern="#[0-9A-Fa-f]{6}" value={values.background_color} onChange={(event) => setValues({ ...values, background_color: event.target.value.toUpperCase() })} /></div></div>
-          </fieldset>
-        </details>
         <fieldset className="panel-editor__layout"><legend>Layout</legend>
           <div className="btn-row"><button className="btn btn--sm" type="button" disabled={rowResult === values.slots} onClick={() => replaceSlots(rowResult)}>Add row</button><button className="btn btn--sm" type="button" disabled={columnResult === values.slots} onClick={() => replaceSlots(columnResult)}>Add column</button></div>
           <p className="field__hint">Selected slot: {selectedSlot + 1}</p>
@@ -269,11 +292,17 @@ function PanelEditor({ panelId }: { panelId: number }) {
             return <div className="field" key={key}><label htmlFor={`slot-edge-${key}`}>{label}: {Math.round(value * 100)}%</label><input id={`slot-edge-${key}`} type="range" min={range.min} max={range.max} step="0.01" value={value} onInput={(event) => replaceSlots(moveEdge(values.slots, selectedSlot, key, Number(event.currentTarget.value)))} /></div>
           })}</div>}
         </fieldset>
-        {selectedSlotValue?.candidate_id !== null && selectedSlotValue && <fieldset className="panel-editor__crop"><legend>Slot {selectedSlot + 1} crop</legend>
-          <div className="field"><label htmlFor="focal-x">Horizontal focal point: {Math.round(selectedSlotValue.focal_x * 100)}%</label><input id="focal-x" type="range" min="0" max="1" step="0.01" value={selectedSlotValue.focal_x} onChange={(event) => patchSlot({ focal_x: Number(event.target.value) })} /></div>
-          <div className="field"><label htmlFor="focal-y">Vertical focal point: {Math.round(selectedSlotValue.focal_y * 100)}%</label><input id="focal-y" type="range" min="0" max="1" step="0.01" value={selectedSlotValue.focal_y} onChange={(event) => patchSlot({ focal_y: Number(event.target.value) })} /></div>
-          <div className="field"><label htmlFor="slot-zoom">Zoom: {selectedSlotValue.zoom.toFixed(2)}×</label><input id="slot-zoom" type="range" min="1" max="3" step="0.05" value={selectedSlotValue.zoom} onChange={(event) => patchSlot({ zoom: Number(event.target.value) })} /></div>
-        </fieldset>}
+        <details className="panel-editor__page-settings" open>
+          <summary>Page settings</summary>
+          <div className="field"><label htmlFor="edit-format">Format</label><select id="edit-format" value={values.format} onChange={(event) => setValues({ ...values, format: event.target.value })}>{PANEL_FORMATS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></div>
+          <div className="field"><label htmlFor="panel-gutter">Internal gutter: {values.gutter_px}px</label><input id="panel-gutter" type="range" min="0" max="80" value={values.gutter_px} onChange={(event) => setValues({ ...values, gutter_px: Number(event.target.value) })} /></div>
+          <div className="field"><label htmlFor="panel-frame">Outer frame: {values.frame_px}px</label><input id="panel-frame" type="range" min="0" max="80" value={values.frame_px} onChange={(event) => setValues({ ...values, frame_px: Number(event.target.value) })} /></div>
+          <fieldset className="panel-background"><legend>Background color</legend>
+            <div className="panel-background__swatches">{SWATCHES.map((color) => <button key={color} type="button" aria-label={`Set background ${color}`} aria-pressed={values.background_color === color} style={{ backgroundColor: color }} onClick={() => setValues({ ...values, background_color: color })} />)}</div>
+            <div className="form-grid"><div className="field"><label htmlFor="panel-color-picker">Color palette</label><input id="panel-color-picker" type="color" value={/^#[0-9A-F]{6}$/.test(values.background_color) ? values.background_color : '#FFFFFF'} onChange={(event) => setValues({ ...values, background_color: event.target.value.toUpperCase() })} /></div>
+            <div className="field"><label htmlFor="panel-background">Hex color</label><input id="panel-background" type="text" maxLength={7} pattern="#[0-9A-Fa-f]{6}" value={values.background_color} onChange={(event) => setValues({ ...values, background_color: event.target.value.toUpperCase() })} /></div></div>
+          </fieldset>
+        </details>
       </aside>
       <div className="panel-editor__stage">
         <div className="panel-editor__zoom">
@@ -283,6 +312,15 @@ function PanelEditor({ panelId }: { panelId: number }) {
           <button className="btn btn--sm" type="button" aria-label="Zoom in" disabled={canvasZoom >= 5} onClick={() => setCanvasZoom((value) => Math.min(5, Math.round((value + 0.25) * 100) / 100))}>+</button>
           <button className="btn btn--sm" type="button" disabled={canvasZoom === 1} onClick={() => setCanvasZoom(1)}>{Math.round(canvasZoom * 100)}%</button>
         </div>
+        {(() => { const active = selectedSlotValue?.candidate_id != null; const slotZoom = active ? selectedSlotValue.zoom : 1; return (
+        <div className="panel-editor__zoom">
+          <span className="field__hint">Slot zoom</span>
+          <button className="btn btn--sm" type="button" aria-label="Slot zoom out" disabled={!active || slotZoom <= 1} onClick={() => patchSlot({ zoom: Math.max(1, Math.round((slotZoom - 0.05) * 100) / 100) })}>−</button>
+          <input aria-label="Slot zoom" type="range" min="1" max="5" step="0.05" value={slotZoom} disabled={!active} onChange={(event) => patchSlot({ zoom: Number(event.target.value) })} />
+          <button className="btn btn--sm" type="button" aria-label="Slot zoom in" disabled={!active || slotZoom >= 5} onClick={() => patchSlot({ zoom: Math.min(5, Math.round((slotZoom + 0.05) * 100) / 100) })}>+</button>
+          <button className="btn btn--sm" type="button" disabled={!active || slotZoom === 1} onClick={() => patchSlot({ zoom: 1 })}>{Math.round(slotZoom * 100)}%</button>
+        </div>
+        ) })()}
         <div className="panel-canvas__viewport">
         <div className="panel-canvas" aria-label="Panel canvas" style={{ '--panel-ratio': `${format.width} / ${format.height}`, '--panel-max-width': `${68 * format.width / format.height}svh`, '--panel-zoom': canvasZoom, '--panel-background': values.background_color } as CSSProperties}>
           <div className="panel-canvas__content" style={{ left: `${values.frame_px / format.width * 100}%`, right: `${values.frame_px / format.width * 100}%`, top: `${values.frame_px / format.height * 100}%`, bottom: `${values.frame_px / format.height * 100}%` }}>
@@ -292,8 +330,16 @@ function PanelEditor({ panelId }: { panelId: number }) {
               const yBefore = slot.y0 > 0 ? values.gutter_px - Math.floor(values.gutter_px / 2) : 0
               const yAfter = slot.y1 < 1 ? Math.floor(values.gutter_px / 2) : 0
               const style = { left: `calc(${slot.x0 * 100}% + ${xBefore / contentWidth * 100}%)`, top: `calc(${slot.y0 * 100}% + ${yBefore / contentHeight * 100}%)`, width: `calc(${(slot.x1 - slot.x0) * 100}% - ${(xBefore + xAfter) / contentWidth * 100}%)`, height: `calc(${(slot.y1 - slot.y0) * 100}% - ${(yBefore + yAfter) / contentHeight * 100}%)` } as CSSProperties
-              const imageStyle = slot.candidate_id !== null ? { objectPosition: `${slot.focal_x * 100}% ${slot.focal_y * 100}%`, transformOrigin: `${slot.focal_x * 100}% ${slot.focal_y * 100}%`, transform: `scale(${slot.zoom})` } : undefined
-              return <button key={slot.slot_index} type="button" className={`panel-slot${index === selectedSlot ? ' panel-slot--selected' : ''}`} style={style} aria-label={`Slot ${index + 1}${slot.candidate_id !== null ? `, image ${slot.candidate_id}` : ', empty'}`} aria-pressed={index === selectedSlot} onClick={() => setSelectedSlot(index)}>{slot.candidate_id !== null && slot.content_url ? <><ImageWithFallback src={slot.content_url} alt="" style={imageStyle} /><span className="panel-slot__remove" role="button" tabIndex={0} aria-label={`Remove image from slot ${index + 1}`} title="Remove from slot" onClick={(event) => { event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, content_url: null } : item) })) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, content_url: null } : item) })) } }}><Icon name="trash" size="sm" /></span></> : <span>{index + 1}</span>}</button>
+              const targetWidth = (slot.x1 - slot.x0) * contentWidth - (xBefore + xAfter)
+              const targetHeight = (slot.y1 - slot.y0) * contentHeight - (yBefore + yAfter)
+              const natural = slot.candidate_id !== null ? naturalSizes[slot.candidate_id] : undefined
+              const imageStyle = slot.candidate_id !== null
+                ? (natural && targetWidth > 0 && targetHeight > 0
+                  ? (() => { const box = cropImageBox(natural.w, natural.h, targetWidth / targetHeight, slot.focal_x, slot.focal_y, slot.zoom); return { position: 'absolute', width: `${box.widthPct}%`, height: `${box.heightPct}%`, left: `${box.leftPct}%`, top: `${box.topPct}%`, maxWidth: 'none', objectFit: 'fill' } as CSSProperties })()
+                  : { objectPosition: `${slot.focal_x * 100}% ${slot.focal_y * 100}%`, transformOrigin: `${slot.focal_x * 100}% ${slot.focal_y * 100}%`, transform: `scale(${slot.zoom})` } as CSSProperties)
+                : undefined
+              const draggable = index === selectedSlot && natural && targetWidth > 0 && targetHeight > 0
+              return <button key={slot.slot_index} type="button" className={`panel-slot${index === selectedSlot ? ' panel-slot--selected' : ''}${draggable ? ' panel-slot--draggable' : ''}`} style={style} aria-label={`Slot ${index + 1}${slot.candidate_id !== null ? `, image ${slot.candidate_id}` : ', empty'}`} aria-pressed={index === selectedSlot} onClick={() => setSelectedSlot(index)}>{slot.candidate_id !== null && slot.content_url ? <><ImageWithFallback src={slot.content_url} alt="" style={imageStyle} onLoad={(event) => { const image = event.currentTarget; const id = slot.candidate_id; if (id !== null && image.naturalWidth > 0) setNaturalSizes((current) => current[id]?.w === image.naturalWidth && current[id]?.h === image.naturalHeight ? current : { ...current, [id]: { w: image.naturalWidth, h: image.naturalHeight } }) }} {...(draggable ? { onPointerDown: (event: ReactPointerEvent<HTMLImageElement>) => beginSlotDrag(event, slot, targetWidth / targetHeight), onPointerMove: moveSlotDrag, onPointerUp: endSlotDrag, onPointerCancel: endSlotDrag } : {})} /><span className="panel-slot__remove" role="button" tabIndex={0} aria-label={`Remove image from slot ${index + 1}`} title="Remove from slot" onClick={(event) => { event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, content_url: null } : item) })) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, content_url: null } : item) })) } }}><Icon name="trash" size="sm" /></span></> : <span>{index + 1}</span>}</button>
             })}
           </div>
         </div>

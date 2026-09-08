@@ -43,6 +43,43 @@ const emptySlot = (slot_index: number, x0: number, y0: number, x1: number, y1: n
 const normalize = <T extends LayoutSlot>(slots: readonly T[]): T[] =>
   slots.map((slot, slot_index) => ({ ...slot, slot_index }))
 
+/**
+ * Mirrors the backend `PanelRenderService._crop_box`: computes the source crop
+ * window (cover-fit to the target aspect, magnified by `zoom`, centred on the
+ * focal point, then clamped inside the source) and expresses the image's
+ * placement as percentages of the target slot box. Positioning an absolutely
+ * placed <img> with these values reproduces the exported render exactly, unlike
+ * `object-fit: cover` + `transform: scale`, which pivots and clamps differently.
+ */
+export function cropImageBox(
+  sourceWidth: number,
+  sourceHeight: number,
+  targetAspect: number,
+  focalX: number,
+  focalY: number,
+  zoom: number,
+): { widthPct: number; heightPct: number; leftPct: number; topPct: number } {
+  let cropWidth: number
+  let cropHeight: number
+  if (sourceWidth / sourceHeight >= targetAspect) {
+    cropHeight = sourceHeight / zoom
+    cropWidth = cropHeight * targetAspect
+  } else {
+    cropWidth = sourceWidth / zoom
+    cropHeight = cropWidth / targetAspect
+  }
+  const centerX = focalX * sourceWidth
+  const centerY = focalY * sourceHeight
+  const left = Math.max(0, Math.min(centerX - cropWidth / 2, sourceWidth - cropWidth))
+  const top = Math.max(0, Math.min(centerY - cropHeight / 2, sourceHeight - cropHeight))
+  return {
+    widthPct: (sourceWidth / cropWidth) * 100,
+    heightPct: (sourceHeight / cropHeight) * 100,
+    leftPct: -(left / cropWidth) * 100,
+    topPct: -(top / cropHeight) * 100,
+  }
+}
+
 export function createGrid(rows: number, columns: number): LayoutSlot[] {
   if (!Number.isInteger(rows) || !Number.isInteger(columns) || rows < 1 || columns < 1 || rows * columns > MAX_SLOTS) return []
   return Array.from({ length: rows * columns }, (_, index) => {

@@ -49,7 +49,7 @@ def upgrade(conn: sqlite3.Connection) -> None:
             y1           REAL NOT NULL CHECK (y1 BETWEEN 0.0 AND 1.0),
             focal_x      REAL NOT NULL DEFAULT 0.5 CHECK (focal_x BETWEEN 0.0 AND 1.0),
             focal_y      REAL NOT NULL DEFAULT 0.5 CHECK (focal_y BETWEEN 0.0 AND 1.0),
-            zoom         REAL NOT NULL DEFAULT 1.0 CHECK (zoom BETWEEN 1.0 AND 3.0),
+            zoom         REAL NOT NULL DEFAULT 1.0 CHECK (zoom BETWEEN 1.0 AND 5.0),
             CHECK (x1 - x0 >= 0.04),
             CHECK (y1 - y0 >= 0.04),
             UNIQUE (panel_id, slot_index)

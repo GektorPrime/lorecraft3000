@@ -1943,15 +1943,14 @@
 .panel-background__swatches { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
 .panel-background__swatches button { width: 2rem; height: 2rem; padding: 0; border: 1px solid var(--border-strong); border-radius: 50%; box-shadow: inset 0 0 0 2px var(--surface); cursor: pointer; }
 .panel-background__swatches button[aria-pressed='true'] { outline: 3px solid var(--accent); outline-offset: 2px; }
-.panel-editor__crop { margin: var(--space-5) 0 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
-.panel-editor__crop legend { padding-inline: var(--space-1); color: var(--text-heading); font-weight: var(--weight-semibold); }
-.panel-editor__crop .field:last-of-type { margin-bottom: var(--space-3); }
-
 .panel-editor__stage { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); position: sticky; top: var(--space-4); align-self: start; max-height: calc(100svh - var(--space-8)); overflow-y: auto; }
 .panel-editor__zoom { display: flex; align-items: center; gap: var(--space-1); }
-.panel-editor__zoom .field__hint { margin: 0; }
+.panel-editor__zoom + .panel-editor__zoom { margin-top: calc(var(--space-3) * -1 + var(--space-1)); }
+.panel-editor__zoom .field__hint { margin: 0; min-width: 5.5rem; }
 .panel-editor__zoom input[type='range'] { width: 9rem; accent-color: var(--accent); }
+.panel-editor__zoom input[type='range']:disabled { accent-color: var(--border-strong); cursor: not-allowed; }
 .panel-editor__zoom .btn { min-width: 2rem; }
+.panel-editor__zoom:has(input:disabled) .field__hint { color: var(--text-disabled, var(--text-muted)); opacity: 0.6; }
 .panel-canvas__viewport { width: 100%; min-width: 0; overflow: auto; }
 .panel-canvas { position: relative; width: calc(min(100%, var(--panel-max-width), calc((100svh - 12rem) * var(--panel-ratio))) * var(--panel-zoom)); aspect-ratio: var(--panel-ratio); overflow: hidden; background: var(--panel-background); box-shadow: var(--elev-3); flex: 0 0 auto; margin-inline: auto; }
 .panel-canvas__content { position: absolute; background: var(--panel-background); }
@@ -1979,6 +1978,8 @@
   transition: opacity var(--dur-fast) var(--ease-out);
 }
 .panel-slot__remove .icon { width: 1rem; height: 1rem; stroke-width: 2.25; }
+.panel-slot--draggable img { cursor: grab; touch-action: none; }
+.panel-slot--draggable img:active { cursor: grabbing; }
 .panel-slot:hover .panel-slot__remove,
 .panel-slot:focus-within .panel-slot__remove,
 .panel-slot--selected .panel-slot__remove { opacity: 1; }
