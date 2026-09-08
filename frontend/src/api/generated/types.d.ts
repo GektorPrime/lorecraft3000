@@ -481,6 +481,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/page-renders/{render_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page Render Content */
+        get: operations["page_render_content_api_v1_page_renders__render_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/page-renders/{render_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page Render Download */
+        get: operations["page_render_download_api_v1_page_renders__render_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pages */
+        get: operations["list_pages_api_v1_pages_get"];
+        put?: never;
+        /** Create Page */
+        post: operations["create_page_api_v1_pages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages/{page_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Page */
+        get: operations["get_page_api_v1_pages__page_id__get"];
+        /** Update Page */
+        put: operations["update_page_api_v1_pages__page_id__put"];
+        post?: never;
+        /** Delete Page */
+        delete: operations["delete_page_api_v1_pages__page_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages/{page_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Render Page */
+        post: operations["render_page_api_v1_pages__page_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages/{page_id}/renders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Page Renders */
+        get: operations["list_page_renders_api_v1_pages__page_id__renders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ref-images/{image_id}/content": {
         parameters: {
             query?: never;
@@ -1098,6 +1203,112 @@ export interface components {
              */
             visual_contract: string;
         };
+        /** ComicPage */
+        ComicPage: {
+            /** Background Color */
+            background_color: string;
+            /** Created At */
+            created_at: string;
+            /** Divider Values */
+            divider_values: number[];
+            /** Format */
+            format: string;
+            /** Gutter Px */
+            gutter_px: number;
+            /** Height Px */
+            height_px: number;
+            /** Id */
+            id: number;
+            latest_render: components["schemas"]["PageRender"] | null;
+            /** Panels */
+            panels: components["schemas"]["ComicPagePanel"][];
+            /** Revision */
+            revision: number;
+            /** Template Key */
+            template_key: string;
+            /** Template Version */
+            template_version: number;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+            /** Width Px */
+            width_px: number;
+        };
+        /** ComicPageCreate */
+        ComicPageCreate: {
+            /** Candidate Id */
+            candidate_id?: number | null;
+            /** Format */
+            format: string;
+            /** Template Key */
+            template_key: string;
+            /** Title */
+            title: string;
+        };
+        /** ComicPagePanel */
+        ComicPagePanel: {
+            /** Candidate Id */
+            candidate_id: number;
+            /** Content Url */
+            content_url: string;
+            /** Focal X */
+            focal_x: number;
+            /** Focal Y */
+            focal_y: number;
+            /** Id */
+            id: number;
+            /** Slot Index */
+            slot_index: number;
+            /** Zoom */
+            zoom: number;
+        };
+        /** ComicPagePanelInput */
+        ComicPagePanelInput: {
+            /** Candidate Id */
+            candidate_id: number;
+            /**
+             * Focal X
+             * @default 0.5
+             */
+            focal_x: number;
+            /**
+             * Focal Y
+             * @default 0.5
+             */
+            focal_y: number;
+            /** Slot Index */
+            slot_index: number;
+            /**
+             * Zoom
+             * @default 1
+             */
+            zoom: number;
+        };
+        /** ComicPageUpdate */
+        ComicPageUpdate: {
+            /** Background Color */
+            background_color: string;
+            /** Divider Values */
+            divider_values: number[];
+            /** Expected Revision */
+            expected_revision: number;
+            /** Format */
+            format: string;
+            /** Gutter Px */
+            gutter_px: number;
+            /** Panels */
+            panels: components["schemas"]["ComicPagePanelInput"][];
+            /** Template Key */
+            template_key: string;
+            /**
+             * Template Version
+             * @default 1
+             */
+            template_version: number;
+            /** Title */
+            title: string;
+        };
         /** GalleryItem */
         GalleryItem: {
             /** Aspect Ratio */
@@ -1242,6 +1453,34 @@ export interface components {
             scene_immutability_explanation: string;
             /** Spent Today Cents */
             spent_today_cents: number;
+        };
+        /** PageRender */
+        PageRender: {
+            /** Content Url */
+            content_url: string;
+            /** Created At */
+            created_at: string;
+            /** Download Url */
+            download_url: string;
+            /** Height */
+            height: number;
+            /** Id */
+            id: number;
+            /** Layout */
+            layout: {
+                [key: string]: unknown;
+            };
+            /** Page Id */
+            page_id: number;
+            /** Page Revision */
+            page_revision: number;
+            /** Width */
+            width: number;
+        };
+        /** PageRenderCreate */
+        PageRenderCreate: {
+            /** Expected Revision */
+            expected_revision: number;
         };
         /** RefImage */
         RefImage: {
@@ -2428,6 +2667,282 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OptionsSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    page_render_content_api_v1_page_renders__render_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    page_render_download_api_v1_page_renders__render_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pages_api_v1_pages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComicPage"][];
+                };
+            };
+        };
+    };
+    create_page_api_v1_pages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComicPageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComicPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_page_api_v1_pages__page_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComicPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_page_api_v1_pages__page_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComicPageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComicPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_page_api_v1_pages__page_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    render_page_api_v1_pages__page_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageRenderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageRender"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_page_renders_api_v1_pages__page_id__renders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageRender"][];
                 };
             };
             /** @description Validation Error */

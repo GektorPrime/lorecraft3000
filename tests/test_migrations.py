@@ -39,6 +39,9 @@ def test_fresh_init_creates_all_tables(tmp_path):
         "image_provenance",
         "base_stage",
         "base_stage_target",
+        "comic_page",
+        "comic_page_panel",
+        "page_render",
         "schema_migrations",
     }
     assert expected <= tables
@@ -236,6 +239,7 @@ def test_provenance_migration_rolls_back_completely_and_can_retry(tmp_path):
         "017_base_stage_generations",
         "018_character_reference_roles",
         "019_multiview_face_embeddings",
+        "020_comic_pages",
     ]
     conn = connect(db)
     try:
@@ -490,6 +494,7 @@ def test_011_repairs_legacy_generation_missing_scene_revision(tmp_path):
         "017_base_stage_generations",
         "018_character_reference_roles",
         "019_multiview_face_embeddings",
+        "020_comic_pages",
     ]
     assert run_migrations(db) == []  # and healing is idempotent
 

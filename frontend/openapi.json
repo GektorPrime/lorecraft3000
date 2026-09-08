@@ -746,6 +746,270 @@
         "title": "CharacterInput",
         "type": "object"
       },
+      "ComicPage": {
+        "properties": {
+          "background_color": {
+            "title": "Background Color",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "divider_values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Divider Values",
+            "type": "array"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "gutter_px": {
+            "title": "Gutter Px",
+            "type": "integer"
+          },
+          "height_px": {
+            "title": "Height Px",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "latest_render": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageRender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/ComicPagePanel"
+            },
+            "title": "Panels",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "template_key": {
+            "title": "Template Key",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "width_px": {
+            "title": "Width Px",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "format",
+          "width_px",
+          "height_px",
+          "background_color",
+          "gutter_px",
+          "template_key",
+          "template_version",
+          "divider_values",
+          "revision",
+          "created_at",
+          "updated_at",
+          "panels",
+          "latest_render"
+        ],
+        "title": "ComicPage",
+        "type": "object"
+      },
+      "ComicPageCreate": {
+        "properties": {
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "template_key": {
+            "title": "Template Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "format",
+          "template_key"
+        ],
+        "title": "ComicPageCreate",
+        "type": "object"
+      },
+      "ComicPagePanel": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "integer"
+          },
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "focal_x": {
+            "title": "Focal X",
+            "type": "number"
+          },
+          "focal_y": {
+            "title": "Focal Y",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "slot_index": {
+            "title": "Slot Index",
+            "type": "integer"
+          },
+          "zoom": {
+            "title": "Zoom",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "candidate_id",
+          "slot_index",
+          "focal_x",
+          "focal_y",
+          "zoom",
+          "content_url"
+        ],
+        "title": "ComicPagePanel",
+        "type": "object"
+      },
+      "ComicPagePanelInput": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "integer"
+          },
+          "focal_x": {
+            "default": 0.5,
+            "title": "Focal X",
+            "type": "number"
+          },
+          "focal_y": {
+            "default": 0.5,
+            "title": "Focal Y",
+            "type": "number"
+          },
+          "slot_index": {
+            "title": "Slot Index",
+            "type": "integer"
+          },
+          "zoom": {
+            "default": 1.0,
+            "title": "Zoom",
+            "type": "number"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "slot_index"
+        ],
+        "title": "ComicPagePanelInput",
+        "type": "object"
+      },
+      "ComicPageUpdate": {
+        "properties": {
+          "background_color": {
+            "title": "Background Color",
+            "type": "string"
+          },
+          "divider_values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Divider Values",
+            "type": "array"
+          },
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "gutter_px": {
+            "title": "Gutter Px",
+            "type": "integer"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/ComicPagePanelInput"
+            },
+            "title": "Panels",
+            "type": "array"
+          },
+          "template_key": {
+            "title": "Template Key",
+            "type": "string"
+          },
+          "template_version": {
+            "default": 1,
+            "title": "Template Version",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "title",
+          "format",
+          "background_color",
+          "gutter_px",
+          "template_key",
+          "divider_values",
+          "panels"
+        ],
+        "title": "ComicPageUpdate",
+        "type": "object"
+      },
       "GalleryItem": {
         "properties": {
           "aspect_ratio": {
@@ -1201,6 +1465,73 @@
           "scene_immutability_explanation"
         ],
         "title": "OptionsSummary",
+        "type": "object"
+      },
+      "PageRender": {
+        "properties": {
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "layout": {
+            "additionalProperties": true,
+            "title": "Layout",
+            "type": "object"
+          },
+          "page_id": {
+            "title": "Page Id",
+            "type": "integer"
+          },
+          "page_revision": {
+            "title": "Page Revision",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "page_id",
+          "page_revision",
+          "width",
+          "height",
+          "layout",
+          "created_at",
+          "content_url",
+          "download_url"
+        ],
+        "title": "PageRender",
+        "type": "object"
+      },
+      "PageRenderCreate": {
+        "properties": {
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "PageRenderCreate",
         "type": "object"
       },
       "RefImage": {
@@ -3281,6 +3612,382 @@
         "tags": [
           "api-v1",
           "api-v1-options"
+        ]
+      }
+    },
+    "/api/v1/page-renders/{render_id}/content": {
+      "get": {
+        "operationId": "page_render_content_api_v1_page_renders__render_id__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "title": "Render Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Page Render Content",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      }
+    },
+    "/api/v1/page-renders/{render_id}/download": {
+      "get": {
+        "operationId": "page_render_download_api_v1_page_renders__render_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "title": "Render Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Page Render Download",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      }
+    },
+    "/api/v1/pages": {
+      "get": {
+        "operationId": "list_pages_api_v1_pages_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ComicPage"
+                  },
+                  "title": "Response List Pages Api V1 Pages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Pages",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      },
+      "post": {
+        "operationId": "create_page_api_v1_pages_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComicPageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComicPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Page",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      }
+    },
+    "/api/v1/pages/{page_id}": {
+      "delete": {
+        "operationId": "delete_page_api_v1_pages__page_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "title": "Page Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Page",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      },
+      "get": {
+        "operationId": "get_page_api_v1_pages__page_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "title": "Page Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComicPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Page",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      },
+      "put": {
+        "operationId": "update_page_api_v1_pages__page_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "title": "Page Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComicPageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComicPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Page",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      }
+    },
+    "/api/v1/pages/{page_id}/render": {
+      "post": {
+        "operationId": "render_page_api_v1_pages__page_id__render_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "title": "Page Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageRenderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageRender"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Render Page",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
+        ]
+      }
+    },
+    "/api/v1/pages/{page_id}/renders": {
+      "get": {
+        "operationId": "list_page_renders_api_v1_pages__page_id__renders_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "title": "Page Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PageRender"
+                  },
+                  "title": "Response List Page Renders Api V1 Pages  Page Id  Renders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Page Renders",
+        "tags": [
+          "api-v1",
+          "api-v1-pages"
         ]
       }
     },

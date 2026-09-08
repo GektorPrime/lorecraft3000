@@ -322,6 +322,82 @@ class GalleryItem(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# comic pages
+# ---------------------------------------------------------------------------
+
+
+class ComicPageCreate(BaseModel):
+    title: str
+    format: str
+    template_key: str
+    candidate_id: int | None = None
+
+
+class ComicPagePanelInput(BaseModel):
+    candidate_id: int
+    slot_index: int
+    focal_x: float = 0.5
+    focal_y: float = 0.5
+    zoom: float = 1.0
+
+
+class ComicPageUpdate(BaseModel):
+    expected_revision: int
+    title: str
+    format: str
+    background_color: str
+    gutter_px: int
+    template_key: str
+    template_version: int = 1
+    divider_values: list[float]
+    panels: list[ComicPagePanelInput]
+
+
+class PageRenderCreate(BaseModel):
+    expected_revision: int
+
+
+class ComicPagePanel(BaseModel):
+    id: int
+    candidate_id: int
+    slot_index: int
+    focal_x: float
+    focal_y: float
+    zoom: float
+    content_url: str
+
+
+class PageRender(BaseModel):
+    id: int
+    page_id: int
+    page_revision: int
+    width: int
+    height: int
+    layout: dict[str, object]
+    created_at: str
+    content_url: str
+    download_url: str
+
+
+class ComicPage(BaseModel):
+    id: int
+    title: str
+    format: str
+    width_px: int
+    height_px: int
+    background_color: str
+    gutter_px: int
+    template_key: str
+    template_version: int
+    divider_values: list[float]
+    revision: int
+    created_at: str
+    updated_at: str
+    panels: list[ComicPagePanel]
+    latest_render: PageRender | None
+
+
+# ---------------------------------------------------------------------------
 # Base Stages
 # ---------------------------------------------------------------------------
 

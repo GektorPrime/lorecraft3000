@@ -60,6 +60,10 @@ describe('GalleryPage', () => {
       'href',
       '/scenes/3/preview',
     )
+    expect(screen.getByRole('link', { name: 'Add to page' })).toHaveAttribute(
+      'href',
+      '/panels/new?candidate=900',
+    )
   })
 
   it('shows the empty state when no images are accepted', async () => {

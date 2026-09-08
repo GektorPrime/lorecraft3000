@@ -16,10 +16,15 @@ import type {
   Candidate,
   Character,
   CharacterInput,
+  ComicPage,
+  ComicPageCreate,
+  ComicPageUpdate,
   GalleryItem,
   Generation,
   GenerationSummary,
   OptionsSummary,
+  PageRender,
+  PageRenderCreate,
   Scene,
   SceneInput,
   ScenePreview,
@@ -303,3 +308,20 @@ export const editCandidate = (id: number, instruction: string) => {
 // ---------------------------------------------------------------------------
 
 export const getGallery = () => request<GalleryItem[]>('/gallery')
+
+// ---------------------------------------------------------------------------
+// comic pages
+// ---------------------------------------------------------------------------
+
+export const listComicPages = () => request<ComicPage[]>('/pages')
+export const createComicPage = (payload: ComicPageCreate) =>
+  request<ComicPage>('/pages', json('POST', payload))
+export const getComicPage = (id: number) => request<ComicPage>(`/pages/${id}`)
+export const updateComicPage = (id: number, payload: ComicPageUpdate) =>
+  request<ComicPage>(`/pages/${id}`, json('PUT', payload))
+export const deleteComicPage = (id: number) =>
+  request<void>(`/pages/${id}`, { method: 'DELETE' })
+export const renderComicPage = (id: number, payload: PageRenderCreate) =>
+  request<PageRender>(`/pages/${id}/render`, json('POST', payload))
+export const listComicPageRenders = (id: number) =>
+  request<PageRender[]>(`/pages/${id}/renders`)

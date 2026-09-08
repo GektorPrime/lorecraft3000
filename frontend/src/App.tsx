@@ -12,7 +12,6 @@ import { OptionsProvider } from './api/OptionsProvider'
 import { AppShell } from './components/AppShell'
 import { Home } from './pages/Home'
 import { NotFoundPage } from './pages/NotFoundPage'
-import { PanelsStubPage } from './pages/PanelsStubPage'
 import { BaseStageListPage } from './pages/base-stages/BaseStageListPage'
 import { BaseStageNewPage } from './pages/base-stages/BaseStageNewPage'
 import { BaseStagePreviewPage } from './pages/base-stages/BaseStagePreviewPage'
@@ -21,6 +20,8 @@ import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
 import { GalleryPage } from './pages/gallery/GalleryPage'
+import { ComicPageEditorPage } from './pages/comic-pages/ComicPageEditorPage'
+import { ComicPageListPage } from './pages/comic-pages/ComicPageListPage'
 import { SceneFormPage } from './pages/scenes/SceneFormPage'
 import { SceneListPage } from './pages/scenes/SceneListPage'
 import { ScenePreviewPage } from './pages/scenes/ScenePreviewPage'
@@ -175,8 +176,19 @@ const appRoutes: RouteObject[] = [
           },
           {
             path: 'panels',
-            element: <PanelsStubPage />,
-            handle: { title: 'Panels' } satisfies RouteHandle,
+            element: <ComicPageListPage />,
+            handle: { title: 'Comic Pages' } satisfies RouteHandle,
+          },
+          {
+            path: 'panels/new',
+            element: <ComicPageEditorPage />,
+            handle: { title: 'New Comic Page' } satisfies RouteHandle,
+          },
+          {
+            path: 'panels/:id/edit',
+            loader: requireRouteId,
+            element: <ComicPageEditorPage />,
+            handle: { title: 'Edit Comic Page' } satisfies RouteHandle,
           },
           {
             path: 'scenes',
