@@ -19,7 +19,7 @@ describe('panel layout', () => {
     expect(mergeSlot(split, 0, 'up')).toBe(split)
   })
 
-  it('preserves populated content and refuses to discard a different image', () => {
+  it('preserves the selected content when merging populated slots', () => {
     const slots = createGrid(1, 2)
     const neighborOnly = [{ ...slots[0] }, { ...slots[1], candidate_id: 8, content_url: '/8.png' }]
     expect(mergeSlot(neighborOnly, 0, 'right')).toEqual([
@@ -27,10 +27,12 @@ describe('panel layout', () => {
     ])
 
     const both = [
-      { ...slots[0], candidate_id: 7, content_url: '/7.png' },
+      { ...slots[0], candidate_id: 7, content_url: '/7.png', focal_x: 0.25, focal_y: 0.75, zoom: 2 },
       { ...slots[1], candidate_id: 8, content_url: '/8.png' },
     ]
-    expect(mergeSlot(both, 0, 'right')).toBe(both)
+    expect(mergeSlot(both, 0, 'right')).toEqual([
+      expect.objectContaining({ candidate_id: 7, content_url: '/7.png', focal_x: 0.25, focal_y: 0.75, zoom: 2, x0: 0, x1: 1 }),
+    ])
   })
 
   it('moves a boundary shared by one large and several aligned cells', () => {

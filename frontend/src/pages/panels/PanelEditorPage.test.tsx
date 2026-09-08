@@ -87,7 +87,7 @@ describe('PanelEditorPage', () => {
     fireEvent.change(screen.getByLabelText(/Internal gutter:/), { target: { value: '30' } })
     fireEvent.change(screen.getByLabelText(/Outer frame:/), { target: { value: '24' } })
     await userEvent.click(screen.getByRole('button', { name: 'Set background #20242B' }))
-    fireEvent.input(screen.getByLabelText(/Left edge:/), { target: { value: '0.6' } })
+    fireEvent.input(screen.getByLabelText('Left edge'), { target: { value: '0.6' } })
     await userEvent.click(screen.getByRole('button', { name: 'Save panel' }))
 
     await waitFor(() => expect(client.updatePanel).toHaveBeenCalledWith(5, expect.objectContaining({
@@ -106,13 +106,42 @@ describe('PanelEditorPage', () => {
     vi.mocked(client.getGallery).mockResolvedValue(ITEMS)
     renderAt('/panels/5/edit')
     await screen.findByLabelText('Panel canvas')
+    expect(screen.getByLabelText('Left edge')).toBeDisabled()
+    expect(screen.getByLabelText('Right edge')).toBeDisabled()
+    expect(screen.getByLabelText('Top edge')).toBeDisabled()
+    expect(screen.getByLabelText('Bottom edge')).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Split vertically' }))
     expect(screen.getAllByRole('button', { name: /Slot \d, empty/ })).toHaveLength(2)
+    expect(screen.getByLabelText('Left edge')).toBeDisabled()
+    expect(screen.getByLabelText('Right edge')).toBeEnabled()
+    expect(screen.getByLabelText('Top edge')).toBeDisabled()
+    expect(screen.getByLabelText('Bottom edge')).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Merge right' }))
     expect(screen.getAllByRole('button', { name: /Slot \d, empty/ })).toHaveLength(1)
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add column' }))
     expect(screen.getAllByRole('button', { name: /Slot \d, empty/ })).toHaveLength(4)
+  })
+
+  it('merges differently populated slots and retains the selected image', async () => {
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...PANEL,
+      slots: slots.map((slot, index) => ({
+        ...slot,
+        candidate_id: ITEMS[index].candidate_id,
+        content_url: ITEMS[index].content_url,
+      })),
+    })
+    vi.mocked(client.getGallery).mockResolvedValue(ITEMS)
+    renderAt('/panels/5/edit')
+    await screen.findByLabelText('Panel canvas')
+
+    const mergeRight = screen.getByRole('button', { name: 'Merge right' })
+    expect(mergeRight).toBeEnabled()
+    await userEvent.click(mergeRight)
+
+    expect(screen.getByRole('button', { name: 'Slot 1, image 11' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Slot 2, image 12' })).not.toBeInTheDocument()
   })
 
   it('offers an actionable reload for revision conflicts', async () => {

@@ -125,7 +125,6 @@ export function mergeSlot<T extends LayoutSlot>(slots: readonly T[], index: numb
   if (!selected || matches.length !== 1) return slots
   const neighborIndex = matches[0]
   const neighbor = slots[neighborIndex]
-  if (selected.candidate_id !== null && neighbor.candidate_id !== null && selected.candidate_id !== neighbor.candidate_id) return slots
   const content = selected.candidate_id !== null ? selected : neighbor
   const merged = {
     ...selected,

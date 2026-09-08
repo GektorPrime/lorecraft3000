@@ -287,9 +287,9 @@ function PanelEditor({ panelId }: { panelId: number }) {
           <div className="btn-row"><button className="btn btn--sm" type="button" disabled={splitSlot(values.slots, selectedSlot, 'horizontal') === values.slots} onClick={() => split('horizontal')}>Split horizontally</button><button className="btn btn--sm" type="button" disabled={splitSlot(values.slots, selectedSlot, 'vertical') === values.slots} onClick={() => split('vertical')}>Split vertically</button></div>
           {selectedSlotValue && <div className="panel-editor__edges">{EDGES.map(({ key, label }) => {
             const range = getEdgeRange(values.slots, selectedSlot, key)
-            if (!range || range.max - range.min < 0.001) return null
+            const enabled = range !== null && range.max - range.min >= 0.001
             const value = key === 'left' ? selectedSlotValue.x0 : key === 'right' ? selectedSlotValue.x1 : key === 'top' ? selectedSlotValue.y0 : selectedSlotValue.y1
-            return <div className="field" key={key}><label htmlFor={`slot-edge-${key}`}>{label}: {Math.round(value * 100)}%</label><input id={`slot-edge-${key}`} type="range" min={range.min} max={range.max} step="0.01" value={value} onInput={(event) => replaceSlots(moveEdge(values.slots, selectedSlot, key, Number(event.currentTarget.value)))} /></div>
+            return <div className="field" key={key}><label htmlFor={`slot-edge-${key}`}>{label}</label><input id={`slot-edge-${key}`} type="range" min={range?.min ?? 0} max={range?.max ?? 1} step="0.001" value={value} disabled={!enabled} onInput={(event) => replaceSlots(moveEdge(values.slots, selectedSlot, key, Number(event.currentTarget.value)))} /></div>
           })}</div>}
         </fieldset>
         <details className="panel-editor__page-settings" open>
