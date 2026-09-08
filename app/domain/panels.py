@@ -1,4 +1,4 @@
-"""Domain values for template-based comic pages."""
+"""Domain values for flexible panels."""
 
 from __future__ import annotations
 
@@ -7,36 +7,40 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class ComicPagePanel:
+class PanelSlot:
     id: int
-    page_id: int
-    candidate_id: int
+    panel_id: int
+    candidate_id: int | None
     slot_index: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
     focal_x: float
     focal_y: float
     zoom: float
 
     @classmethod
-    def from_row(cls, row) -> "ComicPagePanel":
+    def from_row(cls, row) -> "PanelSlot":
         return cls(**{field: row[field] for field in cls.__dataclass_fields__})
 
 
 @dataclass(frozen=True)
-class PageRender:
+class PanelRender:
     id: int
-    page_id: int
-    page_revision: int
+    panel_id: int
+    panel_revision: int
     width: int
     height: int
     layout: dict
     created_at: str
 
     @classmethod
-    def from_row(cls, row) -> "PageRender":
+    def from_row(cls, row) -> "PanelRender":
         return cls(
             id=row["id"],
-            page_id=row["page_id"],
-            page_revision=row["page_revision"],
+            panel_id=row["panel_id"],
+            panel_revision=row["panel_revision"],
             width=row["width"],
             height=row["height"],
             layout=json.loads(row["layout_json"]),
@@ -45,7 +49,7 @@ class PageRender:
 
 
 @dataclass(frozen=True)
-class ComicPage:
+class Panel:
     id: int
     title: str
     format: str
@@ -53,11 +57,9 @@ class ComicPage:
     height_px: int
     background_color: str
     gutter_px: int
-    template_key: str
-    template_version: int
-    divider_values: list[float]
+    frame_px: int
     revision: int
     created_at: str
     updated_at: str
-    panels: tuple[ComicPagePanel, ...] = ()
-    latest_render: PageRender | None = None
+    slots: tuple[PanelSlot, ...] = ()
+    latest_render: PanelRender | None = None

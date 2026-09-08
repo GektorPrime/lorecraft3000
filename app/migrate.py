@@ -33,7 +33,7 @@ MIGRATIONS: list[str] = [
     "app.migrations.017_base_stage_generations",
     "app.migrations.018_character_reference_roles",
     "app.migrations.019_multiview_face_embeddings",
-    "app.migrations.020_comic_pages",
+    "app.migrations.020_panels",
 ]
 
 

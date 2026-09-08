@@ -34,7 +34,7 @@ function resolvedAppFetch() {
     if (url.endsWith('/base-stages/archived')) return Promise.resolve(jsonResponse([]))
     if (url.endsWith('/base-stages')) return Promise.resolve(jsonResponse([]))
     if (url.endsWith('/scenes')) return Promise.resolve(jsonResponse([]))
-    if (url.endsWith('/pages')) return Promise.resolve(jsonResponse([]))
+    if (url.endsWith('/panels')) return Promise.resolve(jsonResponse([]))
     throw new Error(`Unexpected request: ${url}`)
   })
 }
@@ -86,12 +86,12 @@ describe('App routing', () => {
     await waitFor(() => expect(document.title).toBe('Base Stages | LoreCraft3000'))
   })
 
-  it('renders the comic page list in place of the Panels placeholder', async () => {
+  it('renders the panel list in place of the Panels placeholder', async () => {
     await renderApp('#/panels')
 
-    expect(await screen.findByRole('heading', { name: 'Comic pages' })).toBeInTheDocument()
-    expect(within(screen.getByRole('main')).getAllByRole('link', { name: 'New comic page' }).length).toBeGreaterThan(0)
-    await waitFor(() => expect(document.title).toBe('Comic Pages | LoreCraft3000'))
+    expect(await screen.findByRole('heading', { name: 'Panels' })).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getAllByRole('link', { name: 'New panel' }).length).toBeGreaterThan(0)
+    await waitFor(() => expect(document.title).toBe('Panels | LoreCraft3000'))
   })
 
   it('does not mark Scenes active when on /scenes/new', async () => {

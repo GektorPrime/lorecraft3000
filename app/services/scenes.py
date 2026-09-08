@@ -29,7 +29,7 @@ class SceneImmutableError(SceneError):
 
 
 class SceneDeleteConflictError(SceneError):
-    """Raised when a comic page still references one of the scene's candidates."""
+    """Raised when a panel still references one of the scene's candidates."""
 
 
 # Re-exported from the registry (app/models.py) so existing callers of
@@ -265,8 +265,8 @@ class SceneService:
             raise SceneNotFoundError(f"scene {scene_id} not found")
         referenced = self.conn.execute(
             """
-            SELECT 1 FROM comic_page_panel cpp
-            JOIN candidate c ON c.id = cpp.candidate_id
+            SELECT 1 FROM panel_slot ps
+            JOIN candidate c ON c.id = ps.candidate_id
             JOIN generation g ON g.id = c.generation_id
             WHERE g.scene_id = ? LIMIT 1
             """,
@@ -274,7 +274,7 @@ class SceneService:
         ).fetchone()
         if referenced:
             raise SceneDeleteConflictError(
-                f"scene {scene_id} cannot be deleted while a comic page uses one of its candidates"
+                f"scene {scene_id} cannot be deleted while a panel uses one of its candidates"
             )
         try:
             self.conn.execute(
@@ -313,8 +313,8 @@ class SceneService:
             self.conn.rollback()
             referenced = self.conn.execute(
                 """
-                SELECT 1 FROM comic_page_panel cpp
-                JOIN candidate c ON c.id = cpp.candidate_id
+                SELECT 1 FROM panel_slot ps
+                JOIN candidate c ON c.id = ps.candidate_id
                 JOIN generation g ON g.id = c.generation_id
                 WHERE g.scene_id = ? LIMIT 1
                 """,
@@ -322,7 +322,7 @@ class SceneService:
             ).fetchone()
             if referenced:
                 raise SceneDeleteConflictError(
-                    f"scene {scene_id} cannot be deleted while a comic page uses one of its candidates"
+                    f"scene {scene_id} cannot be deleted while a panel uses one of its candidates"
                 ) from exc
             raise
         except sqlite3.Error:

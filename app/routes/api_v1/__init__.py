@@ -24,7 +24,7 @@ from app.routes.api_v1 import (
     characters,
     generations,
     options,
-    pages,
+    panels,
     scenes,
     ref_sets,
     styles,
@@ -39,4 +39,4 @@ router.include_router(styles.router)
 router.include_router(ref_sets.router)
 router.include_router(scenes.router)
 router.include_router(generations.router)
-router.include_router(pages.router)
+router.include_router(panels.router)

@@ -60,7 +60,7 @@ describe('GalleryPage', () => {
       'href',
       '/scenes/3/preview',
     )
-    expect(screen.getByRole('link', { name: 'Add to page' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Add to panel' })).toHaveAttribute(
       'href',
       '/panels/new?candidate=900',
     )

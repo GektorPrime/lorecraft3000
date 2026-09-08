@@ -144,7 +144,7 @@ def run_check(conn: sqlite3.Connection, storage: ImageStorage) -> ConsistencyRep
     """Scan the store and database and classify every inconsistency found.
 
     The database hashes come from every table that references stored objects
-    (``candidate``, ``ref_image``, uploaded ``base_stage`` rows, page renders,
+    (``candidate``, ``ref_image``, uploaded ``base_stage`` rows, panel renders,
     and the authoritative ``image_provenance``).
     """
     db_hashes = {
@@ -155,7 +155,7 @@ def run_check(conn: sqlite3.Connection, storage: ImageStorage) -> ConsistencyRep
             "UNION SELECT uploaded_sha256 FROM base_stage "
             "WHERE uploaded_sha256 IS NOT NULL "
             "UNION SELECT DISTINCT sha256 FROM image_provenance"
-            " UNION SELECT DISTINCT sha256 FROM page_render"
+            " UNION SELECT DISTINCT sha256 FROM panel_render"
         ).fetchall()
     }
 

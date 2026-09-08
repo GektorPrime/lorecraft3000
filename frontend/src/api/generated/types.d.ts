@@ -481,15 +481,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/page-renders/{render_id}/content": {
+    "/api/v1/panel-renders/{render_id}/content": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Page Render Content */
-        get: operations["page_render_content_api_v1_page_renders__render_id__content_get"];
+        /** Panel Render Content */
+        get: operations["panel_render_content_api_v1_panel_renders__render_id__content_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -498,15 +498,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/page-renders/{render_id}/download": {
+    "/api/v1/panel-renders/{render_id}/download": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Page Render Download */
-        get: operations["page_render_download_api_v1_page_renders__render_id__download_get"];
+        /** Panel Render Download */
+        get: operations["panel_render_download_api_v1_panel_renders__render_id__download_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -515,44 +515,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pages": {
+    "/api/v1/panels": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Pages */
-        get: operations["list_pages_api_v1_pages_get"];
+        /** List Panels */
+        get: operations["list_panels_api_v1_panels_get"];
         put?: never;
-        /** Create Page */
-        post: operations["create_page_api_v1_pages_post"];
+        /** Create Panel */
+        post: operations["create_panel_api_v1_panels_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pages/{page_id}": {
+    "/api/v1/panels/{panel_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Page */
-        get: operations["get_page_api_v1_pages__page_id__get"];
-        /** Update Page */
-        put: operations["update_page_api_v1_pages__page_id__put"];
+        /** Get Panel */
+        get: operations["get_panel_api_v1_panels__panel_id__get"];
+        /** Update Panel */
+        put: operations["update_panel_api_v1_panels__panel_id__put"];
         post?: never;
-        /** Delete Page */
-        delete: operations["delete_page_api_v1_pages__page_id__delete"];
+        /** Delete Panel */
+        delete: operations["delete_panel_api_v1_panels__panel_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pages/{page_id}/render": {
+    "/api/v1/panels/{panel_id}/render": {
         parameters: {
             query?: never;
             header?: never;
@@ -561,23 +561,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Render Page */
-        post: operations["render_page_api_v1_pages__page_id__render_post"];
+        /** Render Panel */
+        post: operations["render_panel_api_v1_panels__panel_id__render_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pages/{page_id}/renders": {
+    "/api/v1/panels/{panel_id}/renders": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Page Renders */
-        get: operations["list_page_renders_api_v1_pages__page_id__renders_get"];
+        /** List Panel Renders */
+        get: operations["list_panel_renders_api_v1_panels__panel_id__renders_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1203,112 +1203,6 @@ export interface components {
              */
             visual_contract: string;
         };
-        /** ComicPage */
-        ComicPage: {
-            /** Background Color */
-            background_color: string;
-            /** Created At */
-            created_at: string;
-            /** Divider Values */
-            divider_values: number[];
-            /** Format */
-            format: string;
-            /** Gutter Px */
-            gutter_px: number;
-            /** Height Px */
-            height_px: number;
-            /** Id */
-            id: number;
-            latest_render: components["schemas"]["PageRender"] | null;
-            /** Panels */
-            panels: components["schemas"]["ComicPagePanel"][];
-            /** Revision */
-            revision: number;
-            /** Template Key */
-            template_key: string;
-            /** Template Version */
-            template_version: number;
-            /** Title */
-            title: string;
-            /** Updated At */
-            updated_at: string;
-            /** Width Px */
-            width_px: number;
-        };
-        /** ComicPageCreate */
-        ComicPageCreate: {
-            /** Candidate Id */
-            candidate_id?: number | null;
-            /** Format */
-            format: string;
-            /** Template Key */
-            template_key: string;
-            /** Title */
-            title: string;
-        };
-        /** ComicPagePanel */
-        ComicPagePanel: {
-            /** Candidate Id */
-            candidate_id: number;
-            /** Content Url */
-            content_url: string;
-            /** Focal X */
-            focal_x: number;
-            /** Focal Y */
-            focal_y: number;
-            /** Id */
-            id: number;
-            /** Slot Index */
-            slot_index: number;
-            /** Zoom */
-            zoom: number;
-        };
-        /** ComicPagePanelInput */
-        ComicPagePanelInput: {
-            /** Candidate Id */
-            candidate_id: number;
-            /**
-             * Focal X
-             * @default 0.5
-             */
-            focal_x: number;
-            /**
-             * Focal Y
-             * @default 0.5
-             */
-            focal_y: number;
-            /** Slot Index */
-            slot_index: number;
-            /**
-             * Zoom
-             * @default 1
-             */
-            zoom: number;
-        };
-        /** ComicPageUpdate */
-        ComicPageUpdate: {
-            /** Background Color */
-            background_color: string;
-            /** Divider Values */
-            divider_values: number[];
-            /** Expected Revision */
-            expected_revision: number;
-            /** Format */
-            format: string;
-            /** Gutter Px */
-            gutter_px: number;
-            /** Panels */
-            panels: components["schemas"]["ComicPagePanelInput"][];
-            /** Template Key */
-            template_key: string;
-            /**
-             * Template Version
-             * @default 1
-             */
-            template_version: number;
-            /** Title */
-            title: string;
-        };
         /** GalleryItem */
         GalleryItem: {
             /** Aspect Ratio */
@@ -1454,8 +1348,55 @@ export interface components {
             /** Spent Today Cents */
             spent_today_cents: number;
         };
-        /** PageRender */
-        PageRender: {
+        /** Panel */
+        Panel: {
+            /** Background Color */
+            background_color: string;
+            /** Created At */
+            created_at: string;
+            /** Format */
+            format: string;
+            /** Frame Px */
+            frame_px: number;
+            /** Gutter Px */
+            gutter_px: number;
+            /** Height Px */
+            height_px: number;
+            /** Id */
+            id: number;
+            latest_render: components["schemas"]["PanelRender"] | null;
+            /** Revision */
+            revision: number;
+            /** Slots */
+            slots: components["schemas"]["PanelSlot"][];
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+            /** Width Px */
+            width_px: number;
+        };
+        /** PanelCreate */
+        PanelCreate: {
+            /** Candidate Id */
+            candidate_id?: number | null;
+            /**
+             * Columns
+             * @default 1
+             */
+            columns: number;
+            /** Format */
+            format: string;
+            /**
+             * Rows
+             * @default 1
+             */
+            rows: number;
+            /** Title */
+            title: string;
+        };
+        /** PanelRender */
+        PanelRender: {
             /** Content Url */
             content_url: string;
             /** Created At */
@@ -1470,17 +1411,89 @@ export interface components {
             layout: {
                 [key: string]: unknown;
             };
-            /** Page Id */
-            page_id: number;
-            /** Page Revision */
-            page_revision: number;
+            /** Panel Id */
+            panel_id: number;
+            /** Panel Revision */
+            panel_revision: number;
             /** Width */
             width: number;
         };
-        /** PageRenderCreate */
-        PageRenderCreate: {
+        /** PanelRenderCreate */
+        PanelRenderCreate: {
             /** Expected Revision */
             expected_revision: number;
+        };
+        /** PanelSlot */
+        PanelSlot: {
+            /** Candidate Id */
+            candidate_id: number | null;
+            /** Content Url */
+            content_url: string | null;
+            /** Focal X */
+            focal_x: number;
+            /** Focal Y */
+            focal_y: number;
+            /** Id */
+            id: number;
+            /** Slot Index */
+            slot_index: number;
+            /** X0 */
+            x0: number;
+            /** X1 */
+            x1: number;
+            /** Y0 */
+            y0: number;
+            /** Y1 */
+            y1: number;
+            /** Zoom */
+            zoom: number;
+        };
+        /** PanelSlotInput */
+        PanelSlotInput: {
+            /** Candidate Id */
+            candidate_id: number | null;
+            /**
+             * Focal X
+             * @default 0.5
+             */
+            focal_x: number;
+            /**
+             * Focal Y
+             * @default 0.5
+             */
+            focal_y: number;
+            /** Slot Index */
+            slot_index: number;
+            /** X0 */
+            x0: number;
+            /** X1 */
+            x1: number;
+            /** Y0 */
+            y0: number;
+            /** Y1 */
+            y1: number;
+            /**
+             * Zoom
+             * @default 1
+             */
+            zoom: number;
+        };
+        /** PanelUpdate */
+        PanelUpdate: {
+            /** Background Color */
+            background_color: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /** Format */
+            format: string;
+            /** Frame Px */
+            frame_px: number;
+            /** Gutter Px */
+            gutter_px: number;
+            /** Slots */
+            slots: components["schemas"]["PanelSlotInput"][];
+            /** Title */
+            title: string;
         };
         /** RefImage */
         RefImage: {
@@ -2680,7 +2693,7 @@ export interface operations {
             };
         };
     };
-    page_render_content_api_v1_page_renders__render_id__content_get: {
+    panel_render_content_api_v1_panel_renders__render_id__content_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2711,7 +2724,7 @@ export interface operations {
             };
         };
     };
-    page_render_download_api_v1_page_renders__render_id__download_get: {
+    panel_render_download_api_v1_panel_renders__render_id__download_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2742,7 +2755,7 @@ export interface operations {
             };
         };
     };
-    list_pages_api_v1_pages_get: {
+    list_panels_api_v1_panels_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2757,12 +2770,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ComicPage"][];
+                    "application/json": components["schemas"]["Panel"][];
                 };
             };
         };
     };
-    create_page_api_v1_pages_post: {
+    create_panel_api_v1_panels_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2771,7 +2784,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ComicPageCreate"];
+                "application/json": components["schemas"]["PanelCreate"];
             };
         };
         responses: {
@@ -2781,7 +2794,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ComicPage"];
+                    "application/json": components["schemas"]["Panel"];
                 };
             };
             /** @description Validation Error */
@@ -2795,12 +2808,12 @@ export interface operations {
             };
         };
     };
-    get_page_api_v1_pages__page_id__get: {
+    get_panel_api_v1_panels__panel_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                page_id: number;
+                panel_id: number;
             };
             cookie?: never;
         };
@@ -2812,7 +2825,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ComicPage"];
+                    "application/json": components["schemas"]["Panel"];
                 };
             };
             /** @description Validation Error */
@@ -2826,18 +2839,18 @@ export interface operations {
             };
         };
     };
-    update_page_api_v1_pages__page_id__put: {
+    update_panel_api_v1_panels__panel_id__put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                page_id: number;
+                panel_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ComicPageUpdate"];
+                "application/json": components["schemas"]["PanelUpdate"];
             };
         };
         responses: {
@@ -2847,7 +2860,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ComicPage"];
+                    "application/json": components["schemas"]["Panel"];
                 };
             };
             /** @description Validation Error */
@@ -2861,12 +2874,12 @@ export interface operations {
             };
         };
     };
-    delete_page_api_v1_pages__page_id__delete: {
+    delete_panel_api_v1_panels__panel_id__delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                page_id: number;
+                panel_id: number;
             };
             cookie?: never;
         };
@@ -2890,18 +2903,18 @@ export interface operations {
             };
         };
     };
-    render_page_api_v1_pages__page_id__render_post: {
+    render_panel_api_v1_panels__panel_id__render_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                page_id: number;
+                panel_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PageRenderCreate"];
+                "application/json": components["schemas"]["PanelRenderCreate"];
             };
         };
         responses: {
@@ -2911,7 +2924,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PageRender"];
+                    "application/json": components["schemas"]["PanelRender"];
                 };
             };
             /** @description Validation Error */
@@ -2925,12 +2938,12 @@ export interface operations {
             };
         };
     };
-    list_page_renders_api_v1_pages__page_id__renders_get: {
+    list_panel_renders_api_v1_panels__panel_id__renders_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                page_id: number;
+                panel_id: number;
             };
             cookie?: never;
         };
@@ -2942,7 +2955,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PageRender"][];
+                    "application/json": components["schemas"]["PanelRender"][];
                 };
             };
             /** @description Validation Error */

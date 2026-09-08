@@ -16,15 +16,15 @@ import type {
   Candidate,
   Character,
   CharacterInput,
-  ComicPage,
-  ComicPageCreate,
-  ComicPageUpdate,
   GalleryItem,
   Generation,
   GenerationSummary,
   OptionsSummary,
-  PageRender,
-  PageRenderCreate,
+  Panel,
+  PanelCreate,
+  PanelRender,
+  PanelRenderCreate,
+  PanelUpdate,
   Scene,
   SceneInput,
   ScenePreview,
@@ -310,18 +310,18 @@ export const editCandidate = (id: number, instruction: string) => {
 export const getGallery = () => request<GalleryItem[]>('/gallery')
 
 // ---------------------------------------------------------------------------
-// comic pages
+// panels
 // ---------------------------------------------------------------------------
 
-export const listComicPages = () => request<ComicPage[]>('/pages')
-export const createComicPage = (payload: ComicPageCreate) =>
-  request<ComicPage>('/pages', json('POST', payload))
-export const getComicPage = (id: number) => request<ComicPage>(`/pages/${id}`)
-export const updateComicPage = (id: number, payload: ComicPageUpdate) =>
-  request<ComicPage>(`/pages/${id}`, json('PUT', payload))
-export const deleteComicPage = (id: number) =>
-  request<void>(`/pages/${id}`, { method: 'DELETE' })
-export const renderComicPage = (id: number, payload: PageRenderCreate) =>
-  request<PageRender>(`/pages/${id}/render`, json('POST', payload))
-export const listComicPageRenders = (id: number) =>
-  request<PageRender[]>(`/pages/${id}/renders`)
+export const listPanels = () => request<Panel[]>('/panels')
+export const createPanel = (payload: PanelCreate) =>
+  request<Panel>('/panels', json('POST', payload))
+export const getPanel = (id: number) => request<Panel>(`/panels/${id}`)
+export const updatePanel = (id: number, payload: PanelUpdate) =>
+  request<Panel>(`/panels/${id}`, json('PUT', payload))
+export const deletePanel = (id: number) =>
+  request<void>(`/panels/${id}`, { method: 'DELETE' })
+export const renderPanel = (id: number, payload: PanelRenderCreate) =>
+  request<PanelRender>(`/panels/${id}/render`, json('POST', payload))
+export const listPanelRenders = (panelId: number) =>
+  request<PanelRender[]>(`/panels/${panelId}/renders`)

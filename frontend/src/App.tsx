@@ -20,8 +20,8 @@ import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
 import { GalleryPage } from './pages/gallery/GalleryPage'
-import { ComicPageEditorPage } from './pages/comic-pages/ComicPageEditorPage'
-import { ComicPageListPage } from './pages/comic-pages/ComicPageListPage'
+import { PanelEditorPage } from './pages/panels/PanelEditorPage'
+import { PanelListPage } from './pages/panels/PanelListPage'
 import { SceneFormPage } from './pages/scenes/SceneFormPage'
 import { SceneListPage } from './pages/scenes/SceneListPage'
 import { ScenePreviewPage } from './pages/scenes/ScenePreviewPage'
@@ -176,19 +176,19 @@ const appRoutes: RouteObject[] = [
           },
           {
             path: 'panels',
-            element: <ComicPageListPage />,
-            handle: { title: 'Comic Pages' } satisfies RouteHandle,
+            element: <PanelListPage />,
+            handle: { title: 'Panels' } satisfies RouteHandle,
           },
           {
             path: 'panels/new',
-            element: <ComicPageEditorPage />,
-            handle: { title: 'New Comic Page' } satisfies RouteHandle,
+            element: <PanelEditorPage />,
+            handle: { title: 'New Panel' } satisfies RouteHandle,
           },
           {
             path: 'panels/:id/edit',
             loader: requireRouteId,
-            element: <ComicPageEditorPage />,
-            handle: { title: 'Edit Comic Page' } satisfies RouteHandle,
+            element: <PanelEditorPage />,
+            handle: { title: 'Edit Panel' } satisfies RouteHandle,
           },
           {
             path: 'scenes',

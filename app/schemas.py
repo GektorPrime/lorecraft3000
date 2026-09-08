@@ -322,55 +322,62 @@ class GalleryItem(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# comic pages
+# Panels
 # ---------------------------------------------------------------------------
 
 
-class ComicPageCreate(BaseModel):
+class PanelCreate(BaseModel):
     title: str
     format: str
-    template_key: str
+    rows: int = Field(default=1, ge=1, le=8)
+    columns: int = Field(default=1, ge=1, le=8)
     candidate_id: int | None = None
 
 
-class ComicPagePanelInput(BaseModel):
-    candidate_id: int
+class PanelSlotInput(BaseModel):
+    candidate_id: int | None
     slot_index: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
     focal_x: float = 0.5
     focal_y: float = 0.5
     zoom: float = 1.0
 
 
-class ComicPageUpdate(BaseModel):
+class PanelUpdate(BaseModel):
     expected_revision: int
     title: str
     format: str
     background_color: str
     gutter_px: int
-    template_key: str
-    template_version: int = 1
-    divider_values: list[float]
-    panels: list[ComicPagePanelInput]
+    frame_px: int
+    slots: list[PanelSlotInput]
 
 
-class PageRenderCreate(BaseModel):
+class PanelRenderCreate(BaseModel):
     expected_revision: int
 
 
-class ComicPagePanel(BaseModel):
+class PanelSlot(BaseModel):
     id: int
-    candidate_id: int
+    candidate_id: int | None
     slot_index: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
     focal_x: float
     focal_y: float
     zoom: float
-    content_url: str
+    content_url: str | None
 
 
-class PageRender(BaseModel):
+class PanelRender(BaseModel):
     id: int
-    page_id: int
-    page_revision: int
+    panel_id: int
+    panel_revision: int
     width: int
     height: int
     layout: dict[str, object]
@@ -379,7 +386,7 @@ class PageRender(BaseModel):
     download_url: str
 
 
-class ComicPage(BaseModel):
+class Panel(BaseModel):
     id: int
     title: str
     format: str
@@ -387,14 +394,12 @@ class ComicPage(BaseModel):
     height_px: int
     background_color: str
     gutter_px: int
-    template_key: str
-    template_version: int
-    divider_values: list[float]
+    frame_px: int
     revision: int
     created_at: str
     updated_at: str
-    panels: list[ComicPagePanel]
-    latest_render: PageRender | None
+    slots: list[PanelSlot]
+    latest_render: PanelRender | None
 
 
 # ---------------------------------------------------------------------------
