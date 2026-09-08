@@ -70,6 +70,8 @@ function BaseStageCard({ stage, archived, busy, onOpen, onArchive, onRestore, pr
         </div>
         <p className="resource-card__summary text-clamp" title={stage.description}>{stage.description}</p>
         <p className="resource-card__meta">
+          <span className="badge badge--draft">{stage.origin === 'upload' ? 'Upload' : 'Generated'}</span>
+          <span className="badge badge--canonical">{stage.state === 'ready' ? 'Ready' : 'Draft'}</span>
           <span>{stage.dimensions ? `${stage.dimensions.width} × ${stage.dimensions.height}` : 'Dimensions unavailable'}</span>
           <span>{stage.aspect_ratio}</span>
           <span>{stage.targets.length} target{stage.targets.length === 1 ? '' : 's'}</span>
@@ -77,10 +79,6 @@ function BaseStageCard({ stage, archived, busy, onOpen, onArchive, onRestore, pr
         </p>
       </div>
       <div className="resource-card__actions">
-        <span className="base-stage-card__badges">
-          <span className="badge badge--draft">{stage.origin === 'upload' ? 'Upload' : 'Generated'}</span>
-          <span className="badge badge--canonical">{stage.state === 'ready' ? 'Ready' : 'Draft'}</span>
-        </span>
         {archived ? (
           <button type="button" className="btn" disabled={busy} onClick={onRestore}>
             {busy ? 'Restoring…' : 'Restore'}
