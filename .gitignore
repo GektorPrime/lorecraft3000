@@ -4,9 +4,6 @@
 # Virtual environment
 .venv/
 
-# Generated output
-out/
-
 # Local project documentation and agent state
 documentation/
 

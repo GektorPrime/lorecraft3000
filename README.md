@@ -1,34 +1,37 @@
 # LoreCraft3000
 
-A local tool for generating comic scenes while keeping multiple characters
-recognizable across scenes. Visual styles are editable.
+LoreCraft3000 is a local comic-generation studio: define your characters once, keep them recognizable across every scene, shape the visual style to taste, and assemble the results into multi-panel pages.
 
 ## Features
 
 - Character library with immutable, versioned canonical reference sets
 - Multi-character scenes with explicit reference-slot allocation
 - Exact prompt and cost preview before any paid request
-- Gemini and OpenAI (gpt-image-1) image generation behind provider adapters,
+- Gemini and/or OpenAI image generation behind provider adapters,
   selected per scene by model
 - Multi-turn image editing: refine a generated candidate with a natural-language
   instruction on the same provider, keeping character identity anchored
-- Hard, configurable daily spending limit (`$3` by default)
+- Hard, configurable daily spending limit
 - Advisory identity scoring: every candidate is matched against the scene
   cast's canonical reference gallery and scored per character, surfaced only
   in the UI (it never gates or auto-rejects) — see
   [docs/OPERATIONS.md](docs/OPERATIONS.md) for the one-time model setup
-- Content-addressed images with complete generation provenance
-- Manual candidate review without automatically changing character canon
-- Panels assembled from accepted candidates with flexible rectangular layouts,
+- Every image is filed under a fingerprint of its own contents 
+  (so it's deduplicated, verifiable, and never overwritten), 
+  and each one carries a full record of exactly how it was generated.
+- Manual candidate review
+- Panels assembled from accepted candidates with flexible layouts,
   adjustable crops, frames, and gutters, and deterministic panel render PNG export
-- Typed `/api/v1` JSON API backing a separated React + Vite frontend
-  (`frontend/`), which is the only UI
+
 
 ## Setup
 
-Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), Node.js 20+, npm, and a
-billed Gemini API key. An OpenAI API key is additionally required only if a
-scene uses an OpenAI model (e.g. `gpt-image-1`).
+Prerequisites:
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/)
+- Node.js 20+
+- npm
+- billed Gemini API key (and/or OpenAI API key).
 
 ```bash
 uv sync
@@ -36,7 +39,7 @@ npm install
 cp .env.example .env
 ```
 
-Set `GEMINI_API_KEY` in `.env` (and `OPENAI_API_KEY` if using OpenAI models).
+Set `GEMINI_API_KEY` in `.env` (and/or `OPENAI_API_KEY`).
 The default daily limit can be changed with
 `LORECRAFT_DAILY_SPEND_CAP_USD`. Spend is counted from midnight in the browser's
 local timezone; the database stores timestamps in UTC.
