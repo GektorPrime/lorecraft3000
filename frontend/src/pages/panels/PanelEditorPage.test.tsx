@@ -115,6 +115,27 @@ describe('PanelEditorPage', () => {
     expect(screen.getAllByRole('button', { name: /Slot \d, empty/ })).toHaveLength(4)
   })
 
+  it('merges differently populated slots and retains the selected image', async () => {
+    vi.mocked(client.getPanel).mockResolvedValue({
+      ...PANEL,
+      slots: slots.map((slot, index) => ({
+        ...slot,
+        candidate_id: ITEMS[index].candidate_id,
+        content_url: ITEMS[index].content_url,
+      })),
+    })
+    vi.mocked(client.getGallery).mockResolvedValue(ITEMS)
+    renderAt('/panels/5/edit')
+    await screen.findByLabelText('Panel canvas')
+
+    const mergeRight = screen.getByRole('button', { name: 'Merge right' })
+    expect(mergeRight).toBeEnabled()
+    await userEvent.click(mergeRight)
+
+    expect(screen.getByRole('button', { name: 'Slot 1, image 11' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Slot 2, image 12' })).not.toBeInTheDocument()
+  })
+
   it('offers an actionable reload for revision conflicts', async () => {
     vi.mocked(client.getPanel).mockResolvedValue(PANEL)
     vi.mocked(client.getGallery).mockResolvedValue(ITEMS)
