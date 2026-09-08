@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addColumn, addRow, createGrid, mergeSlot, moveEdge, splitSlot } from './layout'
+import { addColumn, addRow, createGrid, cropImageBox, mergeSlot, moveEdge, splitSlot } from './layout'
 
 describe('panel layout', () => {
   it('creates normalized row-major grids', () => {
@@ -54,5 +54,23 @@ describe('panel layout', () => {
     const column = addColumn(createGrid(2, 1))
     expect(column).toHaveLength(4)
     expect(column.filter((slot) => slot.x0 === 0.5)).toHaveLength(2)
+  })
+
+  it('reproduces the backend crop window for zoomed, off-centre focal points', () => {
+    // Ground truth from PanelRenderService._crop_box(1600, 1000, 1.5, 0.07, 0.0, 2.2).
+    const box = cropImageBox(1600, 1000, 1.5, 0.07, 0.0, 2.2)
+    expect(box.widthPct).toBeCloseTo(234.6667, 3)
+    expect(box.heightPct).toBeCloseTo(220, 3)
+    expect(box.leftPct).toBeCloseTo(0, 6)
+    expect(box.topPct).toBeCloseTo(0, 6)
+  })
+
+  it('centres the crop when the focal point allows it', () => {
+    // _crop_box(1000, 1000, 1.0, 0.5, 0.5, 2.0) -> left=top=250, crop 500x500.
+    const box = cropImageBox(1000, 1000, 1, 0.5, 0.5, 2)
+    expect(box.widthPct).toBeCloseTo(200, 6)
+    expect(box.heightPct).toBeCloseTo(200, 6)
+    expect(box.leftPct).toBeCloseTo(-50, 6)
+    expect(box.topPct).toBeCloseTo(-50, 6)
   })
 })

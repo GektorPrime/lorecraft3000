@@ -257,8 +257,8 @@ class PanelService:
                 raise PanelValidationError("slot coordinates must be from 0 to 1")
             if x1 - x0 < 0.04 or y1 - y0 < 0.04:
                 raise PanelValidationError("panel slots must be at least 0.04 wide and high")
-            if not 0 <= focal_x <= 1 or not 0 <= focal_y <= 1 or not 1 <= zoom <= 3:
-                raise PanelValidationError("focal points must be 0..1 and zoom must be 1..3")
+            if not 0 <= focal_x <= 1 or not 0 <= focal_y <= 1 or not 1 <= zoom <= 5:
+                raise PanelValidationError("focal points must be 0..1 and zoom must be 1..5")
             slot_indexes.append(slot)
             rectangles.append((x0, y0, x1, y1))
         if sorted(slot_indexes) != list(range(len(panel_slots))):
