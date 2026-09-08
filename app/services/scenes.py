@@ -28,6 +28,10 @@ class SceneImmutableError(SceneError):
     """
 
 
+class SceneDeleteConflictError(SceneError):
+    """Raised when a panel still references one of the scene's candidates."""
+
+
 # Re-exported from the registry (app/models.py) so existing callers of
 # ``from app.services.scenes import ASPECT_RATIOS`` keep working; the registry
 # is the single source of truth for the value.
@@ -259,6 +263,19 @@ class SceneService:
             "SELECT 1 FROM scene WHERE id = ?", (scene_id,)
         ).fetchone() is None:
             raise SceneNotFoundError(f"scene {scene_id} not found")
+        referenced = self.conn.execute(
+            """
+            SELECT 1 FROM panel_slot ps
+            JOIN candidate c ON c.id = ps.candidate_id
+            JOIN generation g ON g.id = c.generation_id
+            WHERE g.scene_id = ? LIMIT 1
+            """,
+            (scene_id,),
+        ).fetchone()
+        if referenced:
+            raise SceneDeleteConflictError(
+                f"scene {scene_id} cannot be deleted while a panel uses one of its candidates"
+            )
         try:
             self.conn.execute(
                 """
@@ -292,6 +309,22 @@ class SceneService:
             self.conn.execute("DELETE FROM generation WHERE scene_id = ?", (scene_id,))
             self.conn.execute("DELETE FROM scene WHERE id = ?", (scene_id,))
             self.conn.commit()
+        except sqlite3.IntegrityError as exc:
+            self.conn.rollback()
+            referenced = self.conn.execute(
+                """
+                SELECT 1 FROM panel_slot ps
+                JOIN candidate c ON c.id = ps.candidate_id
+                JOIN generation g ON g.id = c.generation_id
+                WHERE g.scene_id = ? LIMIT 1
+                """,
+                (scene_id,),
+            ).fetchone()
+            if referenced:
+                raise SceneDeleteConflictError(
+                    f"scene {scene_id} cannot be deleted while a panel uses one of its candidates"
+                ) from exc
+            raise
         except sqlite3.Error:
             self.conn.rollback()
             raise

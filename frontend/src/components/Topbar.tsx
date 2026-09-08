@@ -15,6 +15,8 @@ function pageLabel(pathname: string): string {
   if (pathname.startsWith('/scenes/') && pathname.endsWith('/preview')) return 'Scene preview'
   if (pathname.startsWith('/scenes/') && pathname.endsWith('/edit')) return 'Edit scene'
   if (pathname === '/scenes') return 'Scenes'
+  if (pathname === '/panels/new') return 'New Panel'
+  if (pathname.startsWith('/panels/') && pathname.endsWith('/edit')) return 'Edit Panel'
   if (pathname === '/panels') return 'Panels'
   if (pathname === '/characters/new') return 'New character'
   if (pathname.startsWith('/characters/') && pathname.endsWith('/edit')) return 'Edit character'

@@ -322,6 +322,87 @@ class GalleryItem(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Panels
+# ---------------------------------------------------------------------------
+
+
+class PanelCreate(BaseModel):
+    title: str
+    format: str
+    rows: int = Field(default=1, ge=1, le=8)
+    columns: int = Field(default=1, ge=1, le=8)
+    candidate_id: int | None = None
+
+
+class PanelSlotInput(BaseModel):
+    candidate_id: int | None
+    slot_index: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    focal_x: float = 0.5
+    focal_y: float = 0.5
+    zoom: float = 1.0
+
+
+class PanelUpdate(BaseModel):
+    expected_revision: int
+    title: str
+    format: str
+    background_color: str
+    gutter_px: int
+    frame_px: int
+    slots: list[PanelSlotInput]
+
+
+class PanelRenderCreate(BaseModel):
+    expected_revision: int
+
+
+class PanelSlot(BaseModel):
+    id: int
+    candidate_id: int | None
+    slot_index: int
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    focal_x: float
+    focal_y: float
+    zoom: float
+    content_url: str | None
+
+
+class PanelRender(BaseModel):
+    id: int
+    panel_id: int
+    panel_revision: int
+    width: int
+    height: int
+    layout: dict[str, object]
+    created_at: str
+    content_url: str
+    download_url: str
+
+
+class Panel(BaseModel):
+    id: int
+    title: str
+    format: str
+    width_px: int
+    height_px: int
+    background_color: str
+    gutter_px: int
+    frame_px: int
+    revision: int
+    created_at: str
+    updated_at: str
+    slots: list[PanelSlot]
+    latest_render: PanelRender | None
+
+
+# ---------------------------------------------------------------------------
 # Base Stages
 # ---------------------------------------------------------------------------
 

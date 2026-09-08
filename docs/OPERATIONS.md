@@ -11,7 +11,8 @@ LoreCraft3000 keeps its state in two places:
 
 - **The database** — a single SQLite file, `data/lorecraft.db` by default
   (override with `LORECRAFT_DB_PATH`). It holds characters, styles, reference
-  sets, scenes, generations, candidates, and image provenance rows.
+  sets, scenes, generations, candidates, Panels, panel renders, and image
+  provenance rows.
 - **The image store** — a content-addressed directory tree, `store/` by
   default (override with `LORECRAFT_STORE_ROOT`). It holds every image file and
   its JSON sidecar, named by the SHA-256 of the image bytes.

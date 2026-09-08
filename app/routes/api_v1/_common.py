@@ -46,6 +46,13 @@ from app.services.costs import (
     UnknownPriceError,
 )
 from app.services.generation import GenerationError, GenerationNotFoundError, PreviewChangedError
+from app.services.panels import (
+    PanelCandidateConflictError,
+    PanelError,
+    PanelNotFoundError,
+    PanelRenderNotFoundError,
+    PanelRevisionConflictError,
+)
 from app.services.ref_sets import (
     ImageRejectedError,
     InvalidRoleError,
@@ -55,7 +62,13 @@ from app.services.ref_sets import (
     RefSetNotFoundError,
     RefSetService,
 )
-from app.services.scenes import SceneError, SceneImmutableError, SceneNotFoundError, SceneService
+from app.services.scenes import (
+    SceneDeleteConflictError,
+    SceneError,
+    SceneImmutableError,
+    SceneNotFoundError,
+    SceneService,
+)
 from app.services.styles import (
     StyleArchivedError,
     StyleError,
@@ -104,11 +117,16 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (SceneNotFoundError, 404),
     (GenerationNotFoundError, 404),
     (CandidateNotFoundError, 404),
+    (PanelNotFoundError, 404),
+    (PanelRenderNotFoundError, 404),
     (SlugCollisionError, 409),
     (StyleNameCollisionError, 409),
     (StyleArchivedError, 409),
     (RefSetNotDraftError, 409),
     (SceneImmutableError, 409),
+    (SceneDeleteConflictError, 409),
+    (PanelRevisionConflictError, 409),
+    (PanelCandidateConflictError, 409),
     (GenerationPendingError, 409),
     (IdempotencyConflictError, 409),
     (SceneChangedError, 409),
@@ -132,6 +150,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (CandidateError, 422),
     (CostError, 422),
     (BaseStageError, 422),
+    (PanelError, 422),
 )
 
 

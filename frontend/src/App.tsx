@@ -12,7 +12,6 @@ import { OptionsProvider } from './api/OptionsProvider'
 import { AppShell } from './components/AppShell'
 import { Home } from './pages/Home'
 import { NotFoundPage } from './pages/NotFoundPage'
-import { PanelsStubPage } from './pages/PanelsStubPage'
 import { BaseStageListPage } from './pages/base-stages/BaseStageListPage'
 import { BaseStageNewPage } from './pages/base-stages/BaseStageNewPage'
 import { BaseStagePreviewPage } from './pages/base-stages/BaseStagePreviewPage'
@@ -21,6 +20,8 @@ import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
 import { GalleryPage } from './pages/gallery/GalleryPage'
+import { PanelEditorPage } from './pages/panels/PanelEditorPage'
+import { PanelListPage } from './pages/panels/PanelListPage'
 import { SceneFormPage } from './pages/scenes/SceneFormPage'
 import { SceneListPage } from './pages/scenes/SceneListPage'
 import { ScenePreviewPage } from './pages/scenes/ScenePreviewPage'
@@ -175,8 +176,19 @@ const appRoutes: RouteObject[] = [
           },
           {
             path: 'panels',
-            element: <PanelsStubPage />,
+            element: <PanelListPage />,
             handle: { title: 'Panels' } satisfies RouteHandle,
+          },
+          {
+            path: 'panels/new',
+            element: <PanelEditorPage />,
+            handle: { title: 'New Panel' } satisfies RouteHandle,
+          },
+          {
+            path: 'panels/:id/edit',
+            loader: requireRouteId,
+            element: <PanelEditorPage />,
+            handle: { title: 'Edit Panel' } satisfies RouteHandle,
           },
           {
             path: 'scenes',

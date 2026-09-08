@@ -20,6 +20,11 @@ import type {
   Generation,
   GenerationSummary,
   OptionsSummary,
+  Panel,
+  PanelCreate,
+  PanelRender,
+  PanelRenderCreate,
+  PanelUpdate,
   Scene,
   SceneInput,
   ScenePreview,
@@ -303,3 +308,20 @@ export const editCandidate = (id: number, instruction: string) => {
 // ---------------------------------------------------------------------------
 
 export const getGallery = () => request<GalleryItem[]>('/gallery')
+
+// ---------------------------------------------------------------------------
+// panels
+// ---------------------------------------------------------------------------
+
+export const listPanels = () => request<Panel[]>('/panels')
+export const createPanel = (payload: PanelCreate) =>
+  request<Panel>('/panels', json('POST', payload))
+export const getPanel = (id: number) => request<Panel>(`/panels/${id}`)
+export const updatePanel = (id: number, payload: PanelUpdate) =>
+  request<Panel>(`/panels/${id}`, json('PUT', payload))
+export const deletePanel = (id: number) =>
+  request<void>(`/panels/${id}`, { method: 'DELETE' })
+export const renderPanel = (id: number, payload: PanelRenderCreate) =>
+  request<PanelRender>(`/panels/${id}/render`, json('POST', payload))
+export const listPanelRenders = (panelId: number) =>
+  request<PanelRender[]>(`/panels/${panelId}/renders`)

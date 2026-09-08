@@ -77,6 +77,10 @@ export function GalleryPage() {
                   </p>
                 </div>
                 <div className="gallery-card__actions">
+                  <Link to={`/panels/new?candidate=${item.candidate_id}`} className="btn btn--primary">
+                    <Icon name="plus" size="sm" />
+                    Add to panel
+                  </Link>
                   <Link to={`/scenes/${item.scene_id}/preview`} className="btn">
                     <Icon name="chevronRight" size="sm" />
                     Open scene

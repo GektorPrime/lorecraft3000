@@ -1203,6 +1203,381 @@
         "title": "OptionsSummary",
         "type": "object"
       },
+      "Panel": {
+        "properties": {
+          "background_color": {
+            "title": "Background Color",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "frame_px": {
+            "title": "Frame Px",
+            "type": "integer"
+          },
+          "gutter_px": {
+            "title": "Gutter Px",
+            "type": "integer"
+          },
+          "height_px": {
+            "title": "Height Px",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "latest_render": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PanelRender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/PanelSlot"
+            },
+            "title": "Slots",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "width_px": {
+            "title": "Width Px",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "format",
+          "width_px",
+          "height_px",
+          "background_color",
+          "gutter_px",
+          "frame_px",
+          "revision",
+          "created_at",
+          "updated_at",
+          "slots",
+          "latest_render"
+        ],
+        "title": "Panel",
+        "type": "object"
+      },
+      "PanelCreate": {
+        "properties": {
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "columns": {
+            "default": 1,
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Columns",
+            "type": "integer"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "rows": {
+            "default": 1,
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Rows",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "format"
+        ],
+        "title": "PanelCreate",
+        "type": "object"
+      },
+      "PanelRender": {
+        "properties": {
+          "content_url": {
+            "title": "Content Url",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "layout": {
+            "additionalProperties": true,
+            "title": "Layout",
+            "type": "object"
+          },
+          "panel_id": {
+            "title": "Panel Id",
+            "type": "integer"
+          },
+          "panel_revision": {
+            "title": "Panel Revision",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "panel_id",
+          "panel_revision",
+          "width",
+          "height",
+          "layout",
+          "created_at",
+          "content_url",
+          "download_url"
+        ],
+        "title": "PanelRender",
+        "type": "object"
+      },
+      "PanelRenderCreate": {
+        "properties": {
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "PanelRenderCreate",
+        "type": "object"
+      },
+      "PanelSlot": {
+        "properties": {
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "content_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Url"
+          },
+          "focal_x": {
+            "title": "Focal X",
+            "type": "number"
+          },
+          "focal_y": {
+            "title": "Focal Y",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "slot_index": {
+            "title": "Slot Index",
+            "type": "integer"
+          },
+          "x0": {
+            "title": "X0",
+            "type": "number"
+          },
+          "x1": {
+            "title": "X1",
+            "type": "number"
+          },
+          "y0": {
+            "title": "Y0",
+            "type": "number"
+          },
+          "y1": {
+            "title": "Y1",
+            "type": "number"
+          },
+          "zoom": {
+            "title": "Zoom",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "candidate_id",
+          "slot_index",
+          "x0",
+          "y0",
+          "x1",
+          "y1",
+          "focal_x",
+          "focal_y",
+          "zoom",
+          "content_url"
+        ],
+        "title": "PanelSlot",
+        "type": "object"
+      },
+      "PanelSlotInput": {
+        "properties": {
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "focal_x": {
+            "default": 0.5,
+            "title": "Focal X",
+            "type": "number"
+          },
+          "focal_y": {
+            "default": 0.5,
+            "title": "Focal Y",
+            "type": "number"
+          },
+          "slot_index": {
+            "title": "Slot Index",
+            "type": "integer"
+          },
+          "x0": {
+            "title": "X0",
+            "type": "number"
+          },
+          "x1": {
+            "title": "X1",
+            "type": "number"
+          },
+          "y0": {
+            "title": "Y0",
+            "type": "number"
+          },
+          "y1": {
+            "title": "Y1",
+            "type": "number"
+          },
+          "zoom": {
+            "default": 1.0,
+            "title": "Zoom",
+            "type": "number"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "slot_index",
+          "x0",
+          "y0",
+          "x1",
+          "y1"
+        ],
+        "title": "PanelSlotInput",
+        "type": "object"
+      },
+      "PanelUpdate": {
+        "properties": {
+          "background_color": {
+            "title": "Background Color",
+            "type": "string"
+          },
+          "expected_revision": {
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "frame_px": {
+            "title": "Frame Px",
+            "type": "integer"
+          },
+          "gutter_px": {
+            "title": "Gutter Px",
+            "type": "integer"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/PanelSlotInput"
+            },
+            "title": "Slots",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "title",
+          "format",
+          "background_color",
+          "gutter_px",
+          "frame_px",
+          "slots"
+        ],
+        "title": "PanelUpdate",
+        "type": "object"
+      },
       "RefImage": {
         "properties": {
           "content_url": {
@@ -3281,6 +3656,382 @@
         "tags": [
           "api-v1",
           "api-v1-options"
+        ]
+      }
+    },
+    "/api/v1/panel-renders/{render_id}/content": {
+      "get": {
+        "operationId": "panel_render_content_api_v1_panel_renders__render_id__content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "title": "Render Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Panel Render Content",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panel-renders/{render_id}/download": {
+      "get": {
+        "operationId": "panel_render_download_api_v1_panel_renders__render_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "title": "Render Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Panel Render Download",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels": {
+      "get": {
+        "operationId": "list_panels_api_v1_panels_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Panel"
+                  },
+                  "title": "Response List Panels Api V1 Panels Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Panels",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      },
+      "post": {
+        "operationId": "create_panel_api_v1_panels_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}": {
+      "delete": {
+        "operationId": "delete_panel_api_v1_panels__panel_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      },
+      "get": {
+        "operationId": "get_panel_api_v1_panels__panel_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      },
+      "put": {
+        "operationId": "update_panel_api_v1_panels__panel_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Panel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}/render": {
+      "post": {
+        "operationId": "render_panel_api_v1_panels__panel_id__render_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelRenderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelRender"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Render Panel",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
+        ]
+      }
+    },
+    "/api/v1/panels/{panel_id}/renders": {
+      "get": {
+        "operationId": "list_panel_renders_api_v1_panels__panel_id__renders_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "panel_id",
+            "required": true,
+            "schema": {
+              "title": "Panel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PanelRender"
+                  },
+                  "title": "Response List Panel Renders Api V1 Panels  Panel Id  Renders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Panel Renders",
+        "tags": [
+          "api-v1",
+          "api-v1-panels"
         ]
       }
     },

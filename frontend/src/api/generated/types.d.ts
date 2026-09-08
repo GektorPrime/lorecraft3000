@@ -481,6 +481,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/panel-renders/{render_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Panel Render Content */
+        get: operations["panel_render_content_api_v1_panel_renders__render_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/panel-renders/{render_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Panel Render Download */
+        get: operations["panel_render_download_api_v1_panel_renders__render_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/panels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Panels */
+        get: operations["list_panels_api_v1_panels_get"];
+        put?: never;
+        /** Create Panel */
+        post: operations["create_panel_api_v1_panels_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/panels/{panel_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Panel */
+        get: operations["get_panel_api_v1_panels__panel_id__get"];
+        /** Update Panel */
+        put: operations["update_panel_api_v1_panels__panel_id__put"];
+        post?: never;
+        /** Delete Panel */
+        delete: operations["delete_panel_api_v1_panels__panel_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/panels/{panel_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Render Panel */
+        post: operations["render_panel_api_v1_panels__panel_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/panels/{panel_id}/renders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Panel Renders */
+        get: operations["list_panel_renders_api_v1_panels__panel_id__renders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ref-images/{image_id}/content": {
         parameters: {
             query?: never;
@@ -1242,6 +1347,153 @@ export interface components {
             scene_immutability_explanation: string;
             /** Spent Today Cents */
             spent_today_cents: number;
+        };
+        /** Panel */
+        Panel: {
+            /** Background Color */
+            background_color: string;
+            /** Created At */
+            created_at: string;
+            /** Format */
+            format: string;
+            /** Frame Px */
+            frame_px: number;
+            /** Gutter Px */
+            gutter_px: number;
+            /** Height Px */
+            height_px: number;
+            /** Id */
+            id: number;
+            latest_render: components["schemas"]["PanelRender"] | null;
+            /** Revision */
+            revision: number;
+            /** Slots */
+            slots: components["schemas"]["PanelSlot"][];
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+            /** Width Px */
+            width_px: number;
+        };
+        /** PanelCreate */
+        PanelCreate: {
+            /** Candidate Id */
+            candidate_id?: number | null;
+            /**
+             * Columns
+             * @default 1
+             */
+            columns: number;
+            /** Format */
+            format: string;
+            /**
+             * Rows
+             * @default 1
+             */
+            rows: number;
+            /** Title */
+            title: string;
+        };
+        /** PanelRender */
+        PanelRender: {
+            /** Content Url */
+            content_url: string;
+            /** Created At */
+            created_at: string;
+            /** Download Url */
+            download_url: string;
+            /** Height */
+            height: number;
+            /** Id */
+            id: number;
+            /** Layout */
+            layout: {
+                [key: string]: unknown;
+            };
+            /** Panel Id */
+            panel_id: number;
+            /** Panel Revision */
+            panel_revision: number;
+            /** Width */
+            width: number;
+        };
+        /** PanelRenderCreate */
+        PanelRenderCreate: {
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /** PanelSlot */
+        PanelSlot: {
+            /** Candidate Id */
+            candidate_id: number | null;
+            /** Content Url */
+            content_url: string | null;
+            /** Focal X */
+            focal_x: number;
+            /** Focal Y */
+            focal_y: number;
+            /** Id */
+            id: number;
+            /** Slot Index */
+            slot_index: number;
+            /** X0 */
+            x0: number;
+            /** X1 */
+            x1: number;
+            /** Y0 */
+            y0: number;
+            /** Y1 */
+            y1: number;
+            /** Zoom */
+            zoom: number;
+        };
+        /** PanelSlotInput */
+        PanelSlotInput: {
+            /** Candidate Id */
+            candidate_id: number | null;
+            /**
+             * Focal X
+             * @default 0.5
+             */
+            focal_x: number;
+            /**
+             * Focal Y
+             * @default 0.5
+             */
+            focal_y: number;
+            /** Slot Index */
+            slot_index: number;
+            /** X0 */
+            x0: number;
+            /** X1 */
+            x1: number;
+            /** Y0 */
+            y0: number;
+            /** Y1 */
+            y1: number;
+            /**
+             * Zoom
+             * @default 1
+             */
+            zoom: number;
+        };
+        /** PanelUpdate */
+        PanelUpdate: {
+            /** Background Color */
+            background_color: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /** Format */
+            format: string;
+            /** Frame Px */
+            frame_px: number;
+            /** Gutter Px */
+            gutter_px: number;
+            /** Slots */
+            slots: components["schemas"]["PanelSlotInput"][];
+            /** Title */
+            title: string;
         };
         /** RefImage */
         RefImage: {
@@ -2428,6 +2680,282 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OptionsSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    panel_render_content_api_v1_panel_renders__render_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    panel_render_download_api_v1_panel_renders__render_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_panels_api_v1_panels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Panel"][];
+                };
+            };
+        };
+    };
+    create_panel_api_v1_panels_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PanelCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Panel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_panel_api_v1_panels__panel_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                panel_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Panel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_panel_api_v1_panels__panel_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                panel_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PanelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Panel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_panel_api_v1_panels__panel_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                panel_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    render_panel_api_v1_panels__panel_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                panel_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PanelRenderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelRender"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_panel_renders_api_v1_panels__panel_id__renders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                panel_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelRender"][];
                 };
             };
             /** @description Validation Error */

@@ -19,6 +19,8 @@ recognizable across scenes. Visual styles are editable.
   [docs/OPERATIONS.md](docs/OPERATIONS.md) for the one-time model setup
 - Content-addressed images with complete generation provenance
 - Manual candidate review without automatically changing character canon
+- Panels assembled from accepted candidates with flexible rectangular layouts,
+  adjustable crops, frames, and gutters, and deterministic panel render PNG export
 - Typed `/api/v1` JSON API backing a separated React + Vite frontend
   (`frontend/`), which is the only UI
 
