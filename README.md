@@ -29,7 +29,7 @@ LoreCraft3000 is a local comic-generation studio: define your characters once, k
 Prerequisites:
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/)
-- Node.js 20+
+- Node.js 22.13+ (22.x) or 24+
 - npm
 - billed Gemini API key (and/or OpenAI API key).
 
