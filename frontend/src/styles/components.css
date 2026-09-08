@@ -696,11 +696,6 @@
   object-fit: cover;
 }
 
-.base-stage-card__badges {
-  display: flex;
-  gap: var(--space-2);
-}
-
 .scene-list-card__stage-link {
   text-decoration: none;
 }
