@@ -17,6 +17,7 @@ import type {
   Character,
   CharacterInput,
   GalleryItem,
+  GalleryPicture,
   Generation,
   GenerationSummary,
   OptionsSummary,
@@ -308,6 +309,12 @@ export const editCandidate = (id: number, instruction: string) => {
 // ---------------------------------------------------------------------------
 
 export const getGallery = () => request<GalleryItem[]>('/gallery')
+export const uploadGalleryPicture = (file: File, title: string) => {
+  const form = new FormData()
+  form.append('image', file)
+  form.append('title', title)
+  return request<GalleryPicture>('/gallery-pictures', { method: 'POST', body: form })
+}
 
 // ---------------------------------------------------------------------------
 // panels

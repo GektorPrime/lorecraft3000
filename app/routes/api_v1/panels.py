@@ -36,11 +36,17 @@ def _panel_out(panel) -> Panel:
         slots=[
             PanelSlot(
                 id=slot.id, candidate_id=slot.candidate_id,
+                gallery_picture_id=slot.gallery_picture_id,
                 slot_index=slot.slot_index, x0=slot.x0, y0=slot.y0,
                 x1=slot.x1, y1=slot.y1, focal_x=slot.focal_x,
                 focal_y=slot.focal_y, zoom=slot.zoom,
-                content_url=(f"/api/v1/candidates/{slot.candidate_id}/content"
-                             if slot.candidate_id is not None else None),
+                 content_url=(
+                     f"/api/v1/candidates/{slot.candidate_id}/content"
+                     if slot.candidate_id is not None
+                     else f"/api/v1/gallery-pictures/{slot.gallery_picture_id}/content"
+                     if slot.gallery_picture_id is not None
+                     else None
+                 ),
             ) for slot in panel.slots
         ],
         latest_render=_render_out(panel.latest_render) if panel.latest_render else None,
@@ -61,6 +67,7 @@ def create_panel(payload: PanelCreate, conn=Depends(get_conn)):
             rows=payload.rows,
             columns=payload.columns,
             candidate_id=payload.candidate_id,
+            gallery_picture_id=payload.gallery_picture_id,
         ))
     except PanelError as exc:
         _raise_for(exc)

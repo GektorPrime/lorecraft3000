@@ -37,7 +37,10 @@ class PanelRenderService:
         if existing:
             return PanelRender.from_row(existing)
 
-        if not panel.slots or any(slot.candidate_id is None for slot in panel.slots):
+        if not panel.slots or any(
+            slot.candidate_id is None and slot.gallery_picture_id is None
+            for slot in panel.slots
+        ):
             raise PanelIncompleteError("every panel slot must be filled before rendering")
 
         canvas = Image.new(
@@ -54,17 +57,20 @@ class PanelRenderService:
                 raise PanelValidationError(
                     f"frame and gutter leave panel slot {slot.slot_index} without a positive target"
                 )
-            candidate = self.conn.execute(
-                "SELECT sha256 FROM candidate WHERE id = ?", (slot.candidate_id,)
+            source_type = "candidate" if slot.candidate_id is not None else "upload"
+            source_id = slot.candidate_id or slot.gallery_picture_id
+            table = "candidate" if source_type == "candidate" else "gallery_picture"
+            source_row = self.conn.execute(
+                f"SELECT sha256 FROM {table} WHERE id = ?", (source_id,)
             ).fetchone()
-            if candidate is None:  # The panel slot FK should make this impossible.
-                raise ImageStorageError(f"candidate {slot.candidate_id} image is unavailable")
-            source_bytes, _ = self.storage.read(candidate["sha256"])
+            if source_row is None:  # The panel slot FKs should make this impossible.
+                raise ImageStorageError(f"{source_type} {source_id} image is unavailable")
+            source_bytes, _ = self.storage.read(source_row["sha256"])
             try:
                 with Image.open(io.BytesIO(source_bytes)) as opened:
-                    source = ImageOps.exif_transpose(opened).convert("RGB")
+                    source = ImageOps.exif_transpose(opened).convert("RGBA")
             except (UnidentifiedImageError, OSError, ValueError) as exc:
-                raise ImageStorageError(f"candidate {slot.candidate_id} is not decodable: {exc}") from exc
+                raise ImageStorageError(f"{source_type} {source_id} is not decodable: {exc}") from exc
             crop = self._crop_box(
                 source.width, source.height, target_width / target_height,
                 slot.focal_x, slot.focal_y, slot.zoom,
@@ -72,11 +78,13 @@ class PanelRenderService:
             rendered = source.crop(crop).resize(
                 (target_width, target_height), Image.Resampling.LANCZOS
             )
-            canvas.paste(rendered, (target[0], target[1]))
+            canvas.paste(rendered, (target[0], target[1]), rendered)
             snapshot_slots.append(
                 {
                     "slot_index": slot.slot_index,
                     "candidate_id": slot.candidate_id,
+                    "gallery_picture_id": slot.gallery_picture_id,
+                    "source_type": source_type,
                     "x0": slot.x0,
                     "y0": slot.y0,
                     "x1": slot.x1,

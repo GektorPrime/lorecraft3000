@@ -14,8 +14,9 @@ vi.mock('../../api/client', async () => ({
 vi.mock('../../hooks/useUnsavedChanges', () => ({ useUnsavedChanges: () => ({ allowNavigation: vi.fn(), confirmationProps: { open: false } }) }))
 
 const ITEMS: GalleryItem[] = [
-  { candidate_id: 11, content_url: '/11.png', scene_id: 1, beat_text: 'One', aspect_ratio: '3:2', created_at: '2026-09-01T00:00:00Z' },
-  { candidate_id: 12, content_url: '/12.png', scene_id: 2, beat_text: 'Two', aspect_ratio: '3:2', created_at: '2026-09-01T00:00:00Z' },
+  { source_type: 'candidate', source_id: 11, candidate_id: 11, gallery_picture_id: null, content_url: '/11.png', scene_id: 1, description: 'One', aspect_ratio: '3:2', created_at: '2026-09-01T00:00:00Z' },
+  { source_type: 'candidate', source_id: 12, candidate_id: 12, gallery_picture_id: null, content_url: '/12.png', scene_id: 2, description: 'Two', aspect_ratio: '3:2', created_at: '2026-09-01T00:00:00Z' },
+  { source_type: 'upload', source_id: 11, candidate_id: null, gallery_picture_id: 11, content_url: '/upload-11.png', scene_id: null, description: 'Cover art', aspect_ratio: '2:3', created_at: '2026-09-01T00:00:00Z' },
 ]
 const slots = createGrid(1, 2).map((slot, index) => ({ ...slot, id: index + 1 }))
 const PANEL: Panel = {
@@ -52,6 +53,16 @@ describe('PanelEditorPage', () => {
     }))
   })
 
+  it('creates a panel with an uploaded picture from Gallery handoff', async () => {
+    vi.mocked(client.createPanel).mockResolvedValue(PANEL)
+    renderAt('/panels/new?picture=11')
+    expect(screen.getByText('Uploaded picture #11 will be placed in the first slot.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Create and compose' }))
+    await waitFor(() => expect(client.createPanel).toHaveBeenCalledWith({
+      title: 'Untitled panel', format: 'portrait', rows: 1, columns: 1, gallery_picture_id: 11,
+    }))
+  })
+
   it('supports arrow-key focus and keyboard grid selection', async () => {
     vi.mocked(client.createPanel).mockResolvedValue(PANEL)
     renderAt('/panels/new')
@@ -68,19 +79,19 @@ describe('PanelEditorPage', () => {
     vi.mocked(client.getGallery).mockResolvedValue(ITEMS)
     vi.mocked(client.updatePanel).mockImplementation(async (_id, payload) => ({
       ...PANEL, ...payload, revision: 4,
-      slots: payload.slots.map((slot, index) => ({ ...slot, id: index + 1, content_url: slot.candidate_id === null ? null : `/${slot.candidate_id}.png` })),
+       slots: payload.slots.map((slot, index) => ({ ...slot, candidate_id: slot.candidate_id ?? null, gallery_picture_id: slot.gallery_picture_id ?? null, id: index + 1, content_url: slot.candidate_id != null ? `/${slot.candidate_id}.png` : slot.gallery_picture_id != null ? `/upload-${slot.gallery_picture_id}.png` : null })),
     }))
     vi.mocked(client.renderPanel).mockResolvedValue(RENDER)
     renderAt('/panels/5/edit')
     expect(await screen.findByLabelText('Panel canvas')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Render / export' })).toBeDisabled()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Assign image 11 to selected slot' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Assign image 12 to selected slot' }))
-    expect(screen.getByRole('button', { name: 'Slot 1, image 12' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Assign candidate 11 from scene 1 to selected slot' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Assign candidate 12 from scene 2 to selected slot' }))
+    expect(screen.getByRole('button', { name: 'Slot 1, candidate 12' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Slot 2, empty' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Slot 2, empty' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Assign image 12 to selected slot' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Assign candidate 12 from scene 2 to selected slot' }))
     expect(screen.getAllByText('Used · assign again')).toHaveLength(1)
     expect(screen.getByText(/2 of 2 slots filled/)).toBeInTheDocument()
 
@@ -93,12 +104,34 @@ describe('PanelEditorPage', () => {
     await waitFor(() => expect(client.updatePanel).toHaveBeenCalledWith(5, expect.objectContaining({
       expected_revision: 3, gutter_px: 30, frame_px: 24, background_color: '#20242B',
       slots: [
-        expect.objectContaining({ candidate_id: 12, slot_index: 0, x0: 0, x1: 0.6 }),
-        expect.objectContaining({ candidate_id: 12, slot_index: 1, x0: 0.6, x1: 1 }),
+        expect.objectContaining({ candidate_id: 12, gallery_picture_id: null, slot_index: 0, x0: 0, x1: 0.6 }),
+        expect.objectContaining({ candidate_id: 12, gallery_picture_id: null, slot_index: 1, x0: 0.6, x1: 1 }),
       ],
     })))
     await userEvent.click(screen.getByRole('button', { name: 'Render / export' }))
     await waitFor(() => expect(client.renderPanel).toHaveBeenCalledWith(5, { expected_revision: 4 }))
+  })
+
+  it('assigns an uploaded picture, treats colliding IDs separately, and becomes render-ready', async () => {
+    vi.mocked(client.getPanel).mockResolvedValue(PANEL)
+    vi.mocked(client.getGallery).mockResolvedValue(ITEMS)
+    vi.mocked(client.updatePanel).mockImplementation(async (_id, payload) => ({ ...PANEL, ...payload, revision: 4, slots: payload.slots.map((slot, index) => ({ ...slot, candidate_id: slot.candidate_id ?? null, gallery_picture_id: slot.gallery_picture_id ?? null, id: index + 1, content_url: slot.gallery_picture_id ? `/upload-${slot.gallery_picture_id}.png` : `/${slot.candidate_id}.png` })) }))
+    renderAt('/panels/5/edit')
+    await screen.findByLabelText('Panel canvas')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Assign uploaded picture 11: Cover art to selected slot' }))
+    expect(screen.getByRole('button', { name: 'Slot 1, uploaded picture 11' })).toBeInTheDocument()
+    expect(screen.getAllByText('Used · assign again')).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Slot 2, empty' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Assign candidate 11 from scene 1 to selected slot' }))
+    expect(screen.getByText(/2 of 2 slots filled/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Save panel' }))
+
+    await waitFor(() => expect(client.updatePanel).toHaveBeenCalledWith(5, expect.objectContaining({ slots: [
+      expect.objectContaining({ candidate_id: null, gallery_picture_id: 11 }),
+      expect.objectContaining({ candidate_id: 11, gallery_picture_id: null }),
+    ] })))
+    expect(screen.getByRole('button', { name: 'Render / export' })).toBeEnabled()
   })
 
   it('exposes split, merge, add row and add column controls', async () => {
@@ -140,8 +173,8 @@ describe('PanelEditorPage', () => {
     expect(mergeRight).toBeEnabled()
     await userEvent.click(mergeRight)
 
-    expect(screen.getByRole('button', { name: 'Slot 1, image 11' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Slot 2, image 12' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Slot 1, candidate 11' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Slot 2, candidate 12' })).not.toBeInTheDocument()
   })
 
   it('offers an actionable reload for revision conflicts', async () => {

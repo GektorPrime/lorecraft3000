@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type K
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, createPanel, getGallery, getPanel, renderPanel, updatePanel } from '../../api/client'
 import type { GalleryItem, Panel, PanelRender, PanelSlotInput, PanelUpdate } from '../../api/types'
-import { PANEL_FORMATS, addColumn, addRow, cropImageBox, getEdgeRange, mergeSlot, moveEdge, splitSlot, type MergeDirection, type SlotEdge, type SplitDirection } from '../../panels/layout'
+import { PANEL_FORMATS, addColumn, addRow, cropImageBox, getEdgeRange, mergeSlot, moveEdge, sourceKey, splitSlot, type MergeDirection, type SlotEdge, type SplitDirection } from '../../panels/layout'
 import { AsyncMessage } from '../../components/AsyncMessage'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ImageWithFallback } from '../../components/ImageWithFallback'
@@ -13,7 +13,11 @@ import { RouteIdGuard } from '../../routing/routeId'
 import { usePageTitle } from '../../routing/usePageTitle'
 import { NotFoundPage } from '../NotFoundPage'
 
-interface EditorSlot extends PanelSlotInput { content_url: string | null }
+interface EditorSlot extends Omit<PanelSlotInput, 'candidate_id' | 'gallery_picture_id'> {
+  candidate_id: number | null
+  gallery_picture_id: number | null
+  content_url: string | null
+}
 interface EditorValues extends Omit<PanelUpdate, 'expected_revision' | 'slots'> { slots: EditorSlot[] }
 
 const SWATCHES = ['#FFFFFF', '#F4EBDD', '#D9E7F0', '#20242B', '#16120F', '#000000'] as const
@@ -34,6 +38,12 @@ const errorMessage = (error: unknown) => error instanceof ApiError ? error.messa
 const snapshot = (values: EditorValues) => JSON.stringify(values)
 const positiveId = (value: string | null) => value && /^[1-9]\d*$/.test(value) ? Number(value) : null
 const gridLabel = (rows: number, columns: number) => `${columns} column${columns === 1 ? '' : 's'} × ${rows} row${rows === 1 ? '' : 's'}`
+const galleryItemLabel = (item: GalleryItem) => item.source_type === 'candidate'
+  ? `candidate ${item.candidate_id} from scene ${item.scene_id}`
+  : `uploaded picture ${item.gallery_picture_id}: ${item.description}`
+const slotSourceLabel = (slot: EditorSlot) => slot.candidate_id != null
+  ? `candidate ${slot.candidate_id}`
+  : slot.gallery_picture_id != null ? `uploaded picture ${slot.gallery_picture_id}` : null
 
 function hydrate(panel: Panel): EditorValues {
   return {
@@ -42,7 +52,7 @@ function hydrate(panel: Panel): EditorValues {
     background_color: panel.background_color,
     gutter_px: panel.gutter_px,
     frame_px: panel.frame_px,
-    slots: panel.slots.map(({ candidate_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom, content_url }) => ({ candidate_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom, content_url })),
+    slots: panel.slots.map(({ candidate_id, gallery_picture_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom, content_url }) => ({ candidate_id, gallery_picture_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom, content_url })),
   }
 }
 
@@ -98,6 +108,7 @@ function NewPanelSetup() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const candidateId = positiveId(params.get('candidate'))
+  const pictureId = candidateId === null ? positiveId(params.get('picture')) : null
   const [title, setTitle] = useState('Untitled panel')
   const [format, setFormat] = useState('portrait')
   const [rows, setRows] = useState(1)
@@ -112,7 +123,7 @@ function NewPanelSetup() {
     setSubmitting(true)
     setError(null)
     try {
-      const panel = await createPanel({ title, format, rows, columns, ...(candidateId === null ? {} : { candidate_id: candidateId }) })
+      const panel = await createPanel({ title, format, rows, columns, ...(candidateId !== null ? { candidate_id: candidateId } : pictureId !== null ? { gallery_picture_id: pictureId } : {}) })
       allowNavigation()
       navigate(`/panels/${panel.id}/edit`, { replace: true })
     } catch (reason) {
@@ -129,7 +140,8 @@ function NewPanelSetup() {
         <div className="field"><label htmlFor="panel-title">Title</label><input id="panel-title" type="text" required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} /></div>
         <div className="field"><label htmlFor="panel-format">Format</label><select id="panel-format" value={format} onChange={(event) => setFormat(event.target.value)}>{PANEL_FORMATS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></div>
         <GridPicker rows={rows} columns={columns} onSelect={(nextRows, nextColumns) => { setRows(nextRows); setColumns(nextColumns) }} />
-        {candidateId && <p className="field__hint">Gallery image #{candidateId} will be placed in the first slot.</p>}
+        {candidateId && <p className="field__hint">Generated candidate #{candidateId} will be placed in the first slot.</p>}
+        {pictureId && <p className="field__hint">Uploaded picture #{pictureId} will be placed in the first slot.</p>}
       </fieldset>
       <div className="form-actions"><button className="btn btn--primary" disabled={submitting} type="submit">{submitting ? 'Creating…' : 'Create and compose'}</button><Link className="btn" to="/panels">Cancel</Link></div>
     </form>
@@ -152,13 +164,13 @@ function PanelEditor({ panelId }: { panelId: number }) {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [galleryQuery, setGalleryQuery] = useState('')
   const [canvasZoom, setCanvasZoom] = useState(1)
-  const [naturalSizes, setNaturalSizes] = useState<Record<number, { w: number; h: number }>>({})
+  const [naturalSizes, setNaturalSizes] = useState<Record<string, { w: number; h: number }>>({})
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; focalX: number; focalY: number; xPerPx: number; yPerPx: number } | null>(null)
   const mounted = useRef(true)
   const dirty = values !== null && baseline !== null && snapshot(values) !== baseline
   const { confirmationProps } = useUnsavedChanges(dirty)
   const selectedSlotValue = values?.slots[selectedSlot]
-  const filled = values?.slots.filter((slot) => slot.candidate_id !== null).length ?? 0
+  const filled = values?.slots.filter((slot) => sourceKey(slot) !== null).length ?? 0
   const complete = values !== null && values.slots.length > 0 && filled === values.slots.length
   const currentRender = render?.panel_revision === revision ? render : null
   usePageTitle(values ? `Edit ${values.title}` : 'Edit Panel')
@@ -186,8 +198,9 @@ function PanelEditor({ panelId }: { panelId: number }) {
 
   const patchSlot = (patch: Partial<EditorSlot>) => setValues((current) => current && ({ ...current, slots: current.slots.map((slot, index) => index === selectedSlot ? { ...slot, ...patch } : slot) }))
   const beginSlotDrag = (event: ReactPointerEvent<HTMLImageElement>, slot: EditorSlot, targetAspect: number) => {
-    if (event.button !== 0 || slot.candidate_id === null) return
-    const natural = naturalSizes[slot.candidate_id]
+    const key = sourceKey(slot)
+    if (event.button !== 0 || key === null) return
+    const natural = naturalSizes[key]
     if (!natural || natural.w <= 0 || natural.h <= 0) return
     const rect = event.currentTarget.parentElement?.getBoundingClientRect()
     if (!rect || rect.width <= 0 || rect.height <= 0) return
@@ -217,7 +230,7 @@ function PanelEditor({ panelId }: { panelId: number }) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     dragRef.current = null
   }
-  const assign = (item: GalleryItem) => patchSlot({ candidate_id: item.candidate_id, content_url: item.content_url, focal_x: 0.5, focal_y: 0.5, zoom: 1 })
+  const assign = (item: GalleryItem) => patchSlot({ candidate_id: item.candidate_id, gallery_picture_id: item.gallery_picture_id, content_url: item.content_url, focal_x: 0.5, focal_y: 0.5, zoom: 1 })
   const replaceSlots = (next: readonly EditorSlot[]) => setValues((current) => current ? { ...current, slots: [...next] } : current)
   const split = (direction: SplitDirection) => {
     if (!values) return
@@ -239,7 +252,7 @@ function PanelEditor({ panelId }: { panelId: number }) {
     setError(null)
     setConflict(false)
     try {
-      const slots: PanelSlotInput[] = values.slots.map(({ candidate_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom }) => ({ candidate_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom }))
+      const slots: PanelSlotInput[] = values.slots.map(({ candidate_id, gallery_picture_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom }) => ({ candidate_id, gallery_picture_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom }))
       const panel = await updatePanel(panelId, { ...values, slots, expected_revision: revision })
       if (!mounted.current) return
       const hydrated = hydrate(panel)
@@ -312,7 +325,7 @@ function PanelEditor({ panelId }: { panelId: number }) {
           <button className="btn btn--sm" type="button" aria-label="Zoom in" disabled={canvasZoom >= 5} onClick={() => setCanvasZoom((value) => Math.min(5, Math.round((value + 0.25) * 100) / 100))}>+</button>
           <button className="btn btn--sm" type="button" disabled={canvasZoom === 1} onClick={() => setCanvasZoom(1)}>{Math.round(canvasZoom * 100)}%</button>
         </div>
-        {(() => { const active = selectedSlotValue?.candidate_id != null; const slotZoom = active ? selectedSlotValue.zoom : 1; return (
+        {(() => { const active = selectedSlotValue ? sourceKey(selectedSlotValue) !== null : false; const slotZoom = active && selectedSlotValue ? selectedSlotValue.zoom : 1; return (
         <div className="panel-editor__zoom">
           <span className="field__hint">Slot zoom</span>
           <button className="btn btn--sm" type="button" aria-label="Slot zoom out" disabled={!active || slotZoom <= 1} onClick={() => patchSlot({ zoom: Math.max(1, Math.round((slotZoom - 0.05) * 100) / 100) })}>−</button>
@@ -332,14 +345,16 @@ function PanelEditor({ panelId }: { panelId: number }) {
               const style = { left: `calc(${slot.x0 * 100}% + ${xBefore / contentWidth * 100}%)`, top: `calc(${slot.y0 * 100}% + ${yBefore / contentHeight * 100}%)`, width: `calc(${(slot.x1 - slot.x0) * 100}% - ${(xBefore + xAfter) / contentWidth * 100}%)`, height: `calc(${(slot.y1 - slot.y0) * 100}% - ${(yBefore + yAfter) / contentHeight * 100}%)` } as CSSProperties
               const targetWidth = (slot.x1 - slot.x0) * contentWidth - (xBefore + xAfter)
               const targetHeight = (slot.y1 - slot.y0) * contentHeight - (yBefore + yAfter)
-              const natural = slot.candidate_id !== null ? naturalSizes[slot.candidate_id] : undefined
-              const imageStyle = slot.candidate_id !== null
+              const key = sourceKey(slot)
+              const natural = key !== null ? naturalSizes[key] : undefined
+              const imageStyle = key !== null
                 ? (natural && targetWidth > 0 && targetHeight > 0
                   ? (() => { const box = cropImageBox(natural.w, natural.h, targetWidth / targetHeight, slot.focal_x, slot.focal_y, slot.zoom); return { position: 'absolute', width: `${box.widthPct}%`, height: `${box.heightPct}%`, left: `${box.leftPct}%`, top: `${box.topPct}%`, maxWidth: 'none', objectFit: 'fill' } as CSSProperties })()
                   : { objectPosition: `${slot.focal_x * 100}% ${slot.focal_y * 100}%`, transformOrigin: `${slot.focal_x * 100}% ${slot.focal_y * 100}%`, transform: `scale(${slot.zoom})` } as CSSProperties)
                 : undefined
               const draggable = index === selectedSlot && natural && targetWidth > 0 && targetHeight > 0
-              return <button key={slot.slot_index} type="button" className={`panel-slot${index === selectedSlot ? ' panel-slot--selected' : ''}${draggable ? ' panel-slot--draggable' : ''}`} style={style} aria-label={`Slot ${index + 1}${slot.candidate_id !== null ? `, image ${slot.candidate_id}` : ', empty'}`} aria-pressed={index === selectedSlot} onClick={() => setSelectedSlot(index)}>{slot.candidate_id !== null && slot.content_url ? <><ImageWithFallback src={slot.content_url} alt="" style={imageStyle} onLoad={(event) => { const image = event.currentTarget; const id = slot.candidate_id; if (id !== null && image.naturalWidth > 0) setNaturalSizes((current) => current[id]?.w === image.naturalWidth && current[id]?.h === image.naturalHeight ? current : { ...current, [id]: { w: image.naturalWidth, h: image.naturalHeight } }) }} {...(draggable ? { onPointerDown: (event: ReactPointerEvent<HTMLImageElement>) => beginSlotDrag(event, slot, targetWidth / targetHeight), onPointerMove: moveSlotDrag, onPointerUp: endSlotDrag, onPointerCancel: endSlotDrag } : {})} /><span className="panel-slot__remove" role="button" tabIndex={0} aria-label={`Remove image from slot ${index + 1}`} title="Remove from slot" onClick={(event) => { event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, content_url: null } : item) })) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, content_url: null } : item) })) } }}><Icon name="trash" size="sm" /></span></> : <span>{index + 1}</span>}</button>
+              const sourceLabel = slotSourceLabel(slot)
+              return <button key={slot.slot_index} type="button" className={`panel-slot${index === selectedSlot ? ' panel-slot--selected' : ''}${draggable ? ' panel-slot--draggable' : ''}`} style={style} aria-label={`Slot ${index + 1}${sourceLabel ? `, ${sourceLabel}` : ', empty'}`} aria-pressed={index === selectedSlot} onClick={() => setSelectedSlot(index)}>{key !== null && slot.content_url ? <><ImageWithFallback src={slot.content_url} alt="" style={imageStyle} onLoad={(event) => { const image = event.currentTarget; if (key !== null && image.naturalWidth > 0) setNaturalSizes((current) => current[key]?.w === image.naturalWidth && current[key]?.h === image.naturalHeight ? current : { ...current, [key]: { w: image.naturalWidth, h: image.naturalHeight } }) }} {...(draggable ? { onPointerDown: (event: ReactPointerEvent<HTMLImageElement>) => beginSlotDrag(event, slot, targetWidth / targetHeight), onPointerMove: moveSlotDrag, onPointerUp: endSlotDrag, onPointerCancel: endSlotDrag } : {})} /><span className="panel-slot__remove" role="button" tabIndex={0} aria-label={`Remove image from slot ${index + 1}`} title="Remove from slot" onClick={(event) => { event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, gallery_picture_id: null, content_url: null } : item) })) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSelectedSlot(index); setValues((current) => current && ({ ...current, slots: current.slots.map((item) => item.slot_index === slot.slot_index ? { ...item, candidate_id: null, gallery_picture_id: null, content_url: null } : item) })) } }}><Icon name="trash" size="sm" /></span></> : <span>{index + 1}</span>}</button>
             })}
           </div>
         </div>
@@ -347,11 +362,11 @@ function PanelEditor({ panelId }: { panelId: number }) {
         <p className="panel-editor__status" role="status">{filled} of {values.slots.length} slots filled{dirty ? ' · Unsaved changes' : ' · Saved'}</p>
         <div className="panel-editor__actions"><button className="btn btn--primary" type="button" disabled={!dirty || saving || !values.title.trim() || !/^#[0-9A-F]{6}$/.test(values.background_color)} onClick={() => void save()}>{saving ? 'Saving…' : 'Save panel'}</button><button className="btn" type="button" disabled={!complete || dirty || rendering} onClick={() => void exportPanel()}>{rendering ? 'Rendering…' : 'Render / export'}</button>{currentRender && <><a className="btn" href={currentRender.content_url} target="_blank" rel="noreferrer">Preview</a><a className="btn" href={currentRender.download_url}>Download</a></>}</div>
       </div>
-      <aside className="panel-source-picker card" aria-label="Accepted image picker">
-        <div className="panel-source-picker__header"><h2>Accepted images</h2><span>{gallery.length}</span></div>
-        {gallery.length === 0 ? <p className="field__hint">No accepted images. <Link to="/gallery">Open Gallery</Link> to review scenes.</p> : <>
-          <div className="field"><label htmlFor="gallery-filter">Filter images</label><input id="gallery-filter" type="text" placeholder="Scene or description" value={galleryQuery} onChange={(event) => setGalleryQuery(event.target.value)} /></div>
-          <div className="panel-source-picker__grid">{gallery.filter((item) => `${item.scene_id} ${item.beat_text}`.toLowerCase().includes(galleryQuery.trim().toLowerCase())).map((item) => <button key={item.candidate_id} type="button" aria-label={`Assign image ${item.candidate_id} to selected slot`} title={item.beat_text} onClick={() => assign(item)}><ImageWithFallback src={item.content_url} alt="" /><span>{values.slots.some((slot) => slot.candidate_id === item.candidate_id) ? 'Used · assign again' : `Scene ${item.scene_id}`}</span></button>)}</div>
+      <aside className="panel-source-picker card" aria-label="Gallery picture picker">
+        <div className="panel-source-picker__header"><h2>Gallery pictures</h2><span>{gallery.length}</span></div>
+        {gallery.length === 0 ? <p className="field__hint">No gallery pictures. <Link to="/gallery/upload">Upload a picture</Link> or review a scene candidate.</p> : <>
+          <div className="field"><label htmlFor="gallery-filter">Filter pictures</label><input id="gallery-filter" type="text" placeholder="Title, description, or scene" value={galleryQuery} onChange={(event) => setGalleryQuery(event.target.value)} /></div>
+          <div className="panel-source-picker__grid">{gallery.filter((item) => `${item.source_type} ${item.source_id} ${item.scene_id ?? ''} ${item.description}`.toLowerCase().includes(galleryQuery.trim().toLowerCase())).map((item) => { const itemKey = sourceKey(item); const used = values.slots.some((slot) => sourceKey(slot) === itemKey); return <button key={itemKey} type="button" aria-label={`Assign ${galleryItemLabel(item)} to selected slot`} title={item.description} onClick={() => assign(item)}><ImageWithFallback src={item.content_url} alt="" /><span>{used ? 'Used · assign again' : item.source_type === 'candidate' ? `Scene ${item.scene_id}` : 'Uploaded'}</span></button> })}</div>
         </>}
       </aside>
     </div>

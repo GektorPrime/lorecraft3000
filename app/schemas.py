@@ -15,7 +15,9 @@ every DTO here:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, Field, StrictInt
 
 # ---------------------------------------------------------------------------
 # shared / options
@@ -313,12 +315,31 @@ class GenerationSummary(BaseModel):
 
 
 class GalleryItem(BaseModel):
-    candidate_id: int
+    source_type: Literal["candidate", "upload"]
+    source_id: int
+    candidate_id: int | None
+    gallery_picture_id: int | None
     content_url: str
-    scene_id: int
-    beat_text: str
+    scene_id: int | None
+    description: str
+    beat_text: str | None = None
     aspect_ratio: str
     created_at: str
+
+
+class ImageDimensions(BaseModel):
+    width: int
+    height: int
+
+
+class GalleryPicture(BaseModel):
+    id: int
+    title: str
+    original_filename: str | None
+    dimensions: ImageDimensions
+    created_at: str
+    archived_at: str | None
+    content_url: str
 
 
 # ---------------------------------------------------------------------------
@@ -331,11 +352,13 @@ class PanelCreate(BaseModel):
     format: str
     rows: int = Field(default=1, ge=1, le=8)
     columns: int = Field(default=1, ge=1, le=8)
-    candidate_id: int | None = None
+    candidate_id: StrictInt | None = None
+    gallery_picture_id: StrictInt | None = None
 
 
 class PanelSlotInput(BaseModel):
-    candidate_id: int | None
+    candidate_id: StrictInt | None = None
+    gallery_picture_id: StrictInt | None = None
     slot_index: int
     x0: float
     y0: float
@@ -363,6 +386,7 @@ class PanelRenderCreate(BaseModel):
 class PanelSlot(BaseModel):
     id: int
     candidate_id: int | None
+    gallery_picture_id: int | None
     slot_index: int
     x0: float
     y0: float
@@ -411,11 +435,6 @@ class BaseStageTarget(BaseModel):
     id: int
     position: int
     description: str
-
-
-class ImageDimensions(BaseModel):
-    width: int
-    height: int
 
 
 class BaseStage(BaseModel):

@@ -37,6 +37,10 @@ class PanelCandidateConflictError(PanelError):
     pass
 
 
+class PanelGalleryPictureConflictError(PanelError):
+    pass
+
+
 class PanelIncompleteError(PanelError):
     pass
 
@@ -82,6 +86,7 @@ class PanelService:
         rows: int = 1,
         columns: int = 1,
         candidate_id: int | None = None,
+        gallery_picture_id: int | None = None,
     ) -> Panel:
         title = self._title(title)
         width, height = self._format(format)
@@ -90,15 +95,13 @@ class PanelService:
             raise PanelValidationError("panel rows and columns must be integers from 1 to 8")
         if rows * columns > 64:
             raise PanelValidationError("a panel may have at most 64 slots")
-        if candidate_id is not None and (
-            isinstance(candidate_id, bool)
-            or not isinstance(candidate_id, int)
-            or candidate_id < 1
-        ):
-            raise PanelValidationError("candidate id must be null or a positive integer")
+        self._validate_source_ids(candidate_id, gallery_picture_id)
         slots = [
             {
                 "candidate_id": candidate_id if row == 0 and column == 0 else None,
+                "gallery_picture_id": (
+                    gallery_picture_id if row == 0 and column == 0 else None
+                ),
                 "slot_index": row * columns + column,
                 "x0": column / columns,
                 "y0": row / rows,
@@ -113,16 +116,17 @@ class PanelService:
         ]
         self.conn.execute("BEGIN IMMEDIATE")
         try:
-            self._validate_candidates(slots, set())
+            self._validate_sources(slots, set(), set())
             cursor = self.conn.execute(
                 "INSERT INTO panel (title, format, width_px, height_px) VALUES (?, ?, ?, ?)",
                 (title, format, width, height),
             )
             self.conn.executemany(
                 "INSERT INTO panel_slot "
-                "(panel_id, candidate_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [(cursor.lastrowid, slot["candidate_id"], slot["slot_index"],
+                "(panel_id, candidate_id, gallery_picture_id, slot_index, "
+                "x0, y0, x1, y1, focal_x, focal_y, zoom) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(cursor.lastrowid, slot["candidate_id"], slot["gallery_picture_id"], slot["slot_index"],
                   slot["x0"], slot["y0"], slot["x1"], slot["y1"],
                   slot["focal_x"], slot["focal_y"], slot["zoom"]) for slot in slots],
             )
@@ -163,7 +167,13 @@ class PanelService:
                     "WHERE panel_id = ? AND candidate_id IS NOT NULL", (panel_id,)
                 )
             }
-            self._validate_candidates(slots, retained)
+            retained_gallery_pictures = {
+                row["gallery_picture_id"] for row in self.conn.execute(
+                    "SELECT gallery_picture_id FROM panel_slot "
+                    "WHERE panel_id = ? AND gallery_picture_id IS NOT NULL", (panel_id,)
+                )
+            }
+            self._validate_sources(slots, retained, retained_gallery_pictures)
             cursor = self.conn.execute(
                 """
                 UPDATE panel SET title=?, format=?, width_px=?, height_px=?,
@@ -179,9 +189,10 @@ class PanelService:
             self.conn.execute("DELETE FROM panel_slot WHERE panel_id = ?", (panel_id,))
             self.conn.executemany(
                 "INSERT INTO panel_slot "
-                "(panel_id, candidate_id, slot_index, x0, y0, x1, y1, focal_x, focal_y, zoom) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [(panel_id, slot["candidate_id"], slot["slot_index"],
+                "(panel_id, candidate_id, gallery_picture_id, slot_index, "
+                "x0, y0, x1, y1, focal_x, focal_y, zoom) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(panel_id, slot["candidate_id"], slot.get("gallery_picture_id"), slot["slot_index"],
                   slot["x0"], slot["y0"], slot["x1"], slot["y1"],
                   slot["focal_x"], slot["focal_y"], slot["zoom"])
                  for slot in slots],
@@ -236,12 +247,14 @@ class PanelService:
         rectangles: list[tuple[float, float, float, float]] = []
         for panel_slot in panel_slots:
             try:
-                slot, candidate = panel_slot["slot_index"], panel_slot["candidate_id"]
+                slot = panel_slot["slot_index"]
+                candidate = panel_slot.get("candidate_id")
+                gallery_picture = panel_slot.get("gallery_picture_id")
                 x0, y0, x1, y1 = (panel_slot[key] for key in ("x0", "y0", "x1", "y1"))
                 focal_x, focal_y, zoom = panel_slot["focal_x"], panel_slot["focal_y"], panel_slot["zoom"]
             except (KeyError, TypeError) as exc:
                 raise PanelValidationError(
-                    "every panel slot requires candidate, index, geometry, focal point, and zoom"
+                    "every panel slot requires source, index, geometry, focal point, and zoom"
                 ) from exc
             if isinstance(slot, bool) or not isinstance(slot, int):
                 raise PanelValidationError("panel slot indexes must be integers")
@@ -249,6 +262,7 @@ class PanelService:
                 isinstance(candidate, bool) or not isinstance(candidate, int) or candidate < 1
             ):
                 raise PanelValidationError("candidate id must be null or a positive integer")
+            self._validate_source_ids(candidate, gallery_picture)
             numbers = (x0, y0, x1, y1, focal_x, focal_y, zoom)
             if any(isinstance(value, bool) or not isinstance(value, (int, float))
                    or not math.isfinite(value) for value in numbers):
@@ -339,3 +353,43 @@ class PanelService:
                 )
             if row["review_status"] != "accepted":
                 raise PanelCandidateConflictError(f"candidate {candidate_id} must be accepted first")
+
+    def _validate_sources(
+        self,
+        panel_slots: list[dict],
+        retained_candidates: set[int],
+        retained_gallery_pictures: set[int],
+    ) -> None:
+        self._validate_candidates(panel_slots, retained_candidates)
+        picture_ids = {
+            slot.get("gallery_picture_id")
+            for slot in panel_slots
+            if slot.get("gallery_picture_id") is not None
+        }
+        for picture_id in picture_ids - retained_gallery_pictures:
+            row = self.conn.execute(
+                "SELECT archived_at FROM gallery_picture WHERE id = ?", (picture_id,)
+            ).fetchone()
+            if row is None:
+                raise PanelValidationError(f"gallery picture {picture_id} not found")
+            if row["archived_at"] is not None:
+                raise PanelGalleryPictureConflictError(
+                    f"gallery picture {picture_id} is archived and cannot be assigned"
+                )
+
+    @staticmethod
+    def _validate_source_ids(
+        candidate_id: int | None, gallery_picture_id: int | None
+    ) -> None:
+        for label, value in (
+            ("candidate", candidate_id),
+            ("gallery picture", gallery_picture_id),
+        ):
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 1
+            ):
+                raise PanelValidationError(
+                    f"{label} id must be null or a positive integer"
+                )
+        if candidate_id is not None and gallery_picture_id is not None:
+            raise PanelValidationError("a panel slot may have at most one image source")

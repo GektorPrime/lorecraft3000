@@ -5,7 +5,7 @@ describe('panel layout', () => {
   it('creates normalized row-major grids', () => {
     const slots = createGrid(2, 3)
     expect(slots).toHaveLength(6)
-    expect(slots[0]).toMatchObject({ slot_index: 0, x0: 0, y0: 0, x1: 1 / 3, y1: 0.5, candidate_id: null })
+    expect(slots[0]).toMatchObject({ slot_index: 0, x0: 0, y0: 0, x1: 1 / 3, y1: 0.5, candidate_id: null, gallery_picture_id: null })
     expect(slots[5]).toMatchObject({ slot_index: 5, x0: 2 / 3, y0: 0.5, x1: 1, y1: 1 })
   })
 
@@ -32,6 +32,16 @@ describe('panel layout', () => {
     ]
     expect(mergeSlot(both, 0, 'right')).toEqual([
       expect.objectContaining({ candidate_id: 7, content_url: '/7.png', focal_x: 0.25, focal_y: 0.75, zoom: 2, x0: 0, x1: 1 }),
+    ])
+  })
+
+  it('preserves uploaded picture identity through split and merge', () => {
+    const original = [{ ...createGrid(1, 1)[0], gallery_picture_id: 42, content_url: '/uploads/42.png' }]
+    const split = splitSlot(original, 0, 'vertical')
+    expect(split[0]).toMatchObject({ candidate_id: null, gallery_picture_id: 42 })
+    expect(split[1]).toMatchObject({ candidate_id: null, gallery_picture_id: null })
+    expect(mergeSlot(split, 1, 'left')).toEqual([
+      expect.objectContaining({ candidate_id: null, gallery_picture_id: 42, content_url: '/uploads/42.png' }),
     ])
   })
 

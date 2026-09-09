@@ -447,6 +447,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery-pictures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Gallery Picture */
+        post: operations["upload_gallery_picture_api_v1_gallery_pictures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gallery-pictures/{picture_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Gallery Picture */
+        delete: operations["archive_gallery_picture_api_v1_gallery_pictures__picture_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gallery-pictures/{picture_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gallery Picture Content */
+        get: operations["gallery_picture_content_api_v1_gallery_pictures__picture_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gallery-pictures/{picture_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Gallery Picture */
+        post: operations["restore_gallery_picture_api_v1_gallery_pictures__picture_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/generations/{generation_id}": {
         parameters: {
             query?: never;
@@ -1073,6 +1141,13 @@ export interface components {
             /** Targets */
             targets: string;
         };
+        /** Body_upload_gallery_picture_api_v1_gallery_pictures_post */
+        Body_upload_gallery_picture_api_v1_gallery_pictures_post: {
+            /** Image */
+            image: string;
+            /** Title */
+            title: string;
+        };
         /** Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post */
         Body_upload_ref_image_api_v1_ref_sets__ref_set_id__images_post: {
             /** Image */
@@ -1208,15 +1283,42 @@ export interface components {
             /** Aspect Ratio */
             aspect_ratio: string;
             /** Beat Text */
-            beat_text: string;
+            beat_text?: string | null;
             /** Candidate Id */
-            candidate_id: number;
+            candidate_id: number | null;
             /** Content Url */
             content_url: string;
             /** Created At */
             created_at: string;
+            /** Description */
+            description: string;
+            /** Gallery Picture Id */
+            gallery_picture_id: number | null;
             /** Scene Id */
-            scene_id: number;
+            scene_id: number | null;
+            /** Source Id */
+            source_id: number;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "candidate" | "upload";
+        };
+        /** GalleryPicture */
+        GalleryPicture: {
+            /** Archived At */
+            archived_at: string | null;
+            /** Content Url */
+            content_url: string;
+            /** Created At */
+            created_at: string;
+            dimensions: components["schemas"]["ImageDimensions"];
+            /** Id */
+            id: number;
+            /** Original Filename */
+            original_filename: string | null;
+            /** Title */
+            title: string;
         };
         /** Generation */
         Generation: {
@@ -1387,6 +1489,8 @@ export interface components {
             columns: number;
             /** Format */
             format: string;
+            /** Gallery Picture Id */
+            gallery_picture_id?: number | null;
             /**
              * Rows
              * @default 1
@@ -1433,6 +1537,8 @@ export interface components {
             focal_x: number;
             /** Focal Y */
             focal_y: number;
+            /** Gallery Picture Id */
+            gallery_picture_id: number | null;
             /** Id */
             id: number;
             /** Slot Index */
@@ -1451,7 +1557,7 @@ export interface components {
         /** PanelSlotInput */
         PanelSlotInput: {
             /** Candidate Id */
-            candidate_id: number | null;
+            candidate_id?: number | null;
             /**
              * Focal X
              * @default 0.5
@@ -1462,6 +1568,8 @@ export interface components {
              * @default 0.5
              */
             focal_y: number;
+            /** Gallery Picture Id */
+            gallery_picture_id?: number | null;
             /** Slot Index */
             slot_index: number;
             /** X0 */
@@ -2627,6 +2735,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GalleryItem"][];
+                };
+            };
+        };
+    };
+    upload_gallery_picture_api_v1_gallery_pictures_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_gallery_picture_api_v1_gallery_pictures_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryPicture"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_gallery_picture_api_v1_gallery_pictures__picture_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                picture_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gallery_picture_content_api_v1_gallery_pictures__picture_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                picture_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_gallery_picture_api_v1_gallery_pictures__picture_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                picture_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryPicture"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -5,6 +5,7 @@ export type SlotEdge = 'left' | 'right' | 'top' | 'bottom'
 
 export interface LayoutSlot {
   candidate_id: number | null
+  gallery_picture_id: number | null
   slot_index: number
   x0: number
   y0: number
@@ -29,6 +30,7 @@ const equal = (a: number, b: number) => Math.abs(a - b) < EPSILON
 
 const emptySlot = (slot_index: number, x0: number, y0: number, x1: number, y1: number): LayoutSlot => ({
   candidate_id: null,
+  gallery_picture_id: null,
   slot_index,
   x0,
   y0,
@@ -39,6 +41,12 @@ const emptySlot = (slot_index: number, x0: number, y0: number, x1: number, y1: n
   zoom: 1,
   content_url: null,
 })
+
+export function sourceKey(source: Pick<LayoutSlot, 'candidate_id' | 'gallery_picture_id'>): string | null {
+  if (source.candidate_id != null) return `candidate:${source.candidate_id}`
+  if (source.gallery_picture_id != null) return `upload:${source.gallery_picture_id}`
+  return null
+}
 
 const normalize = <T extends LayoutSlot>(slots: readonly T[]): T[] =>
   slots.map((slot, slot_index) => ({ ...slot, slot_index }))
@@ -125,10 +133,11 @@ export function mergeSlot<T extends LayoutSlot>(slots: readonly T[], index: numb
   if (!selected || matches.length !== 1) return slots
   const neighborIndex = matches[0]
   const neighbor = slots[neighborIndex]
-  const content = selected.candidate_id !== null ? selected : neighbor
+  const content = sourceKey(selected) !== null ? selected : neighbor
   const merged = {
     ...selected,
     candidate_id: content.candidate_id,
+    gallery_picture_id: content.gallery_picture_id,
     content_url: content.content_url,
     focal_x: content.focal_x,
     focal_y: content.focal_y,
