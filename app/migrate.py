@@ -34,6 +34,7 @@ MIGRATIONS: list[str] = [
     "app.migrations.018_character_reference_roles",
     "app.migrations.019_multiview_face_embeddings",
     "app.migrations.020_panels",
+    "app.migrations.021_gallery_pictures",
 ]
 
 

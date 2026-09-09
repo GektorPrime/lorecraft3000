@@ -50,9 +50,12 @@ function scene(id: number, editable = false): Scene {
 
 function galleryItem(id: number): GalleryItem {
   return {
+    source_type: 'candidate',
+    source_id: id,
     candidate_id: id,
+    gallery_picture_id: null,
     scene_id: id,
-    beat_text: `Accepted beat ${id}`,
+    description: `Accepted beat ${id}`,
     aspect_ratio: '3:2',
     content_url: `/api/v1/content/${id}`,
     created_at: `2026-01-${String(id).padStart(2, '0')}T00:00:00Z`,
@@ -235,8 +238,8 @@ describe('Dashboard', () => {
       'href',
       '#/scenes/new',
     )
-    expect(screen.getByRole('heading', { name: 'No accepted images yet' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Review scenes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No gallery pictures yet' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Upload picture' })).toBeInTheDocument()
   })
 
   it('keeps healthy sections visible when one dashboard request fails', async () => {

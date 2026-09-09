@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, generateScene, getCharacter, listCharacters, uploadBaseStage } from './client'
+import { ApiError, generateScene, getCharacter, listCharacters, uploadBaseStage, uploadGalleryPicture } from './client'
 
 const originalFetch = globalThis.fetch
 
@@ -112,6 +112,21 @@ describe('api client', () => {
     expect(form.get('image')).toBe(file)
     expect(form.get('description')).toBe('Rainy station platform')
     expect(form.get('targets')).toBe('["woman by the clock","porter"]')
+    expect(new Headers(init?.headers).has('Content-Type')).toBe(false)
+  })
+
+  it('uploads gallery pictures with image and title multipart fields', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse({ id: 18 }, 201))
+    const file = new File(['image'], 'cover.png', { type: 'image/png' })
+
+    await uploadGalleryPicture(file, 'Issue one cover')
+
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0]
+    expect(url).toBe('/api/v1/gallery-pictures')
+    expect(init?.method).toBe('POST')
+    const form = init?.body as FormData
+    expect(form.get('image')).toBe(file)
+    expect(form.get('title')).toBe('Issue one cover')
     expect(new Headers(init?.headers).has('Content-Type')).toBe(false)
   })
 })

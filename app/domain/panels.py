@@ -11,6 +11,7 @@ class PanelSlot:
     id: int
     panel_id: int
     candidate_id: int | None
+    gallery_picture_id: int | None
     slot_index: int
     x0: float
     y0: float

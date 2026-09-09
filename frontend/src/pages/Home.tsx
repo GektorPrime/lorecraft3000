@@ -12,6 +12,10 @@ import { PageHeader } from '../components/PageHeader'
 const RECENT_SCENE_COUNT = 3
 const RECENT_OUTPUT_COUNT = 6
 
+const galleryLabel = (item: GalleryItem) => item.source_type === 'candidate'
+  ? `Accepted image from scene ${item.scene_id}`
+  : `Uploaded picture: ${item.description}`
+
 function message(error: unknown): string {
   return error instanceof ApiError || error instanceof Error ? error.message : String(error)
 }
@@ -267,7 +271,7 @@ export function Home() {
         <div className="dashboard-section__heading">
           <div>
             <h2 id="recent-output-title">Recent output</h2>
-            <p>Your latest accepted images.</p>
+            <p>Your latest generated and uploaded pictures.</p>
           </div>
           <Link to="/gallery" className="dashboard-section__link">
             Open gallery <Icon name="chevronRight" size="sm" />
@@ -279,9 +283,9 @@ export function Home() {
         {recentOutput && recentOutput.length === 0 && (
           <EmptyState
             icon="gallery"
-            title="No accepted images yet"
-            description="Accepted generation candidates will collect here automatically."
-            action={<Link to="/scenes">Review scenes</Link>}
+            title="No gallery pictures yet"
+            description="Upload a picture or accept a generation candidate to see it here."
+            action={<Link to="/gallery/upload">Upload picture</Link>}
             compact
           />
         )}
@@ -289,15 +293,17 @@ export function Home() {
           <div className="dashboard-output">
             {recentOutput.map((item, index) => {
               const previewItem = recentOutput[previewIndex ?? index]
+              const label = galleryLabel(item)
+              const previewLabel = galleryLabel(previewItem)
               return (
-                <article key={item.candidate_id} className="card card--flush dashboard-output__item">
+                <article key={`${item.source_type}:${item.source_id}`} className="card card--flush dashboard-output__item">
                   <ImageDialog
                     src={item.content_url}
                     previewSrc={previewItem.content_url}
-                    thumbnailAlt={`Accepted image from scene ${item.scene_id}`}
-                    previewAlt={`Accepted image from scene ${previewItem.scene_id}, full-size preview`}
-                    triggerLabel={`Preview accepted image from scene ${item.scene_id}`}
-                    dialogLabel={`Accepted image from scene ${previewItem.scene_id}, larger preview`}
+                    thumbnailAlt={label}
+                    previewAlt={`${previewLabel}, full-size preview`}
+                    triggerLabel={`Preview ${label.toLowerCase()}`}
+                    dialogLabel={`${previewLabel}, larger preview`}
                     onPrevious={() =>
                       setPreviewIndex(
                         (current) => ((current ?? index) - 1 + recentOutput.length) % recentOutput.length,
@@ -308,9 +314,9 @@ export function Home() {
                     }
                     onOpenChange={(open) => setPreviewIndex(open ? index : null)}
                   />
-                  <Link to={`/scenes/${item.scene_id}/preview`}>
-                    Scene #{item.scene_id}
-                  </Link>
+                  {item.source_type === 'candidate'
+                    ? <Link to={`/scenes/${item.scene_id}/preview`}>Scene #{item.scene_id}</Link>
+                    : <Link to="/gallery">{item.description}</Link>}
                 </article>
               )
             })}

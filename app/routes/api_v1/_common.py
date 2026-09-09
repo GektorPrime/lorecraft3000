@@ -46,8 +46,13 @@ from app.services.costs import (
     UnknownPriceError,
 )
 from app.services.generation import GenerationError, GenerationNotFoundError, PreviewChangedError
+from app.services.gallery import (
+    GalleryPictureError,
+    GalleryPictureNotFoundError,
+)
 from app.services.panels import (
     PanelCandidateConflictError,
+    PanelGalleryPictureConflictError,
     PanelError,
     PanelNotFoundError,
     PanelRenderNotFoundError,
@@ -117,6 +122,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (SceneNotFoundError, 404),
     (GenerationNotFoundError, 404),
     (CandidateNotFoundError, 404),
+    (GalleryPictureNotFoundError, 404),
     (PanelNotFoundError, 404),
     (PanelRenderNotFoundError, 404),
     (SlugCollisionError, 409),
@@ -127,6 +133,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (SceneDeleteConflictError, 409),
     (PanelRevisionConflictError, 409),
     (PanelCandidateConflictError, 409),
+    (PanelGalleryPictureConflictError, 409),
     (GenerationPendingError, 409),
     (IdempotencyConflictError, 409),
     (SceneChangedError, 409),
@@ -148,6 +155,7 @@ _ERROR_STATUS: tuple[tuple[type[Exception], int], ...] = (
     (SceneError, 422),
     (GenerationError, 422),
     (CandidateError, 422),
+    (GalleryPictureError, 422),
     (CostError, 422),
     (BaseStageError, 422),
     (PanelError, 422),

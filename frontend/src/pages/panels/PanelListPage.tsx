@@ -57,7 +57,7 @@ export function PanelListPage() {
     <section aria-busy={panels === null && !error || busyId !== null || undefined}>
       <PageHeader
         title="Panels"
-        description="Arrange accepted images into finished, export-ready panels."
+        description="Arrange Gallery pictures into finished, export-ready panels."
         actions={<Link className="btn btn--primary" to="/panels/new"><Icon name="plus" size="sm" />New panel</Link>}
       />
       {error && <div className="content-stack"><AsyncMessage kind="error">{error}</AsyncMessage><div><button className="btn" type="button" onClick={() => void reload()}>Retry</button></div></div>}
@@ -66,13 +66,13 @@ export function PanelListPage() {
         <EmptyState
           icon="panels"
           title="No panels yet"
-          description="Choose accepted images from the Gallery, then arrange them into a panel."
+          description="Choose pictures from the Gallery, then arrange them into a panel."
           action={<div className="btn-row"><Link className="btn" to="/gallery">Open Gallery</Link><Link className="btn btn--primary" to="/panels/new">New panel</Link></div>}
         />
       )}
       {panels && panels.length > 0 && <div className="panel-grid">
         {panels.map((panel) => {
-          const filled = panel.slots.filter((slot) => slot.candidate_id !== null).length
+          const filled = panel.slots.filter((slot) => slot.candidate_id != null || slot.gallery_picture_id != null).length
           return <article className="card card--flush panel-card" key={panel.id}>
             <div className={`panel-card__media panel-card__media--${panel.format}`}>
               {panel.latest_render

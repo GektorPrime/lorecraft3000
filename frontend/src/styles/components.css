@@ -1822,6 +1822,11 @@
   font-size: var(--text-sm);
 }
 
+.gallery-card__topline {
+  display: flex;
+  margin-bottom: var(--space-2);
+}
+
 .gallery-card__summary {
   margin: 0 0 var(--space-2);
   color: var(--text-heading);
@@ -1843,6 +1848,12 @@
 .gallery-card__actions .btn {
   width: 100%;
   justify-content: center;
+}
+
+@media (max-width: 420px) {
+  .gallery-card__actions {
+    flex-direction: column;
+  }
 }
 
 /* ------------------------------------------------------------------------ */

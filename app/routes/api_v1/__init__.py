@@ -23,6 +23,7 @@ from app.routes.api_v1 import (
     base_stages,
     characters,
     generations,
+    gallery,
     options,
     panels,
     scenes,
@@ -39,4 +40,5 @@ router.include_router(styles.router)
 router.include_router(ref_sets.router)
 router.include_router(scenes.router)
 router.include_router(generations.router)
+router.include_router(gallery.router)
 router.include_router(panels.router)

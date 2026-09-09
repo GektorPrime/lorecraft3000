@@ -20,6 +20,7 @@ import { CharacterDetailPage } from './pages/characters/CharacterDetailPage'
 import { CharacterFormPage } from './pages/characters/CharacterFormPage'
 import { CharacterListPage } from './pages/characters/CharacterListPage'
 import { GalleryPage } from './pages/gallery/GalleryPage'
+import { GalleryUploadPage } from './pages/gallery/GalleryUploadPage'
 import { PanelEditorPage } from './pages/panels/PanelEditorPage'
 import { PanelListPage } from './pages/panels/PanelListPage'
 import { SceneFormPage } from './pages/scenes/SceneFormPage'
@@ -173,6 +174,11 @@ const appRoutes: RouteObject[] = [
             path: 'gallery',
             element: <GalleryPage />,
             handle: { title: 'Gallery' } satisfies RouteHandle,
+          },
+          {
+            path: 'gallery/upload',
+            element: <GalleryUploadPage />,
+            handle: { title: 'Upload Gallery Picture' } satisfies RouteHandle,
           },
           {
             path: 'panels',

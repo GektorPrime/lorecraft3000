@@ -12,20 +12,30 @@ vi.mock('../../api/client', async () => {
 })
 
 const ACCEPTED: GalleryItem = {
+  source_type: 'candidate',
+  source_id: 900,
   candidate_id: 900,
+  gallery_picture_id: null,
   content_url: '/api/v1/candidates/900/content',
   scene_id: 3,
-  beat_text: 'Mara backs toward the door.',
+  description: 'Mara backs toward the door.',
   aspect_ratio: '3:2',
   created_at: '2026-09-02T00:00:00Z',
 }
 
 const SECOND_ACCEPTED: GalleryItem = {
   ...ACCEPTED,
+  source_id: 901,
   candidate_id: 901,
   content_url: '/api/v1/candidates/901/content',
   scene_id: 4,
-  beat_text: 'Elias reaches for the lantern.',
+  description: 'Elias reaches for the lantern.',
+}
+
+const UPLOAD: GalleryItem = {
+  source_type: 'upload', source_id: 44, candidate_id: null, gallery_picture_id: 44,
+  content_url: '/api/v1/gallery/pictures/44/content', scene_id: null,
+  description: 'Painted issue cover', aspect_ratio: '2:3', created_at: '2026-09-03T00:00:00Z',
 }
 
 describe('GalleryPage', () => {
@@ -53,6 +63,7 @@ describe('GalleryPage', () => {
 
     await waitFor(() => expect(screen.getByText('Mara backs toward the door.')).toBeInTheDocument())
     expect(screen.getByRole('heading', { name: 'Gallery' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Upload picture' })).toHaveAttribute('href', '/gallery/upload')
     expect(
       screen.getByLabelText('Preview accepted image from scene 3'),
     ).toBeInTheDocument()
@@ -70,7 +81,18 @@ describe('GalleryPage', () => {
     vi.mocked(client.getGallery).mockResolvedValue([])
     renderGallery()
 
-    expect(await screen.findByText('No accepted images yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No gallery pictures yet.')).toBeInTheDocument()
+  })
+
+  it('renders uploaded pictures with upload metadata and direct panel handoff', async () => {
+    vi.mocked(client.getGallery).mockResolvedValue([UPLOAD])
+    renderGallery()
+
+    expect(await screen.findByRole('img', { name: 'Uploaded picture: Painted issue cover' })).toBeInTheDocument()
+    expect(screen.getByText('Uploaded')).toBeInTheDocument()
+    expect(screen.getByText(/Picture #44/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Add to panel' })).toHaveAttribute('href', '/panels/new?picture=44')
+    expect(screen.queryByRole('link', { name: 'Open scene' })).not.toBeInTheDocument()
   })
 
   it('cycles through full-size images with arrow keys while the dialog stays open', async () => {

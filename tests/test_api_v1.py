@@ -1273,7 +1273,10 @@ def test_gallery_lists_only_accepted_candidates(api):
     assert item["content_url"] == f"/api/v1/candidates/{candidate['id']}/content"
     assert item["scene_id"] == scene["id"]
     assert item["aspect_ratio"]
-    assert item["beat_text"].strip()
+    assert item["source_type"] == "candidate"
+    assert item["source_id"] == candidate["id"]
+    assert item["gallery_picture_id"] is None
+    assert item["description"].strip()
 
 
 def test_generation_not_found_is_404(api):
