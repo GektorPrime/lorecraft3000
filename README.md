@@ -1,6 +1,7 @@
 # LoreCraft3000
 
 LoreCraft3000 is a local comic-generation studio: define your characters once, keep them recognizable across every scene, shape the visual style to taste, and assemble the results into multi-panel pages.
+e.g. https://www.instagram.com/theoldfellowship/
 
 ## Features
 
